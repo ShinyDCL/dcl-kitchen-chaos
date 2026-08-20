@@ -18,4 +18,4 @@ export const CIRCLE_THICKNESS = 0.02 // thin "disc" — no native ring/torus pri
 // to reliably catch the avatar. Do not resize this.
 export const TRIGGER_HEIGHT = 2
 
-export const TRANSITION_DURATION = 1 // seconds for the color countdown
+export const TRANSITION_DURATION = 0.5 // seconds for the color countdown
