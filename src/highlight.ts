@@ -4,7 +4,7 @@
 // by construction.
 
 import { engine, Entity, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
-import { Color4, Vector3 } from '@dcl/sdk/math'
+import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { HIGHLIGHT_DEPTH, HIGHLIGHT_THICKNESS, HIGHLIGHT_WIDTH } from './constants'
 
@@ -33,10 +33,12 @@ function getOrCreateHighlight(): Entity {
   return highlight
 }
 
-/** Moves the shared highlight to sit on top of the given world position and shows it. */
-export function showHighlightAt(worldPosition: Vector3): void {
+/** Moves the shared highlight to sit on top of the given world position and shows it, matching the given rotation. */
+export function showHighlightAt(worldPosition: Vector3, rotation: Quaternion): void {
   const highlight = getOrCreateHighlight()
-  Transform.getMutable(highlight).position = worldPosition
+  const transform = Transform.getMutable(highlight)
+  transform.position = worldPosition
+  transform.rotation = rotation
   VisibilityComponent.getMutable(highlight).visible = true
 }
 

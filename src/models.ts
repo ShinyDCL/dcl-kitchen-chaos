@@ -1,6 +1,7 @@
 export const MODELS = {
   // Fixtures
   counter: 'assets/scene/models/Counter.glb',
+  stove: 'assets/scene/models/Stove.glb',
 
   // Pickup items (attached to player's hand)
   cucumberSlice: 'assets/scene/models/CucumberSlice.glb',

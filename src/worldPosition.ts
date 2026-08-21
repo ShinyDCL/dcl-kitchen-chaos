@@ -2,13 +2,13 @@
 // for world-space checks (distance, highlight placement) once entities are
 // nested under an offset parent — like counters under the scene root here.
 // This walks the parent chain and sums local positions to get world position.
+// getWorldRotation does the equivalent for rotation, composing local
+// rotations up the chain via quaternion multiplication.
 //
-// Assumes no rotation or non-uniform scale on any ancestor. All parents in
-// this scene only carry a position offset, so a positional sum is enough;
-// if that ever changes, this needs a real matrix composition instead.
+// Assumes no non-uniform scale on any ancestor.
 
 import { Entity, Transform } from '@dcl/sdk/ecs'
-import { Vector3 } from '@dcl/sdk/math'
+import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 export function getWorldPosition(entity: Entity): Vector3 {
   const transform = Transform.getOrNull(entity)
@@ -18,4 +18,12 @@ export function getWorldPosition(entity: Entity): Vector3 {
   // so treating a falsy parent as "no offset to add" is correct, not a bug.
   const parentWorldPosition = transform.parent ? getWorldPosition(transform.parent) : Vector3.Zero()
   return Vector3.add(transform.position, parentWorldPosition)
+}
+
+export function getWorldRotation(entity: Entity): Quaternion {
+  const transform = Transform.getOrNull(entity)
+  if (!transform) return Quaternion.Identity()
+
+  const parentWorldRotation = transform.parent ? getWorldRotation(transform.parent) : Quaternion.Identity()
+  return Quaternion.multiply(parentWorldRotation, transform.rotation)
 }
