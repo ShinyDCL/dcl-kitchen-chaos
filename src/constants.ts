@@ -8,14 +8,16 @@ export const COUNTER_WIDTH = 1.4
 export const COUNTER_DEPTH = 1.1
 export const COUNTER_HEIGHT = 1
 
-// Horizontal distance between counter centers when laid out in a line.
-export const COUNTER_SPACING = 2.5
+// How close the player needs to be for a counter to become the focused one.
+export const INTERACTION_RANGE = 2.5 // meters
 
-export const CIRCLE_DIAMETER = 1 // meters
-export const CIRCLE_THICKNESS = 0.02 // thin "disc" — no native ring/torus primitive
+// Visual highlight shown on top of the currently focused counter.
+export const HIGHLIGHT_WIDTH = COUNTER_WIDTH //* 1.05
+export const HIGHLIGHT_DEPTH = COUNTER_DEPTH // * 1.05
+export const HIGHLIGHT_THICKNESS = 0.02
 
-// Trigger volume: same footprint as COUNTER_WIDTH on both axes, tall enough
-// to reliably catch the avatar. Do not resize this.
-export const TRIGGER_HEIGHT = 2
-
-export const TRANSITION_DURATION = 0.5 // seconds for the color countdown
+// Minimum dot product between the player's forward vector and the direction
+// to a counter for that counter to count as "faced". ~0.1 ≈ a wide ±84°
+// cone — only rules out counters roughly behind the player, doesn't
+// require anything close to precise aim.
+export const FACING_THRESHOLD = 0.1

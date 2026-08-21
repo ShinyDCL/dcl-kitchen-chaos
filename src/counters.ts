@@ -1,11 +1,8 @@
-// Lays out three counters in a row, each with its own Display model and a
-// countdown trigger that attaches the matching slice to the player's hand.
-
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
-import { createColorChangingCircleTrigger } from './circleTrigger'
-import { COUNTER_DEPTH, COUNTER_HEIGHT, COUNTER_WIDTH } from './constants'
+import { COUNTER_HEIGHT, COUNTER_WIDTH } from './constants'
+import { registerFocusableCounter } from './focusManager'
 import { attachItemToPlayerHand } from './heldItem'
 import { MODELS } from './models'
 
@@ -48,9 +45,16 @@ function createCounter(position: Vector3, parent: Entity, definition: CounterDef
   })
   GltfContainer.create(display, { src: definition.displayModel })
 
-  const triggerPosition = Vector3.create(0, 0, COUNTER_DEPTH / 2 + COUNTER_WIDTH / 2)
+  // Anchor entity marking where the focus highlight should appear — its world
+  // position is resolved via the parent chain, so it stays correct no
+  // matter where `counter` (or its parent scene) ends up in the world.
+  const focusAnchor = engine.addEntity()
+  Transform.create(focusAnchor, {
+    position: Vector3.create(0, COUNTER_HEIGHT, 0),
+    parent: counter
+  })
 
-  createColorChangingCircleTrigger(triggerPosition, counter, () => {
+  registerFocusableCounter(focusAnchor, () => {
     attachItemToPlayerHand(definition.sliceModel)
   })
 }
