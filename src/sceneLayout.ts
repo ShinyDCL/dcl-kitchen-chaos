@@ -31,6 +31,7 @@ import {
 } from './ingredientCounters'
 import { MODELS } from './models'
 import { placeHeldItemOnCounter } from './preparationCounters'
+import { handleStoveInteract } from './stoveCooking'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
@@ -83,8 +84,7 @@ function createFrontRow(parent: Entity): void {
       rotation,
       parent,
       height: kind === 'stove' ? STOVE_HEIGHT : COUNTER_HEIGHT,
-      // Stoves stay highlight-only (no onInteract) until their behavior is implemented.
-      onInteract: kind === 'counter' ? placeHeldItemOnCounter : undefined
+      onInteract: kind === 'counter' ? placeHeldItemOnCounter : handleStoveInteract
     })
 
     cursorX += width

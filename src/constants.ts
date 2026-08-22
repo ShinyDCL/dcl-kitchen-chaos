@@ -1,3 +1,5 @@
+import { Color4, Vector3 } from '@dcl/sdk/math'
+
 export const GRID_SIZE = 1 // square grid (rows = columns)
 export const PARCEL_SIZE = 16 // parcel size in meters
 export const SCENE_SIZE = GRID_SIZE * PARCEL_SIZE // scene size in meters
@@ -44,3 +46,19 @@ export const HIGHLIGHT_THICKNESS = 0.02
 // cone — only rules out fixtures roughly behind the player, doesn't
 // require anything close to precise aim.
 export const FACING_THRESHOLD = 0.1
+
+// --- Stove cooking ---
+
+// Local offset (relative to the stove fixture) where the raw/cooked item
+// model is placed while cooking — tune this so it sits on top of the pan
+// model rather than the stove's base.
+export const STOVE_ITEM_OFFSET = Vector3.create(0.25, STOVE_HEIGHT + 0.05, 0.25)
+
+// Progress bar shown above a stove while cooking.
+export const PROGRESS_BAR_WIDTH = 0.6
+export const PROGRESS_BAR_HEIGHT = 0.1
+export const PROGRESS_BAR_THICKNESS = 0.02
+export const PROGRESS_BAR_Y_OFFSET = STOVE_HEIGHT + 0.6 // floats above the cooking item
+export const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
+export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
+export const CHECKMARK_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
