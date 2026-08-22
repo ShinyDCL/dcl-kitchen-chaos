@@ -1,28 +1,27 @@
 // Stove cooking: interacting with a stove while holding a cookable item
 // (see cookableItems.ts) starts a timed cook. A raw model appears on the
-// stove and a progress bar above it fills in as time passes; when done,
-// the model swaps to its cooked version and a checkmark appears. A second
+// stove, a progress bar above it fills in as time passes, and a smoke
+// particle emitter runs for the duration. When done, the model swaps to
+// its cooked version, the checkmark appears, and smoke stops. A second
 // interact while done picks up the cooked item and resets the stove.
 // Interacting with a non-cookable item in hand, or while a cook is already
 // in progress, does nothing.
 //
-// Visibility is controlled on just two entities — root (background + fill)
-// and checkmarkAnchor (the two checkmark legs) — using VisibilityComponent's
-// propagateToChildren so their child meshes don't need their own
-// VisibilityComponent. checkmarkAnchor has its own component so it can be
-// toggled independently of root (checkmark hidden while cooking, shown only
-// once done), since a child's own VisibilityComponent overrides whatever
-// its parent propagates.
+// Visibility for the progress bar / checkmark is controlled on just two
+// entities via VisibilityComponent's propagateToChildren — see the note
+// above resetProgressBar/hideProgressBar. The smoke emitter is a single
+// persistent ParticleSystem per stove (created once, like the progress
+// bar), toggled on/off via its `active` field rather than recreated per
+// cook.
 //
-// The progress bar is plain code-built geometry (a background box plus a
-// scaling fill box), which is simple and cheap — with at most 3 stoves
-// cooking at once, this has no meaningful performance cost. It faces the
-// player via the built-in Billboard component (BM_Y) rather than manual
-// rotation math, so the engine handles it natively. The checkmark is built
-// the same way (two crossed thin boxes) as a functional placeholder; a
-// small 2D checkmark texture on a plane, or a tiny checkmark .glb, would
-// look sharper than tuning box rotations in code — worth doing if you want
-// to polish this later.
+// The progress bar and checkmark are plain code-built geometry, which is
+// simple and cheap at this scale. Everything faces the player via the
+// built-in Billboard component (BM_Y) rather than manual rotation math.
+// The checkmark is two crossed thin boxes as a functional placeholder — a
+// small 2D checkmark texture or tiny .glb would look sharper. The smoke
+// emitter expects a soft round puff texture at assets/scene/textures/
+// Smoke.png (see textures.ts) — without it, particles render as plain
+// white squares.
 //
 // This is the ONLY system registered for stove cooking — a single
 // engine.addSystem call advances every active cook's timer and fill.
@@ -35,10 +34,12 @@ import {
   GltfContainer,
   Material,
   MeshRenderer,
+  ParticleSystem,
+  PBParticleSystem_BlendMode,
   Transform,
   VisibilityComponent
 } from '@dcl/sdk/ecs'
-import { Quaternion, Vector3 } from '@dcl/sdk/math'
+import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
   CHECKMARK_COLOR,
@@ -48,6 +49,17 @@ import {
   PROGRESS_BAR_THICKNESS,
   PROGRESS_BAR_WIDTH,
   PROGRESS_BAR_Y_OFFSET,
+  SMOKE_COLOR,
+  SMOKE_GRAVITY,
+  SMOKE_INITIAL_SIZE,
+  SMOKE_INITIAL_VELOCITY,
+  SMOKE_LIFETIME,
+  SMOKE_MAX_PARTICLES,
+  SMOKE_OFFSET,
+  SMOKE_RATE,
+  SMOKE_SIZE_OVER_TIME,
+  SMOKE_SPAWN_RADIUS,
+  SMOKE_TEXTURE,
   STOVE_ITEM_OFFSET
 } from './constants'
 import { CookableItemDefinition, getCookableItemDefinition } from './cookableItems'
@@ -63,6 +75,7 @@ interface ProgressBar {
 interface CookingState {
   itemEntity: Entity
   progressBar: ProgressBar
+  smokeEmitter: Entity
   cookedModel: string
   cookDurationSeconds: number
   elapsedSeconds: number
@@ -70,6 +83,7 @@ interface CookingState {
 }
 
 const progressBars = new Map<Entity, ProgressBar>()
+const smokeEmitters = new Map<Entity, Entity>()
 const cookingStates = new Map<Entity, CookingState>()
 let systemRegistered = false
 
@@ -101,9 +115,13 @@ function startCooking(stove: Entity, definition: CookableItemDefinition): void {
   const progressBar = getOrCreateProgressBar(stove)
   resetProgressBar(progressBar)
 
+  const smokeEmitter = getOrCreateSmokeEmitter(stove)
+  ParticleSystem.getMutable(smokeEmitter).active = true
+
   cookingStates.set(stove, {
     itemEntity,
     progressBar,
+    smokeEmitter,
     cookedModel: definition.cookedModel,
     cookDurationSeconds: definition.cookDurationSeconds,
     elapsedSeconds: 0,
@@ -209,6 +227,33 @@ function createCheckmark(parent: Entity): void {
   })
 }
 
+/** Persistent per-stove smoke emitter, created once and toggled via `active` rather than recreated per cook. */
+function getOrCreateSmokeEmitter(stove: Entity): Entity {
+  const existing = smokeEmitters.get(stove)
+  if (existing) return existing
+
+  const emitter = engine.addEntity()
+  Transform.create(emitter, { position: SMOKE_OFFSET, parent: stove })
+  ParticleSystem.create(emitter, {
+    active: false,
+    rate: SMOKE_RATE,
+    maxParticles: SMOKE_MAX_PARTICLES,
+    lifetime: SMOKE_LIFETIME,
+    shape: ParticleSystem.Shape.Sphere({ radius: SMOKE_SPAWN_RADIUS }),
+    gravity: SMOKE_GRAVITY,
+    initialVelocitySpeed: SMOKE_INITIAL_VELOCITY,
+    initialSize: SMOKE_INITIAL_SIZE,
+    sizeOverTime: SMOKE_SIZE_OVER_TIME,
+    initialColor: { start: SMOKE_COLOR, end: SMOKE_COLOR },
+    colorOverTime: { start: SMOKE_COLOR, end: fadeToTransparent(SMOKE_COLOR) },
+    texture: { src: SMOKE_TEXTURE },
+    blendMode: PBParticleSystem_BlendMode.PSB_ALPHA
+  })
+
+  smokeEmitters.set(stove, emitter)
+  return emitter
+}
+
 function resetProgressBar(progressBar: ProgressBar): void {
   VisibilityComponent.getMutable(progressBar.root).visible = true
   VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = false
@@ -249,6 +294,11 @@ function cookingSystem(dt: number): void {
       state.done = true
       GltfContainer.createOrReplace(state.itemEntity, { src: state.cookedModel })
       VisibilityComponent.getMutable(state.progressBar.checkmarkAnchor).visible = true
+      ParticleSystem.getMutable(state.smokeEmitter).active = false
     }
   }
+}
+
+function fadeToTransparent(color: Color4): Color4 {
+  return Color4.create(color.r, color.g, color.b, 0)
 }
