@@ -3,10 +3,11 @@
 // A fixture always gets a model and a focus anchor registered with
 // focusManager so it highlights on proximity. Everything else is optional:
 // pass displayModel for fixtures that show something on top (ingredient
-// trays), and onInteract for fixtures that do something today. Fixtures
-// without onInteract still highlight on proximity, they just don't respond
-// to the interact button yet — this is how stoves and empty counters work
-// until their behavior is implemented.
+// trays), and onInteract for fixtures that do something today — it
+// receives the fixture's own entity, e.g. so a preparation counter knows
+// which counter to stack an item onto. Fixtures without onInteract still
+// highlight on proximity, they just don't respond to the interact button
+// yet — this is how stoves work until their behavior is implemented.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -20,7 +21,7 @@ export interface FixtureOptions {
   parent: Entity
   height: number // vertical offset for the display model and the focus highlight
   displayModel?: string
-  onInteract?: () => void
+  onInteract?: (fixtureEntity: Entity) => void
 }
 
 export function createFixture(options: FixtureOptions): Entity {
@@ -47,7 +48,7 @@ export function createFixture(options: FixtureOptions): Entity {
     position: Vector3.create(0, height, 0),
     parent: fixture
   })
-  registerFocusableFixture(focusAnchor, onInteract)
+  registerFocusableFixture(focusAnchor, onInteract ? () => onInteract(fixture) : undefined)
 
   return fixture
 }

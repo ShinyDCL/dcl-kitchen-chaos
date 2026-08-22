@@ -1,7 +1,8 @@
 // Assembles the full kitchen layout: ingredient counters along the left and
-// right walls, a front row alternating empty counters and stoves, and a
-// 2x2 counter island in the middle. All positions/rotations are local to
-// `parent` (the scene root), matching the existing world-placement pattern.
+// right walls, a front row alternating preparation counters and stoves, a
+// plate wall at the back, and a 2x2 preparation-counter island in the
+// middle. All positions/rotations are local to `parent` (the scene root),
+// matching the existing world-placement pattern.
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -29,6 +30,7 @@ import {
   RIGHT_SIDE_INGREDIENTS
 } from './ingredientCounters'
 import { MODELS } from './models'
+import { placeHeldItemOnCounter } from './preparationCounters'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
@@ -60,8 +62,9 @@ function createSideWall(parent: Entity, x: number, ingredients: IngredientDefini
 
 /**
  * Places the front row: counter, stove, counter, stove, counter, stove,
- * counter — 7 fixtures side-by-side, empty and non-interactive for now
- * (highlight only), all facing toward the room's center.
+ * counter — 7 fixtures side-by-side, all facing toward the room's center.
+ * The counters are preparation counters (place held items on interact);
+ * stoves stay highlight-only until their behavior is implemented.
  */
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
@@ -79,8 +82,9 @@ function createFrontRow(parent: Entity): void {
       position,
       rotation,
       parent,
-      height: kind === 'stove' ? STOVE_HEIGHT : COUNTER_HEIGHT
-      // no displayModel, no onInteract — highlight-only until behavior is implemented
+      height: kind === 'stove' ? STOVE_HEIGHT : COUNTER_HEIGHT,
+      // Stoves stay highlight-only (no onInteract) until their behavior is implemented.
+      onInteract: kind === 'counter' ? placeHeldItemOnCounter : undefined
     })
 
     cursorX += width
@@ -90,7 +94,8 @@ function createFrontRow(parent: Entity): void {
 /**
  * Places a 2x2 counter island in the middle: two counters facing -Z, two
  * facing +Z, backs touching at Z=0 so the whole block reads as one island
- * with fronts facing outward on both sides.
+ * with fronts facing outward on both sides. All four are preparation
+ * counters.
  */
 function createIsland(parent: Entity): void {
   const halfWidth = COUNTER_WIDTH / 2
@@ -109,8 +114,8 @@ function createIsland(parent: Entity): void {
         position: Vector3.create(x, 0, row.z),
         rotation,
         parent,
-        height: COUNTER_HEIGHT
-        // no displayModel, no onInteract — highlight-only until behavior is implemented
+        height: COUNTER_HEIGHT,
+        onInteract: placeHeldItemOnCounter
       })
     }
   }
