@@ -7,6 +7,7 @@ import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
+  BACK_WALL_DISTANCE,
   COUNTER_DEPTH,
   COUNTER_HEIGHT,
   COUNTER_WIDTH,
@@ -20,6 +21,7 @@ import {
   STOVE_WIDTH
 } from './constants'
 import { createFixture } from './fixtures'
+import { attachItemToPlayerHand } from './heldItem'
 import {
   createIngredientCounter,
   IngredientDefinition,
@@ -36,6 +38,7 @@ export function createSceneLayout(parent: Entity): void {
   createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X)
   createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
   createFrontRow(parent)
+  createBackWall(parent)
   createIsland(parent)
 }
 
@@ -110,5 +113,31 @@ function createIsland(parent: Entity): void {
         // no displayModel, no onInteract — highlight-only until behavior is implemented
       })
     }
+  }
+}
+
+/**
+ * Places 2 plate counters on the back wall — the last free wall — each
+ * topped with a plate stack. Interacting attaches a single plate to the
+ * player's hand, facing toward the room's center.
+ */
+function createBackWall(parent: Entity): void {
+  const plateCounterCount = 2
+  const totalWidth = (plateCounterCount - 1) * COUNTER_WIDTH
+  const startX = -totalWidth / 2
+  const rotation = rotationDegrees(FACE_NEGATIVE_Z)
+
+  for (let index = 0; index < plateCounterCount; index++) {
+    const position = Vector3.create(startX + index * COUNTER_WIDTH, 0, BACK_WALL_DISTANCE)
+
+    createFixture({
+      model: MODELS.counter,
+      position,
+      rotation,
+      parent,
+      height: COUNTER_HEIGHT,
+      displayModel: MODELS.plateDisplay,
+      onInteract: () => attachItemToPlayerHand(MODELS.plate)
+    })
   }
 }

@@ -13,6 +13,7 @@ export const MODELS = {
   bunTop: 'assets/scene/models/BunTop.glb',
   pattyRaw: 'assets/scene/models/PattyRaw.glb',
   egg: 'assets/scene/models/Egg.glb',
+  plate: 'assets/scene/models/Plate.glb',
 
   // Display items
   bunBottomDisplay: 'assets/scene/models/BunBottomDisplay.glb',
@@ -23,5 +24,6 @@ export const MODELS = {
   cucumberDisplay: 'assets/scene/models/CucumberDisplay.glb',
   saladDisplay: 'assets/scene/models/SaladDisplay.glb',
   eggDisplay: 'assets/scene/models/EggDisplay.glb',
-  bunTopDisplay: 'assets/scene/models/BunTopDisplay.glb'
+  bunTopDisplay: 'assets/scene/models/BunTopDisplay.glb',
+  plateDisplay: 'assets/scene/models/PlateDisplay.glb'
 } as const

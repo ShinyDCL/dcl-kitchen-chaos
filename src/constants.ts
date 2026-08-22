@@ -20,6 +20,7 @@ export const STOVE_HEIGHT = COUNTER_HEIGHT
 // them to match the actual Scene.glb dimensions.
 export const SIDE_WALL_DISTANCE = 6 // meters from center to the left/right counter rows, along X
 export const FRONT_ROW_DISTANCE = 6 // meters from center to the front row, along Z
+export const BACK_WALL_DISTANCE = 6 // meters from center to the back wall (plate counters), along Z
 
 // Y-axis rotation (degrees) for a fixture whose unrotated model faces +Z —
 // matching the original counter's front-facing convention (the old pickup
