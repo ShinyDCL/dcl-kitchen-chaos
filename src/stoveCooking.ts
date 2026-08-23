@@ -110,7 +110,7 @@ function startCooking(stove: Entity, definition: CookableIngredientDefinition): 
 
   const itemEntity = engine.addEntity()
   Transform.create(itemEntity, { position: STOVE_ITEM_OFFSET, parent: stove })
-  GltfContainer.create(itemEntity, { src: definition.rawModel })
+  GltfContainer.create(itemEntity, { src: definition.stoveModel })
 
   const progressBar = getOrCreateProgressBar(stove)
   resetProgressBar(progressBar)

@@ -1,13 +1,23 @@
 // Single registry of every pickup-able ingredient. Non-cookable ones just
-// have a model; cookable ones have a raw/cooked model pair and a cook
-// time. classifyItem() and getCookableItemDefinition() are both derived
-// from this one object, so there's one place to add or edit an ingredient.
+// have a model; cookable ones have three models — the one held before
+// cooking (heldModel, also used as the lookup key), the one shown on the
+// stove while cooking (stoveModel — may differ from heldModel, e.g. egg's
+// held model is "egg" but its stove model is "eggRaw"), and the one
+// swapped in once done (cookedModel) — plus a cook time.
+//
+// classifyItem() and getCookableItemDefinition() are both derived from
+// this one object, so there's one place to add or edit an ingredient.
+//
+// Bacon isn't listed here yet — no models exist for it. Its ingredient
+// counter slot is handled separately in ingredientCounters.ts (shows
+// "Not available yet" until it's added here with real models).
 
 import { MODELS } from './models'
 
 export interface CookableIngredientDefinition {
   cookable: true
-  rawModel: string // model shown on the stove and held before cooking
+  heldModel: string // model held before cooking; used as the lookup key
+  stoveModel: string // model placed on the stove while cooking
   cookedModel: string // model swapped in once cooking finishes
   cookDurationSeconds: number
 }
@@ -27,29 +37,41 @@ export const INGREDIENTS: Record<string, IngredientDefinition> = {
   cheese: { cookable: false, model: MODELS.cheeseSlice },
   bunTop: { cookable: false, model: MODELS.bunTop },
   bunBottom: { cookable: false, model: MODELS.bunBottom },
-  patty: { cookable: true, rawModel: MODELS.pattyRaw, cookedModel: MODELS.pattyCooked, cookDurationSeconds: 5 },
-  egg: { cookable: true, rawModel: MODELS.egg, cookedModel: MODELS.eggCooked, cookDurationSeconds: 5 }
+  patty: {
+    cookable: true,
+    heldModel: MODELS.pattyRaw,
+    stoveModel: MODELS.pattyRaw,
+    cookedModel: MODELS.pattyCooked,
+    cookDurationSeconds: 5
+  },
+  egg: {
+    cookable: true,
+    heldModel: MODELS.egg,
+    stoveModel: MODELS.eggRaw,
+    cookedModel: MODELS.eggCooked,
+    cookDurationSeconds: 5
+  }
 }
 
-const RAW_MODEL_TO_DEFINITION = new Map<string, CookableIngredientDefinition>()
+const HELD_MODEL_TO_DEFINITION = new Map<string, CookableIngredientDefinition>()
 const COOKED_MODELS = new Set<string>()
 
 for (const definition of Object.values(INGREDIENTS)) {
   if (definition.cookable) {
-    RAW_MODEL_TO_DEFINITION.set(definition.rawModel, definition)
+    HELD_MODEL_TO_DEFINITION.set(definition.heldModel, definition)
     COOKED_MODELS.add(definition.cookedModel)
   }
 }
 
-export function getCookableItemDefinition(rawModel: string): CookableIngredientDefinition | undefined {
-  return RAW_MODEL_TO_DEFINITION.get(rawModel)
+export function getCookableItemDefinition(heldModel: string): CookableIngredientDefinition | undefined {
+  return HELD_MODEL_TO_DEFINITION.get(heldModel)
 }
 
 export type ItemCategory = 'nonCookable' | 'rawCookable' | 'cookedCookable' | 'plate'
 
 export function classifyItem(model: string): ItemCategory {
   if (model === MODELS.plate) return 'plate'
-  if (RAW_MODEL_TO_DEFINITION.has(model)) return 'rawCookable'
+  if (HELD_MODEL_TO_DEFINITION.has(model)) return 'rawCookable'
   if (COOKED_MODELS.has(model)) return 'cookedCookable'
   return 'nonCookable'
 }
