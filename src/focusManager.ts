@@ -1,30 +1,37 @@
-// Tracks all interactable fixtures (ingredient counters, stoves, empty
-// counters — anything registered via registerFocusableFixture) and, every
-// frame, focuses the single nearest one within INTERACTION_RANGE. When
-// multiple fixtures are in range at once, prefers the one the player is
-// roughly facing over pure nearest-distance, using a dot-product check
-// rather than an actual raycast — no precise aim required, which matters
-// for mobile touch controls.
-// Also listens for the "interact" button (E on desktop, primary action
-// button on mobile) and fires the focused fixture's callback when pressed,
-// if it has one — fixtures without an onInteract (stoves, empty counters
-// for now) still highlight but simply do nothing on press.
+// Tracks all interactable fixtures and, every frame, focuses the single
+// nearest one within INTERACTION_RANGE (preferring one the player is
+// roughly facing when several are in range — see FACING_THRESHOLD).
+//
+// Each focused fixture is re-evaluated every frame via its `evaluate`
+// callback (not just when focus changes), since an InteractionResult can
+// change while still looking at the same fixture — e.g. picking something
+// up while facing a stove changes whether cooking is now allowed. The
+// highlight's position/rotation only update on focus change (cheap); its
+// color updates every frame from the fresh evaluation (also cheap — one
+// shared entity, not per-fixture).
+//
+// On an interact-button press: if the current evaluation says allowed,
+// its `perform` runs; otherwise its `message` (if any) is shown via the
+// on-screen message UI.
 //
 // This is the ONLY system registered for the pickup feature — a single
-// engine.addSystem call handles proximity, facing, and input for every fixture.
+// engine.addSystem call handles proximity, facing, evaluation, and input
+// for every fixture.
 
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { FACING_THRESHOLD, INTERACTION_RANGE } from './constants'
-import { hideHighlight, showHighlightAt } from './highlight'
+import { showMessage } from './fixtureMessage'
+import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
+import { InteractionResult } from './interactionRules'
 import { getWorldPosition, getWorldRotation } from './worldPosition'
 
 interface FocusableFixture {
   id: number
   worldPosition: Vector3
   worldRotation: Quaternion
-  onInteract: (() => void) | undefined
+  evaluate: (() => InteractionResult) | undefined
 }
 
 interface FixtureCandidate {
@@ -38,19 +45,20 @@ let nextId = 0
 let focusedFixtureId: number | null = null
 let systemRegistered = false
 
+const ALWAYS_ALLOWED: InteractionResult = { allowed: true }
+
 /**
  * Registers a fixture as focusable. Resolves the anchor's world position
- * once, immediately — fixtures don't move after scene setup, so there's no
- * need to re-walk the parent chain every frame.
- * @param onInteract optional — omit for fixtures that should highlight but
- *   not respond to the interact button yet.
+ * once, immediately — fixtures don't move after scene setup.
+ * @param evaluate optional — omit for a fixture that should highlight
+ *   (always green) but has no interaction logic at all.
  */
-export function registerFocusableFixture(anchor: Entity, onInteract?: () => void): void {
+export function registerFocusableFixture(anchor: Entity, evaluate?: () => InteractionResult): void {
   fixtures.push({
     id: nextId++,
     worldPosition: getWorldPosition(anchor),
     worldRotation: getWorldRotation(anchor),
-    onInteract
+    evaluate
   })
   ensureSystemRegistered()
 }
@@ -108,14 +116,23 @@ function focusSystem(): void {
       focusedFixtureId = null
       hideHighlight()
     }
-  } else if (nearest.id !== focusedFixtureId) {
-    focusedFixtureId = nearest.id
-    showHighlightAt(nearest.worldPosition, nearest.worldRotation)
+    return
   }
 
-  if (focusedFixtureId === null) return
+  const result = nearest.evaluate ? nearest.evaluate() : ALWAYS_ALLOWED
+
+  if (nearest.id !== focusedFixtureId) {
+    focusedFixtureId = nearest.id
+    showHighlightAt(nearest.worldPosition, nearest.worldRotation, result.allowed)
+  } else {
+    setHighlightAllowed(result.allowed)
+  }
 
   if (!inputSystem.isTriggered(InputAction.IA_PRIMARY, PointerEventType.PET_DOWN)) return
 
-  fixtures.find((f) => f.id === focusedFixtureId)?.onInteract?.()
+  if (result.allowed) {
+    result.perform?.()
+  } else if (result.message) {
+    showMessage(result.message, nearest.worldPosition)
+  }
 }

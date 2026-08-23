@@ -1,15 +1,16 @@
 // Ingredient pickup counters — each has a display model showing what's
 // available and, once interacted with, attaches the matching slice to the
-// player's hand. A definition with no displayModel/sliceModel (currently
-// just bacon) still places the counter fixture and highlights it on
-// proximity, but stays empty and non-interactive until its models exist.
+// player's hand, discarding whatever was held before (attachItemToPlayerHand
+// always clears the previous held item). A definition with no
+// displayModel/sliceModel (currently just bacon) shows a "not available"
+// message instead.
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { COUNTER_HEIGHT } from './constants'
 import { createFixture } from './fixtures'
-import { attachItemToPlayerHand } from './heldItem'
+import { evaluateIngredientCounterInteraction } from './interactionRules'
 import { MODELS } from './models'
 
 export interface IngredientDefinition {
@@ -30,7 +31,7 @@ export const LEFT_SIDE_INGREDIENTS: IngredientDefinition[] = [
   { displayModel: MODELS.bunBottomDisplay, sliceModel: MODELS.bunBottom },
   { displayModel: MODELS.bunTopDisplay, sliceModel: MODELS.bunTop },
   { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg },
-  {} // TODO: bacon — no models yet. Counter is placed and highlights, but stays empty.
+  {} // TODO: bacon — no models yet. Counter is placed and highlights, shows "Not available yet".
 ]
 
 export function createIngredientCounter(
@@ -39,8 +40,6 @@ export function createIngredientCounter(
   parent: Entity,
   definition: IngredientDefinition
 ): void {
-  const sliceModel = definition.sliceModel
-
   createFixture({
     model: MODELS.counter,
     position,
@@ -48,6 +47,6 @@ export function createIngredientCounter(
     parent,
     height: COUNTER_HEIGHT,
     displayModel: definition.displayModel,
-    onInteract: sliceModel ? () => attachItemToPlayerHand(sliceModel) : undefined
+    evaluateInteraction: () => evaluateIngredientCounterInteraction(definition.sliceModel)
   })
 }

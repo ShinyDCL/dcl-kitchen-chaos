@@ -1,33 +1,96 @@
-// Preparation counters: empty counters where the player can stack items.
-// Pressing the interact button while focused on one takes whatever's in
-// the player's hand and places it on top of the counter's current stack,
-// offset by the cumulative height of whatever's already placed there.
+// Owns the plate/ingredient state of each preparation counter and the
+// visuals that represent it. Doesn't decide what's allowed — see
+// interactionRules.ts for that. Every action function here assumes the
+// caller already checked it's allowed.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
 import { COUNTER_HEIGHT } from './constants'
-import { hasHeldItem, takeHeldItem } from './heldItem'
+import { attachAssembledItemToPlayerHand, attachItemToPlayerHand, takeHeldItem, takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
+import { MODELS } from './models'
 
-// Cumulative stack height per counter, keyed by the counter's own entity.
-const stackHeights = new Map<Entity, number>()
+interface CounterState {
+  plateEntity: Entity | null
+  ingredientEntities: Entity[]
+  ingredientModels: string[]
+}
 
-/** Places whatever the player is holding on top of the given counter's stack. Does nothing if the player's hands are empty. */
-export function placeHeldItemOnCounter(counter: Entity): void {
-  if (!hasHeldItem()) return
+const counterStates = new Map<Entity, CounterState>()
 
-  const model = takeHeldItem()
-  if (!model) return
+function getState(counter: Entity): CounterState {
+  let state = counterStates.get(counter)
+  if (!state) {
+    state = { plateEntity: null, ingredientEntities: [], ingredientModels: [] }
+    counterStates.set(counter, state)
+  }
+  return state
+}
 
-  const currentStackHeight = stackHeights.get(counter) ?? 0
+export interface PreparationCounterSnapshot {
+  hasPlate: boolean
+  ingredientCount: number
+}
 
-  const item = engine.addEntity()
-  Transform.create(item, {
-    position: Vector3.create(0, COUNTER_HEIGHT + currentStackHeight, 0),
-    parent: counter
-  })
-  GltfContainer.create(item, { src: model })
+export function getPreparationCounterSnapshot(counter: Entity): PreparationCounterSnapshot {
+  const state = getState(counter)
+  return { hasPlate: state.plateEntity !== null, ingredientCount: state.ingredientModels.length }
+}
 
-  stackHeights.set(counter, currentStackHeight + getItemHeight(model))
+function currentStackHeight(state: CounterState): number {
+  let height = state.plateEntity ? getItemHeight(MODELS.plate) : 0
+  for (const model of state.ingredientModels) height += getItemHeight(model)
+  return height
+}
+
+function placeVisual(counter: Entity, model: string, yOffset: number): Entity {
+  const entity = engine.addEntity()
+  Transform.create(entity, { position: Vector3.create(0, COUNTER_HEIGHT + yOffset, 0), parent: counter })
+  GltfContainer.create(entity, { src: model })
+  return entity
+}
+
+export function placePlateOnCounter(counter: Entity): void {
+  takeHeldItem()
+  const state = getState(counter)
+  state.plateEntity = placeVisual(counter, MODELS.plate, 0)
+}
+
+export function pickUpPlateFromCounter(counter: Entity): void {
+  const state = getState(counter)
+  attachItemToPlayerHand(MODELS.plate)
+  if (state.plateEntity) engine.removeEntity(state.plateEntity)
+  state.plateEntity = null
+}
+
+export function pickUpAssembledFromCounter(counter: Entity): void {
+  const state = getState(counter)
+  attachAssembledItemToPlayerHand([...state.ingredientModels])
+  for (const entity of state.ingredientEntities) engine.removeEntity(entity)
+  state.ingredientEntities = []
+  state.ingredientModels = []
+}
+
+function appendIngredients(counter: Entity, state: CounterState, models: string[]): void {
+  let yOffset = currentStackHeight(state)
+  for (const model of models) {
+    const entity = placeVisual(counter, model, yOffset)
+    state.ingredientEntities.push(entity)
+    state.ingredientModels.push(model)
+    yOffset += getItemHeight(model)
+  }
+}
+
+export function placeIngredientOnCounter(counter: Entity): void {
+  const placedModel = takeHeldItem()
+  if (!placedModel) return
+  appendIngredients(counter, getState(counter), [placedModel])
+}
+
+/** Places every item from a held assembled stack onto the counter's existing stack, on top of whatever's already there. */
+export function placeAssembledOnCounter(counter: Entity): void {
+  const models = takeHeldItemModels()
+  if (models.length === 0) return
+  appendIngredients(counter, getState(counter), models)
 }

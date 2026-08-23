@@ -62,8 +62,8 @@ import {
   SMOKE_TEXTURE,
   STOVE_ITEM_OFFSET
 } from './constants'
-import { CookableItemDefinition, getCookableItemDefinition } from './cookableItems'
-import { attachItemToPlayerHand, hasHeldItem, peekHeldItemModel, takeHeldItem } from './heldItem'
+import { attachItemToPlayerHand, takeHeldItem } from './heldItem'
+import { CookableIngredientDefinition } from './ingredients'
 import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {
@@ -87,25 +87,25 @@ const smokeEmitters = new Map<Entity, Entity>()
 const cookingStates = new Map<Entity, CookingState>()
 let systemRegistered = false
 
-/** Call from a stove fixture's onInteract. */
-export function handleStoveInteract(stove: Entity): void {
+export type StoveStatus = 'idle' | 'cooking' | 'done'
+
+export function getStoveStatus(stove: Entity): StoveStatus {
   const state = cookingStates.get(stove)
+  if (!state) return 'idle'
+  return state.done ? 'done' : 'cooking'
+}
 
-  if (state) {
-    if (state.done) collectCookedItem(stove, state)
-    return // still cooking — ignore interact until done
-  }
-
-  if (!hasHeldItem()) return
-
-  const model = peekHeldItemModel()
-  const definition = model ? getCookableItemDefinition(model) : undefined
-  if (!definition) return // non-cookable item — nothing happens
-
+export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
   startCooking(stove, definition)
 }
 
-function startCooking(stove: Entity, definition: CookableItemDefinition): void {
+export function collectFromStove(stove: Entity): void {
+  const state = cookingStates.get(stove)
+  if (!state) return
+  collectCookedItem(stove, state)
+}
+
+function startCooking(stove: Entity, definition: CookableIngredientDefinition): void {
   takeHeldItem()
 
   const itemEntity = engine.addEntity()

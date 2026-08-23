@@ -22,16 +22,18 @@ import {
   STOVE_WIDTH
 } from './constants'
 import { createFixture } from './fixtures'
-import { attachItemToPlayerHand } from './heldItem'
 import {
   createIngredientCounter,
   IngredientDefinition,
   LEFT_SIDE_INGREDIENTS,
   RIGHT_SIDE_INGREDIENTS
 } from './ingredientCounters'
+import {
+  evaluatePlateCounterInteraction,
+  evaluatePreparationCounterInteraction,
+  evaluateStoveInteraction
+} from './interactionRules'
 import { MODELS } from './models'
-import { placeHeldItemOnCounter } from './preparationCounters'
-import { handleStoveInteract } from './stoveCooking'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
@@ -84,7 +86,7 @@ function createFrontRow(parent: Entity): void {
       rotation,
       parent,
       height: kind === 'stove' ? STOVE_HEIGHT : COUNTER_HEIGHT,
-      onInteract: kind === 'counter' ? placeHeldItemOnCounter : handleStoveInteract
+      evaluateInteraction: kind === 'counter' ? evaluatePreparationCounterInteraction : evaluateStoveInteraction
     })
 
     cursorX += width
@@ -115,7 +117,7 @@ function createIsland(parent: Entity): void {
         rotation,
         parent,
         height: COUNTER_HEIGHT,
-        onInteract: placeHeldItemOnCounter
+        evaluateInteraction: evaluatePreparationCounterInteraction
       })
     }
   }
@@ -142,7 +144,7 @@ function createBackWall(parent: Entity): void {
       parent,
       height: COUNTER_HEIGHT,
       displayModel: MODELS.plateDisplay,
-      onInteract: () => attachItemToPlayerHand(MODELS.plate)
+      evaluateInteraction: () => evaluatePlateCounterInteraction()
     })
   }
 }
