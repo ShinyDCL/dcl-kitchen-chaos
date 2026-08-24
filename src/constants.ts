@@ -17,6 +17,12 @@ export const STOVE_WIDTH = COUNTER_WIDTH
 export const STOVE_DEPTH = COUNTER_DEPTH
 export const STOVE_HEIGHT = COUNTER_HEIGHT
 
+// Trash bin size — takes up the same footprint as a counter/stove for
+// layout purposes, even though the model itself is visually smaller.
+export const TRASH_BIN_WIDTH = COUNTER_WIDTH
+export const TRASH_BIN_DEPTH = COUNTER_DEPTH
+export const TRASH_BIN_HEIGHT = COUNTER_HEIGHT
+
 // Room layout — local-space distances from the scene root (0,0,0) to each
 // wall/row. There's no way to derive these from the model file, so tune
 // them to match the actual Scene.glb dimensions.

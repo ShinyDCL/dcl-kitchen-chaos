@@ -19,7 +19,8 @@ import {
   FRONT_ROW_DISTANCE,
   SIDE_WALL_DISTANCE,
   STOVE_HEIGHT,
-  STOVE_WIDTH
+  STOVE_WIDTH,
+  TRASH_BIN_HEIGHT
 } from './constants'
 import { createFixture } from './fixtures'
 import {
@@ -31,7 +32,8 @@ import {
 import {
   evaluatePlateCounterInteraction,
   evaluatePreparationCounterInteraction,
-  evaluateStoveInteraction
+  evaluateStoveInteraction,
+  evaluateTrashBinInteraction
 } from './interactionRules'
 import { MODELS } from './models'
 
@@ -124,27 +126,39 @@ function createIsland(parent: Entity): void {
 }
 
 /**
- * Places 2 plate counters on the back wall — the last free wall — each
- * topped with a plate stack. Interacting attaches a single plate to the
- * player's hand, facing toward the room's center.
+ * Places the back wall: 2 plate counters plus a trash bin next to them —
+ * the trash bin uses the same width/depth/height allotment as a counter
+ * even though its model is visually smaller, so it lines up seamlessly in
+ * the same row.
  */
 function createBackWall(parent: Entity): void {
-  const plateCounterCount = 2
-  const totalWidth = (plateCounterCount - 1) * COUNTER_WIDTH
+  const sequence: Array<'plate' | 'trash'> = ['plate', 'plate', 'trash']
+  const totalWidth = sequence.length * COUNTER_WIDTH
   const startX = -totalWidth / 2
   const rotation = rotationDegrees(FACE_NEGATIVE_Z)
 
-  for (let index = 0; index < plateCounterCount; index++) {
-    const position = Vector3.create(startX + index * COUNTER_WIDTH, 0, BACK_WALL_DISTANCE)
+  sequence.forEach((kind, index) => {
+    const position = Vector3.create(startX + index * COUNTER_WIDTH + COUNTER_WIDTH / 2, 0, BACK_WALL_DISTANCE)
 
-    createFixture({
-      model: MODELS.counter,
-      position,
-      rotation,
-      parent,
-      height: COUNTER_HEIGHT,
-      displayModel: MODELS.plateDisplay,
-      evaluateInteraction: () => evaluatePlateCounterInteraction()
-    })
-  }
+    if (kind === 'plate') {
+      createFixture({
+        model: MODELS.counter,
+        position,
+        rotation,
+        parent,
+        height: COUNTER_HEIGHT,
+        displayModel: MODELS.plateDisplay,
+        evaluateInteraction: () => evaluatePlateCounterInteraction()
+      })
+    } else {
+      createFixture({
+        model: MODELS.trashBin,
+        position,
+        rotation,
+        parent,
+        height: TRASH_BIN_HEIGHT,
+        evaluateInteraction: () => evaluateTrashBinInteraction()
+      })
+    }
+  })
 }

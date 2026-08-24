@@ -8,7 +8,13 @@
 
 import { Entity } from '@dcl/sdk/ecs'
 
-import { attachItemToPlayerHand, hasHeldItem, isHoldingAssembledItem, peekHeldItemModel } from './heldItem'
+import {
+  attachItemToPlayerHand,
+  discardHeldItem,
+  hasHeldItem,
+  isHoldingAssembledItem,
+  peekHeldItemModel
+} from './heldItem'
 import { classifyItem, getCookableItemDefinition } from './ingredients'
 import { MODELS } from './models'
 import {
@@ -113,4 +119,12 @@ export function evaluateStoveInteraction(stove: Entity): InteractionResult {
   const definition = getCookableItemDefinition(model)
   if (!definition) return { allowed: false, message: "Can't cook this" }
   return { allowed: true, perform: () => startCookingOnStove(stove, definition) }
+}
+
+// --- Trash bin ---
+// Allowed whenever holding anything (single item or assembled); discards it.
+
+export function evaluateTrashBinInteraction(): InteractionResult {
+  if (!hasHeldItem()) return { allowed: false, message: 'Nothing to discard' }
+  return { allowed: true, perform: () => discardHeldItem() }
 }
