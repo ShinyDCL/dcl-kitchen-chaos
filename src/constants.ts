@@ -67,7 +67,6 @@ export const PROGRESS_BAR_THICKNESS = 0.02
 export const PROGRESS_BAR_Y_OFFSET = STOVE_HEIGHT + 0.6 // floats above the cooking item
 export const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
 export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
-export const CHECKMARK_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
 
 // Smoke particles shown above a stove while something is cooking. Kept
 // light for mobile: rate/lifetime are tuned so the steady-state count per

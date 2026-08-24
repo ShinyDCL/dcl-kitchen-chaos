@@ -14,14 +14,12 @@
 // bar), toggled on/off via its `active` field rather than recreated per
 // cook.
 //
-// The progress bar and checkmark are plain code-built geometry, which is
-// simple and cheap at this scale. Everything faces the player via the
-// built-in Billboard component (BM_Y) rather than manual rotation math.
-// The checkmark is two crossed thin boxes as a functional placeholder — a
-// small 2D checkmark texture or tiny .glb would look sharper. The smoke
-// emitter expects a soft round puff texture at assets/scene/textures/
-// Smoke.png (see textures.ts) — without it, particles render as plain
-// white squares.
+// The progress bar is plain code-built geometry, which is simple and cheap
+// at this scale. Everything faces the player via the built-in Billboard
+// component (BM_Y) rather than manual rotation math. The checkmark is a
+// dedicated 3D model (MODELS.checkmark). The smoke emitter expects a soft
+// round puff texture at assets/scene/textures/Smoke.png (see constants.ts)
+// — without it, particles render as plain white squares.
 //
 // This is the ONLY system registered for stove cooking — a single
 // engine.addSystem call advances every active cook's timer and fill.
@@ -42,7 +40,6 @@ import {
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
-  CHECKMARK_COLOR,
   PROGRESS_BAR_BACKGROUND_COLOR,
   PROGRESS_BAR_FILL_COLOR,
   PROGRESS_BAR_HEIGHT,
@@ -64,6 +61,7 @@ import {
 } from './constants'
 import { attachItemToPlayerHand, takeHeldItem } from './heldItem'
 import { CookableIngredientDefinition } from './ingredients'
+import { MODELS } from './models'
 import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {
@@ -196,35 +194,10 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
   return progressBar
 }
 
-/** Placeholder checkmark built from two crossed thin boxes — swap for a texture or small model for a cleaner look. */
 function createCheckmark(parent: Entity): void {
-  const shortLeg = engine.addEntity()
-  Transform.create(shortLeg, {
-    position: Vector3.create(-0.05, -0.02, 0),
-    rotation: Quaternion.fromEulerDegrees(0, 0, 45),
-    scale: Vector3.create(0.025, 0.08, 0.01),
-    parent
-  })
-  MeshRenderer.setBox(shortLeg)
-  Material.setPbrMaterial(shortLeg, {
-    albedoColor: CHECKMARK_COLOR,
-    emissiveColor: CHECKMARK_COLOR,
-    emissiveIntensity: 0.6
-  })
-
-  const longLeg = engine.addEntity()
-  Transform.create(longLeg, {
-    position: Vector3.create(0.02, 0.02, 0),
-    rotation: Quaternion.fromEulerDegrees(0, 0, -45),
-    scale: Vector3.create(0.025, 0.14, 0.01),
-    parent
-  })
-  MeshRenderer.setBox(longLeg)
-  Material.setPbrMaterial(longLeg, {
-    albedoColor: CHECKMARK_COLOR,
-    emissiveColor: CHECKMARK_COLOR,
-    emissiveIntensity: 0.6
-  })
+  const checkmark = engine.addEntity()
+  Transform.create(checkmark, { parent, rotation: Quaternion.fromEulerDegrees(0, 180, 0) })
+  GltfContainer.create(checkmark, { src: MODELS.checkmark })
 }
 
 /** Persistent per-stove smoke emitter, created once and toggled via `active` rather than recreated per cook. */
