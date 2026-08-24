@@ -5,23 +5,13 @@ export const PARCEL_SIZE = 16 // parcel size in meters
 export const SCENE_SIZE = GRID_SIZE * PARCEL_SIZE // scene size in meters
 export const SCENE_CENTER = SCENE_SIZE / 2 // center point in scene
 
-// Counter size
-export const COUNTER_WIDTH = 1.4
-export const COUNTER_DEPTH = 1.1
-export const COUNTER_HEIGHT = 1
-
-// Stove size — assumed to match the counter footprint until a real stove
-// model is measured. Split out separately so it can diverge later without
-// touching counter layout math.
-export const STOVE_WIDTH = COUNTER_WIDTH
-export const STOVE_DEPTH = COUNTER_DEPTH
-export const STOVE_HEIGHT = COUNTER_HEIGHT
-
-// Trash bin size — takes up the same footprint as a counter/stove for
-// layout purposes, even though the model itself is visually smaller.
-export const TRASH_BIN_WIDTH = COUNTER_WIDTH
-export const TRASH_BIN_DEPTH = COUNTER_DEPTH
-export const TRASH_BIN_HEIGHT = COUNTER_HEIGHT
+// Every fixture (counter, stove, trash bin, and anything added later)
+// shares the same footprint/height for layout purposes, even when the
+// model itself is visually smaller (e.g. the trash bin) or different
+// (the stove) — this keeps every fixture interchangeable in row/grid math.
+export const FIXTURE_WIDTH = 1.4
+export const FIXTURE_DEPTH = 1.1
+export const FIXTURE_HEIGHT = 1
 
 // Room layout — local-space distances from the scene root (0,0,0) to each
 // wall/row. There's no way to derive these from the model file, so tune
@@ -43,8 +33,8 @@ export const FACE_NEGATIVE_X = 270
 export const INTERACTION_RANGE = 2.5 // meters
 
 // Visual highlight shown on top of the currently focused fixture.
-export const HIGHLIGHT_WIDTH = COUNTER_WIDTH
-export const HIGHLIGHT_DEPTH = COUNTER_DEPTH
+export const HIGHLIGHT_WIDTH = FIXTURE_WIDTH
+export const HIGHLIGHT_DEPTH = FIXTURE_DEPTH
 export const HIGHLIGHT_THICKNESS = 0.02
 
 // Minimum dot product between the player's forward vector and the direction
@@ -58,13 +48,13 @@ export const FACING_THRESHOLD = 0.1
 // Local offset (relative to the stove fixture) where the raw/cooked item
 // model is placed while cooking — tune this so it sits on top of the pan
 // model rather than the stove's base.
-export const STOVE_ITEM_OFFSET = Vector3.create(0.25, STOVE_HEIGHT + 0.05, 0.25)
+export const STOVE_ITEM_OFFSET = Vector3.create(0.25, FIXTURE_HEIGHT + 0.05, 0.25)
 
 // Progress bar shown above a stove while cooking.
 export const PROGRESS_BAR_WIDTH = 0.6
 export const PROGRESS_BAR_HEIGHT = 0.1
 export const PROGRESS_BAR_THICKNESS = 0.02
-export const PROGRESS_BAR_Y_OFFSET = STOVE_HEIGHT + 0.6 // floats above the cooking item
+export const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // floats above the cooking item
 export const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
 export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
 
@@ -95,4 +85,4 @@ export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
 export const DELIVERY_ITEM_SIT_DURATION = 1 // seconds the delivered item sits unchanged before shrinking
 export const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds — item shrinks away over this long, once sitting ends
 export const DELIVERY_CHECKMARK_DURATION = 0.8 // seconds — checkmark spin+scale animation length
-export const DELIVERY_CHECKMARK_Y_OFFSET = COUNTER_HEIGHT + 0.6 // above the delivery pad
+export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the delivery pad

@@ -6,7 +6,7 @@
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
-import { COUNTER_HEIGHT } from './constants'
+import { FIXTURE_HEIGHT } from './constants'
 import { attachAssembledItemToPlayerHand, attachItemToPlayerHand, takeHeldItem, takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
 import { MODELS } from './models'
@@ -46,7 +46,7 @@ function currentStackHeight(state: CounterState): number {
 
 function placeVisual(counter: Entity, model: string, yOffset: number): Entity {
   const entity = engine.addEntity()
-  Transform.create(entity, { position: Vector3.create(0, COUNTER_HEIGHT + yOffset, 0), parent: counter })
+  Transform.create(entity, { position: Vector3.create(0, FIXTURE_HEIGHT + yOffset, 0), parent: counter })
   GltfContainer.create(entity, { src: model })
   return entity
 }

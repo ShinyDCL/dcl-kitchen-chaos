@@ -19,11 +19,11 @@ import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
-  COUNTER_HEIGHT,
   DELIVERY_CHECKMARK_DURATION,
   DELIVERY_CHECKMARK_Y_OFFSET,
   DELIVERY_ITEM_SHRINK_DURATION,
-  DELIVERY_ITEM_SIT_DURATION
+  DELIVERY_ITEM_SIT_DURATION,
+  FIXTURE_HEIGHT
 } from './constants'
 import { takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
@@ -68,7 +68,7 @@ export function deliverHeldItem(): void {
   if (models.length === 0) return
 
   itemsRoot = engine.addEntity()
-  Transform.create(itemsRoot, { position: Vector3.create(0, COUNTER_HEIGHT, 0), parent: deliveryCounterEntity })
+  Transform.create(itemsRoot, { position: Vector3.create(0, FIXTURE_HEIGHT, 0), parent: deliveryCounterEntity })
 
   itemEntities = []
   let cumulativeHeight = 0

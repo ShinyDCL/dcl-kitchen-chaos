@@ -11,18 +11,15 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
   BACK_WALL_DISTANCE,
-  COUNTER_DEPTH,
-  COUNTER_HEIGHT,
-  COUNTER_WIDTH,
   FACE_NEGATIVE_X,
   FACE_NEGATIVE_Z,
   FACE_POSITIVE_X,
   FACE_POSITIVE_Z,
+  FIXTURE_DEPTH,
+  FIXTURE_HEIGHT,
+  FIXTURE_WIDTH,
   FRONT_ROW_DISTANCE,
-  SIDE_WALL_DISTANCE,
-  STOVE_HEIGHT,
-  STOVE_WIDTH,
-  TRASH_BIN_HEIGHT
+  SIDE_WALL_DISTANCE
 } from './constants'
 import { registerDeliveryCounter } from './deliveryCounter'
 import { createFixture } from './fixtures'
@@ -59,12 +56,12 @@ export function createSceneLayout(parent: Entity): void {
  * center.
  */
 function createSideWall(parent: Entity, x: number, ingredients: IngredientDefinition[], facingDegrees: number): void {
-  const totalDepth = (ingredients.length - 1) * COUNTER_WIDTH
+  const totalDepth = (ingredients.length - 1) * FIXTURE_WIDTH
   const startZ = -totalDepth / 2
   const rotation = rotationDegrees(facingDegrees)
 
   ingredients.forEach((definition, index) => {
-    const position = Vector3.create(x, 0, startZ + index * COUNTER_WIDTH)
+    const position = Vector3.create(x, 0, startZ + index * FIXTURE_WIDTH)
     createIngredientCounter(position, rotation, parent, definition)
   })
 }
@@ -76,23 +73,23 @@ function createSideWall(parent: Entity, x: number, ingredients: IngredientDefini
  */
 function createLeftWall(parent: Entity): void {
   const slotCount = RIGHT_SIDE_INGREDIENTS.length
-  const totalDepth = (slotCount - 1) * COUNTER_WIDTH
+  const totalDepth = (slotCount - 1) * FIXTURE_WIDTH
   const startZ = -totalDepth / 2
   const rotation = rotationDegrees(FACE_POSITIVE_X)
   const x = -SIDE_WALL_DISTANCE
 
   LEFT_SIDE_INGREDIENTS.forEach((definition, index) => {
-    const position = Vector3.create(x, 0, startZ + index * COUNTER_WIDTH)
+    const position = Vector3.create(x, 0, startZ + index * FIXTURE_WIDTH)
     createIngredientCounter(position, rotation, parent, definition)
   })
 
-  const deliveryPosition = Vector3.create(x, 0, startZ + LEFT_SIDE_INGREDIENTS.length * COUNTER_WIDTH)
+  const deliveryPosition = Vector3.create(x, 0, startZ + LEFT_SIDE_INGREDIENTS.length * FIXTURE_WIDTH)
   const deliveryCounter = createFixture({
     model: MODELS.counter,
     position: deliveryPosition,
     rotation,
     parent,
-    height: COUNTER_HEIGHT,
+    height: FIXTURE_HEIGHT,
     displayModel: MODELS.deliveryPad,
     evaluateInteraction: () => evaluateDeliveryCounterInteraction()
   })
@@ -107,25 +104,20 @@ function createLeftWall(parent: Entity): void {
  */
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
-  const widths = sequence.map((kind) => (kind === 'stove' ? STOVE_WIDTH : COUNTER_WIDTH))
-  const totalWidth = widths.reduce((sum, width) => sum + width, 0)
+  const totalWidth = sequence.length * FIXTURE_WIDTH
   const rotation = rotationDegrees(FACE_POSITIVE_Z)
 
-  let cursorX = -totalWidth / 2
-  sequence.forEach((kind) => {
-    const width = kind === 'stove' ? STOVE_WIDTH : COUNTER_WIDTH
-    const position = Vector3.create(cursorX + width / 2, 0, -FRONT_ROW_DISTANCE)
+  sequence.forEach((kind, index) => {
+    const position = Vector3.create(-totalWidth / 2 + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, -FRONT_ROW_DISTANCE)
 
     createFixture({
       model: kind === 'stove' ? MODELS.stove : MODELS.counter,
       position,
       rotation,
       parent,
-      height: kind === 'stove' ? STOVE_HEIGHT : COUNTER_HEIGHT,
+      height: FIXTURE_HEIGHT,
       evaluateInteraction: kind === 'counter' ? evaluatePreparationCounterInteraction : evaluateStoveInteraction
     })
-
-    cursorX += width
   })
 }
 
@@ -136,8 +128,8 @@ function createFrontRow(parent: Entity): void {
  * counters.
  */
 function createIsland(parent: Entity): void {
-  const halfWidth = COUNTER_WIDTH / 2
-  const halfDepth = COUNTER_DEPTH / 2
+  const halfWidth = FIXTURE_WIDTH / 2
+  const halfDepth = FIXTURE_DEPTH / 2
 
   const rows: Array<{ z: number; facingDegrees: number }> = [
     { z: -halfDepth, facingDegrees: FACE_NEGATIVE_Z },
@@ -152,7 +144,7 @@ function createIsland(parent: Entity): void {
         position: Vector3.create(x, 0, row.z),
         rotation,
         parent,
-        height: COUNTER_HEIGHT,
+        height: FIXTURE_HEIGHT,
         evaluateInteraction: evaluatePreparationCounterInteraction
       })
     }
@@ -166,12 +158,12 @@ function createIsland(parent: Entity): void {
  */
 function createBackWall(parent: Entity): void {
   const sequence: Array<'plate' | 'trash'> = ['plate', 'plate', 'trash']
-  const totalWidth = sequence.length * COUNTER_WIDTH
+  const totalWidth = sequence.length * FIXTURE_WIDTH
   const startX = -totalWidth / 2
   const rotation = rotationDegrees(FACE_NEGATIVE_Z)
 
   sequence.forEach((kind, index) => {
-    const position = Vector3.create(startX + index * COUNTER_WIDTH + COUNTER_WIDTH / 2, 0, BACK_WALL_DISTANCE)
+    const position = Vector3.create(startX + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, BACK_WALL_DISTANCE)
 
     if (kind === 'plate') {
       createFixture({
@@ -179,7 +171,7 @@ function createBackWall(parent: Entity): void {
         position,
         rotation,
         parent,
-        height: COUNTER_HEIGHT,
+        height: FIXTURE_HEIGHT,
         displayModel: MODELS.plateDisplay,
         evaluateInteraction: () => evaluatePlateCounterInteraction()
       })
@@ -189,7 +181,7 @@ function createBackWall(parent: Entity): void {
         position,
         rotation,
         parent,
-        height: TRASH_BIN_HEIGHT,
+        height: FIXTURE_HEIGHT,
         evaluateInteraction: () => evaluateTrashBinInteraction()
       })
     }

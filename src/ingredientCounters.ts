@@ -8,7 +8,7 @@
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { COUNTER_HEIGHT } from './constants'
+import { FIXTURE_HEIGHT } from './constants'
 import { createFixture } from './fixtures'
 import { evaluateIngredientCounterInteraction } from './interactionRules'
 import { MODELS } from './models'
@@ -44,7 +44,7 @@ export function createIngredientCounter(
     position,
     rotation,
     parent,
-    height: COUNTER_HEIGHT,
+    height: FIXTURE_HEIGHT,
     displayModel: definition.displayModel,
     evaluateInteraction: () => evaluateIngredientCounterInteraction(definition.sliceModel)
   })
