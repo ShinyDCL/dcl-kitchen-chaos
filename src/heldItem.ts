@@ -7,14 +7,15 @@
 // of models (attachAssembledItemToPlayerHand) — the first model uses its
 // configured hand offset/rotation/scale (itemHandTransforms.ts) as the
 // stack's base, and subsequent models stack directly above it using
-// itemHeights.ts, the same way preparationCounterState.ts stacks items on
-// a counter.
+// itemHeights.ts, the same way preparationCounters.ts stacks items on a
+// counter.
 //
 // takeHeldItem only returns a model for a single-item hold — it returns
 // null for an assembled stack, since there's no single model to hand back;
 // callers that need to know whether an assembled item is held should check
-// isHoldingAssembledItem(). discardHeldItem removes whatever's held
-// (single or assembled) without returning anything.
+// isHoldingAssembledItem(). takeHeldItemModels returns every model
+// regardless of shape. discardHeldItem removes whatever's held (single or
+// assembled) without returning anything.
 
 import { AvatarAnchorPointType, AvatarAttach, engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -97,6 +98,13 @@ export function takeHeldItem(): string | null {
   return model
 }
 
+/** Removes the held item (single or assembled) and returns its models in stacking order, or an empty array if empty-handed. */
+export function takeHeldItemModels(): string[] {
+  const models = heldItem?.models ?? []
+  clearHeldItem()
+  return models
+}
+
 /** Removes whatever's held (single or assembled) without returning anything. */
 export function discardHeldItem(): void {
   clearHeldItem()
@@ -107,11 +115,4 @@ function clearHeldItem(): void {
   for (const child of heldItem.children) engine.removeEntity(child)
   engine.removeEntity(heldItem.parent)
   heldItem = null
-}
-
-/** Removes the held item (single or assembled) and returns its models in stacking order, or an empty array if empty-handed. */
-export function takeHeldItemModels(): string[] {
-  const models = heldItem?.models ?? []
-  clearHeldItem()
-  return models
 }

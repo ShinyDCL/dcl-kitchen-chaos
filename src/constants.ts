@@ -88,3 +88,11 @@ export const SMOKE_GRAVITY = -0.05 // negative = drifts upward;
 export const SMOKE_INITIAL_VELOCITY = { start: 0.03, end: 0.08 }
 export const SMOKE_COLOR = Color4.create(0.85, 0.85, 0.85, 0.85) // birth color; fades to fully transparent over lifetime
 export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
+
+// Delivery counter success flourish. Both animations are simple Transform
+// lerps driven by a system that only runs while something is actually
+// animating — no particles, cheap on mobile.
+export const DELIVERY_ITEM_SIT_DURATION = 1 // seconds the delivered item sits unchanged before shrinking
+export const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds — item shrinks away over this long, once sitting ends
+export const DELIVERY_CHECKMARK_DURATION = 0.8 // seconds — checkmark spin+scale animation length
+export const DELIVERY_CHECKMARK_Y_OFFSET = COUNTER_HEIGHT + 0.6 // above the delivery pad

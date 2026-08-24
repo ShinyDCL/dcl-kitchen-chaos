@@ -30,5 +30,6 @@ export const MODELS = {
   saladDisplay: 'assets/scene/models/SaladDisplay.glb',
   eggDisplay: 'assets/scene/models/EggDisplay.glb',
   bunTopDisplay: 'assets/scene/models/BunTopDisplay.glb',
-  plateDisplay: 'assets/scene/models/PlateDisplay.glb'
+  plateDisplay: 'assets/scene/models/PlateDisplay.glb',
+  deliveryPad: 'assets/scene/models/DeliveryPad.glb'
 } as const

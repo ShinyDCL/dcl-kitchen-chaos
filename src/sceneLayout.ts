@@ -1,8 +1,10 @@
 // Assembles the full kitchen layout: ingredient counters along the left and
-// right walls, a front row alternating preparation counters and stoves, a
-// plate wall at the back, and a 2x2 preparation-counter island in the
-// middle. All positions/rotations are local to `parent` (the scene root),
-// matching the existing world-placement pattern.
+// right walls (left wall's last slot is a delivery counter instead of a
+// 5th ingredient, since bacon isn't implemented), a front row alternating
+// preparation counters and stoves, a plate/trash wall at the back, and a
+// 2x2 preparation-counter island in the middle. All positions/rotations
+// are local to `parent` (the scene root), matching the existing
+// world-placement pattern.
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -22,6 +24,7 @@ import {
   STOVE_WIDTH,
   TRASH_BIN_HEIGHT
 } from './constants'
+import { registerDeliveryCounter } from './deliveryCounter'
 import { createFixture } from './fixtures'
 import {
   createIngredientCounter,
@@ -30,6 +33,7 @@ import {
   RIGHT_SIDE_INGREDIENTS
 } from './ingredientCounters'
 import {
+  evaluateDeliveryCounterInteraction,
   evaluatePlateCounterInteraction,
   evaluatePreparationCounterInteraction,
   evaluateStoveInteraction,
@@ -43,7 +47,7 @@ function rotationDegrees(degrees: number): Quaternion {
 
 export function createSceneLayout(parent: Entity): void {
   createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X)
-  createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
+  createLeftWall(parent)
   createFrontRow(parent)
   createBackWall(parent)
   createIsland(parent)
@@ -66,10 +70,40 @@ function createSideWall(parent: Entity, x: number, ingredients: IngredientDefini
 }
 
 /**
+ * Places the left wall: 4 ingredient counters plus a delivery counter in
+ * the 5th slot — where bacon's counter used to be — using the same 5-slot
+ * spacing as the right wall so both walls stay aligned.
+ */
+function createLeftWall(parent: Entity): void {
+  const slotCount = RIGHT_SIDE_INGREDIENTS.length
+  const totalDepth = (slotCount - 1) * COUNTER_WIDTH
+  const startZ = -totalDepth / 2
+  const rotation = rotationDegrees(FACE_POSITIVE_X)
+  const x = -SIDE_WALL_DISTANCE
+
+  LEFT_SIDE_INGREDIENTS.forEach((definition, index) => {
+    const position = Vector3.create(x, 0, startZ + index * COUNTER_WIDTH)
+    createIngredientCounter(position, rotation, parent, definition)
+  })
+
+  const deliveryPosition = Vector3.create(x, 0, startZ + LEFT_SIDE_INGREDIENTS.length * COUNTER_WIDTH)
+  const deliveryCounter = createFixture({
+    model: MODELS.counter,
+    position: deliveryPosition,
+    rotation,
+    parent,
+    height: COUNTER_HEIGHT,
+    displayModel: MODELS.deliveryPad,
+    evaluateInteraction: () => evaluateDeliveryCounterInteraction()
+  })
+
+  registerDeliveryCounter(deliveryCounter)
+}
+
+/**
  * Places the front row: counter, stove, counter, stove, counter, stove,
  * counter — 7 fixtures side-by-side, all facing toward the room's center.
- * The counters are preparation counters (place held items on interact);
- * stoves stay highlight-only until their behavior is implemented.
+ * The counters are preparation counters.
  */
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
@@ -126,10 +160,9 @@ function createIsland(parent: Entity): void {
 }
 
 /**
- * Places the back wall: 2 plate counters plus a trash bin next to them —
- * the trash bin uses the same width/depth/height allotment as a counter
- * even though its model is visually smaller, so it lines up seamlessly in
- * the same row.
+ * Places the back wall: 2 plate counters plus a trash bin — the trash bin
+ * uses the same width/depth/height allotment as a counter even though its
+ * model is visually smaller, so it lines up seamlessly in the same row.
  */
 function createBackWall(parent: Entity): void {
   const sequence: Array<'plate' | 'trash'> = ['plate', 'plate', 'trash']

@@ -8,6 +8,7 @@
 
 import { Entity } from '@dcl/sdk/ecs'
 
+import { deliverHeldItem } from './deliveryCounter'
 import {
   attachItemToPlayerHand,
   discardHeldItem,
@@ -127,4 +128,13 @@ export function evaluateStoveInteraction(stove: Entity): InteractionResult {
 export function evaluateTrashBinInteraction(): InteractionResult {
   if (!hasHeldItem()) return { allowed: false, message: 'Nothing to discard' }
   return { allowed: true, perform: () => discardHeldItem() }
+}
+
+// --- Delivery counter ---
+// Allowed whenever holding anything; plays a success flourish. No
+// scoring/order system yet, so this always "succeeds" regardless of what's held.
+
+export function evaluateDeliveryCounterInteraction(): InteractionResult {
+  if (!hasHeldItem()) return { allowed: false, message: 'Nothing to deliver' }
+  return { allowed: true, perform: deliverHeldItem }
 }

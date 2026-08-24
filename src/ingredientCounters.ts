@@ -30,8 +30,7 @@ export const LEFT_SIDE_INGREDIENTS: IngredientDefinition[] = [
   { displayModel: MODELS.pattyDisplay, sliceModel: MODELS.pattyRaw },
   { displayModel: MODELS.bunBottomDisplay, sliceModel: MODELS.bunBottom },
   { displayModel: MODELS.bunTopDisplay, sliceModel: MODELS.bunTop },
-  { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg },
-  {} // TODO: bacon — no models yet. Counter is placed and highlights, shows "Not available yet".
+  { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg }
 ]
 
 export function createIngredientCounter(
