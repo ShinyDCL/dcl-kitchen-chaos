@@ -30,7 +30,16 @@ export const Messages = {
   // item to the sender's HeldItem — see server/stoveCooking.ts — which is
   // what stops two players racing the same finished stove from both
   // walking away with a copy.
-  collectFromStove: Schemas.Map({ stoveId: Schemas.Int })
+  collectFromStove: Schemas.Map({ stoveId: Schemas.Int }),
+
+  // Deliver whatever's just been taken out of the sender's hand (already
+  // removed client-side via takeHeldItemModels before this is sent). The
+  // server just timestamps it into the synced DeliveryState everyone
+  // animates from — unlike the stove, nothing scarce is handed out here,
+  // so no legality check is needed beyond that. deliveryCounterId is only
+  // used to pick a syncEntity id that doesn't collide with any other
+  // fixture's — see server/deliveryCounter.ts.
+  deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int })
 }
 
 export const room = registerMessages(Messages)

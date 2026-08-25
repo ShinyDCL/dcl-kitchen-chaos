@@ -1,13 +1,15 @@
 // Client bootstrap — called once from index.ts's main() on the client
 // branch. Builds the scene, then starts the systems that reconcile visuals
 // against server-synced state (see heldItem.ts's startRenderingHeldItems,
-// preparationCounters.ts's startRenderingPreparationCounters, and
-// stoveCooking.ts's startRenderingStoves).
+// preparationCounters.ts's startRenderingPreparationCounters,
+// stoveCooking.ts's startRenderingStoves, and deliveryCounter.ts's
+// startRenderingDeliveryCounter).
 
 import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
+import { startRenderingDeliveryCounter } from './deliveryCounter'
 import { startRenderingHeldItems } from './heldItem'
 import { startRenderingPreparationCounters } from './preparationCounters'
 import { createSceneLayout } from './sceneLayout'
@@ -24,4 +26,5 @@ export function initClient(): void {
   startRenderingHeldItems()
   startRenderingPreparationCounters()
   startRenderingStoves()
+  startRenderingDeliveryCounter()
 }

@@ -4,16 +4,22 @@
 // DELIVERY_ITEM_SHRINK_DURATION while a checkmark (the same model used on
 // stoves) spins and scales up above the pad. No scoring/order system yet.
 //
+// Reconciled against the server-synced DeliveryState (shared/schemas.ts)
+// rather than held as local truth — see the authoritative-server skill.
 // Only one delivery counter exists in the scene, so this keeps simple
 // module-level state rather than a Map keyed by fixture, unlike
-// stoveCooking.ts's per-stove state. Re-interacting while an item is
-// sitting/shrinking naturally shows "Nothing to deliver" — the player's
-// hand is already empty at that point (see interactionRules.ts), so no
-// extra locking is needed.
+// stoveCooking.ts's per-stove state.
 //
-// Two small systems, each a no-op when nothing's happening: one drives the
-// placed item's sit/shrink/removal, the other drives the checkmark's
-// spin+scale. No particles, no per-frame allocation — cheap on mobile.
+// Both animations (item sit+shrink, checkmark spin+scale) are pure
+// functions of `Date.now() - startTimestamp`, so nothing but the delivery
+// itself (models + one timestamp) is ever sent over the network — every
+// client, including the delivering player's own, derives the same
+// animation frame from that one shared instant, and a client that joins
+// mid-animation picks it up at the right point instead of restarting it.
+// deliverHeldItem still renders the item locally right away, ahead of the
+// round trip, for zero-latency feedback — unlike the stove's
+// collectFromStove, nothing scarce is at stake here, so predicting
+// optimistically is safe.
 
 import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -25,29 +31,16 @@ import {
   DELIVERY_ITEM_SIT_DURATION,
   FIXTURE_HEIGHT
 } from '../shared/constants'
+import { room } from '../shared/messages'
+import { MODELS } from '../shared/models'
+import { DeliveryState } from '../shared/schemas'
+import { getFixtureSyncId } from './fixtures'
 import { takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
-import { MODELS } from '../shared/models'
 import { getWorldPosition } from './worldPosition'
 
 let deliveryCounterEntity: Entity | null = null
 let checkmarkWorldPosition: Vector3 | null = null
-
-// --- Placed item: sit, then shrink ---
-
-type ItemPhase = 'idle' | 'sitting' | 'shrinking'
-let itemPhase: ItemPhase = 'idle'
-let itemsRoot: Entity | null = null
-let itemEntities: Entity[] = []
-let itemElapsedSeconds = 0
-let itemSystemRegistered = false
-
-// --- Checkmark: spin + scale ---
-
-let checkmarkEntity: Entity | null = null
-let checkmarkAnimating = false
-let checkmarkElapsedSeconds = 0
-let checkmarkSystemRegistered = false
 
 /** Call once when the delivery counter fixture is created. */
 export function registerDeliveryCounter(fixtureEntity: Entity): void {
@@ -60,76 +53,128 @@ export function registerDeliveryCounter(fixtureEntity: Entity): void {
   )
 }
 
-/** Takes whatever's held, places it on the counter, and starts the sit-then-shrink sequence. No-op if nothing's held. */
+/** Takes whatever's held, sends it to the server, and renders the sit-then-shrink sequence locally right away. No-op if nothing's held. */
 export function deliverHeldItem(): void {
   if (deliveryCounterEntity === null) return
 
   const models = takeHeldItemModels()
   if (models.length === 0) return
 
-  itemsRoot = engine.addEntity()
-  Transform.create(itemsRoot, { position: Vector3.create(0, FIXTURE_HEIGHT, 0), parent: deliveryCounterEntity })
+  const startTimestamp = Date.now()
+  void room.send('deliverHeldItem', { models, deliveryCounterId: getFixtureSyncId(deliveryCounterEntity) })
 
-  itemEntities = []
+  renderedModels = models
+  renderedStartTimestamp = startTimestamp
+  rebuildItemEntities(models)
+}
+
+function getSyncedState(): { models: string[]; startTimestamp: number } {
+  for (const [, data] of engine.getEntitiesWith(DeliveryState)) {
+    return { models: [...data.models], startTimestamp: Number(data.startTimestamp) }
+  }
+  return { models: [], startTimestamp: 0 }
+}
+
+function elapsedSince(startTimestamp: number): number {
+  return (Date.now() - startTimestamp) / 1000
+}
+
+// --- Rendering, reconciled against the synced DeliveryState component ---
+
+interface RenderedItem {
+  root: Entity
+  entities: Entity[]
+}
+
+let renderedItem: RenderedItem | null = null
+let renderedModels: string[] = []
+let renderedStartTimestamp = 0
+let checkmarkEntity: Entity | null = null
+let systemRegistered = false
+
+/** Reconciles the delivery counter's synced state against what's currently rendered. Call once during client setup. */
+export function startRenderingDeliveryCounter(): void {
+  if (systemRegistered) return
+  engine.addSystem(deliveryRenderSystem)
+  systemRegistered = true
+}
+
+function deliveryRenderSystem(): void {
+  const synced = getSyncedState()
+  const isSameDelivery = sameModels(synced.models, renderedModels) && synced.startTimestamp === renderedStartTimestamp
+  const withinItemWindow =
+    synced.models.length > 0 &&
+    elapsedSince(synced.startTimestamp) < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
+
+  if (!isSameDelivery || withinItemWindow !== (renderedItem !== null)) {
+    renderedModels = synced.models
+    renderedStartTimestamp = synced.startTimestamp
+    rebuildItemEntities(withinItemWindow ? synced.models : [])
+  }
+
+  if (renderedItem !== null) updateItemScale(synced.startTimestamp)
+  updateCheckmark(synced.models.length > 0, synced.startTimestamp)
+}
+
+function rebuildItemEntities(models: string[]): void {
+  if (renderedItem !== null) {
+    for (const entity of renderedItem.entities) engine.removeEntity(entity)
+    engine.removeEntity(renderedItem.root)
+    renderedItem = null
+  }
+  if (models.length === 0 || deliveryCounterEntity === null) return
+
+  const root = engine.addEntity()
+  Transform.create(root, { position: Vector3.create(0, FIXTURE_HEIGHT, 0), parent: deliveryCounterEntity })
+
+  const entities: Entity[] = []
   let cumulativeHeight = 0
   for (const model of models) {
     const item = engine.addEntity()
-    Transform.create(item, { position: Vector3.create(0, cumulativeHeight, 0), parent: itemsRoot })
+    Transform.create(item, { position: Vector3.create(0, cumulativeHeight, 0), parent: root })
     GltfContainer.create(item, { src: model })
-    itemEntities.push(item)
+    entities.push(item)
     cumulativeHeight += getItemHeight(model)
   }
 
-  itemPhase = 'sitting'
-  itemElapsedSeconds = 0
-  ensureItemSystemRegistered()
+  renderedItem = { root, entities }
 }
 
-function ensureItemSystemRegistered(): void {
-  if (itemSystemRegistered) return
-  engine.addSystem(itemSystem)
-  itemSystemRegistered = true
-}
+function updateItemScale(startTimestamp: number): void {
+  if (renderedItem === null) return
 
-function itemSystem(dt: number): void {
-  if (itemPhase === 'idle') return
-  itemElapsedSeconds += dt
-
-  if (itemPhase === 'sitting') {
-    if (itemElapsedSeconds >= DELIVERY_ITEM_SIT_DURATION) {
-      itemPhase = 'shrinking'
-      itemElapsedSeconds = 0
-      playCheckmarkAnimation()
-    }
+  const elapsed = elapsedSince(startTimestamp)
+  if (elapsed < DELIVERY_ITEM_SIT_DURATION) {
+    Transform.getMutable(renderedItem.root).scale = Vector3.One()
     return
   }
 
-  // shrinking
-  const t = Math.min(itemElapsedSeconds / DELIVERY_ITEM_SHRINK_DURATION, 1)
-  if (itemsRoot !== null) {
-    const scale = 1 - t
-    Transform.getMutable(itemsRoot).scale = Vector3.create(scale, scale, scale)
-  }
-
-  if (t >= 1) {
-    for (const item of itemEntities) engine.removeEntity(item)
-    if (itemsRoot !== null) engine.removeEntity(itemsRoot)
-    itemEntities = []
-    itemsRoot = null
-    itemPhase = 'idle'
-  }
+  const shrinkT = Math.min((elapsed - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_ITEM_SHRINK_DURATION, 1)
+  const scale = 1 - shrinkT
+  Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 
-function playCheckmarkAnimation(): void {
-  if (!checkmarkWorldPosition) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
+/** The checkmark's whole spin+scale animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
+function updateCheckmark(active: boolean, startTimestamp: number): void {
+  if (checkmarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
   const checkmark = getOrCreateCheckmark()
-  Transform.getMutable(checkmark).scale = Vector3.Zero()
-  VisibilityComponent.getMutable(checkmark).visible = true
-  checkmarkElapsedSeconds = 0
-  checkmarkAnimating = true
+  if (!active) {
+    VisibilityComponent.getMutable(checkmark).visible = false
+    return
+  }
 
-  ensureCheckmarkSystemRegistered()
+  // Scale up then back down across the duration — a simple triangle curve
+  // peaking at the midpoint. Starts once the item finishes sitting.
+  const t = (elapsedSince(startTimestamp) - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_CHECKMARK_DURATION
+  if (t < 0 || t > 1) {
+    VisibilityComponent.getMutable(checkmark).visible = false
+    return
+  }
+
+  VisibilityComponent.getMutable(checkmark).visible = true
+  const scale = t < 0.5 ? t / 0.5 : (1 - t) / 0.5
+  Transform.getMutable(checkmark).scale = Vector3.create(scale, scale, scale)
 }
 
 function getOrCreateCheckmark(): Entity {
@@ -148,25 +193,6 @@ function getOrCreateCheckmark(): Entity {
   return checkmark
 }
 
-function ensureCheckmarkSystemRegistered(): void {
-  if (checkmarkSystemRegistered) return
-  engine.addSystem(checkmarkAnimationSystem)
-  checkmarkSystemRegistered = true
-}
-
-function checkmarkAnimationSystem(dt: number): void {
-  if (!checkmarkAnimating || checkmarkEntity === null) return
-
-  checkmarkElapsedSeconds += dt
-  const t = Math.min(checkmarkElapsedSeconds / DELIVERY_CHECKMARK_DURATION, 1)
-
-  // Scale up then back down across the duration — a simple triangle curve
-  // peaking at the midpoint.
-  const scale = t < 0.5 ? t / 0.5 : (1 - t) / 0.5
-  Transform.getMutable(checkmarkEntity).scale = Vector3.create(scale, scale, scale)
-
-  if (t >= 1) {
-    checkmarkAnimating = false
-    VisibilityComponent.getMutable(checkmarkEntity).visible = false
-  }
+function sameModels(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((model, index) => model === b[index])
 }

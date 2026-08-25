@@ -61,3 +61,21 @@ export const StoveState = engine.defineComponent('game::StoveState', {
 if (isServer()) {
   StoveState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
 }
+
+/**
+ * Singleton — the scene only ever creates one delivery counter (see
+ * client/sceneLayout.ts). `models` is what was last delivered (bottom to
+ * top), empty meaning nothing to show right now. `startTimestamp` (server
+ * clock, ms) is when that delivery landed; every client derives both the
+ * item sit/shrink animation and the checkmark flourish from
+ * `Date.now() - startTimestamp`, the same reasoning as StoveState, so
+ * there's no separate phase/progress field to keep in sync.
+ */
+export const DeliveryState = engine.defineComponent('game::DeliveryState', {
+  models: Schemas.Array(Schemas.String),
+  startTimestamp: Schemas.Int64
+})
+
+if (isServer()) {
+  DeliveryState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}
