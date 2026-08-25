@@ -16,8 +16,8 @@ import {
   isHoldingAssembledItem,
   peekHeldItemModel
 } from './heldItem'
-import { classifyItem, getCookableItemDefinition } from './ingredients'
-import { MODELS } from './models'
+import { classifyItem, getCookableItemDefinition } from '../shared/ingredients'
+import { MODELS } from '../shared/models'
 import {
   getPreparationCounterSnapshot,
   pickUpAssembledFromCounter,

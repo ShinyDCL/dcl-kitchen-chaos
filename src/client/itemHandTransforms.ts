@@ -11,7 +11,7 @@
 
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { MODELS } from './models'
+import { MODELS } from '../shared/models'
 
 export interface HandTransform {
   position: Vector3

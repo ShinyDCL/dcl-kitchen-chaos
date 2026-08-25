@@ -58,10 +58,10 @@ import {
   SMOKE_SPAWN_RADIUS,
   SMOKE_TEXTURE,
   STOVE_ITEM_OFFSET
-} from './constants'
+} from '../shared/constants'
+import { CookableIngredientDefinition } from '../shared/ingredients'
+import { MODELS } from '../shared/models'
 import { attachItemToPlayerHand, takeHeldItem } from './heldItem'
-import { CookableIngredientDefinition } from './ingredients'
-import { MODELS } from './models'
 import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {

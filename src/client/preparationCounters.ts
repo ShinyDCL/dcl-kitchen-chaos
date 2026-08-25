@@ -6,10 +6,10 @@
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
-import { FIXTURE_HEIGHT } from './constants'
+import { FIXTURE_HEIGHT } from '../shared/constants'
+import { MODELS } from '../shared/models'
 import { attachAssembledItemToPlayerHand, attachItemToPlayerHand, takeHeldItem, takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
-import { MODELS } from './models'
 
 interface CounterState {
   plateEntity: Entity | null

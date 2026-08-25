@@ -24,10 +24,10 @@ import {
   DELIVERY_ITEM_SHRINK_DURATION,
   DELIVERY_ITEM_SIT_DURATION,
   FIXTURE_HEIGHT
-} from './constants'
+} from '../shared/constants'
 import { takeHeldItemModels } from './heldItem'
 import { getItemHeight } from './itemHeights'
-import { MODELS } from './models'
+import { MODELS } from '../shared/models'
 import { getWorldPosition } from './worldPosition'
 
 let deliveryCounterEntity: Entity | null = null

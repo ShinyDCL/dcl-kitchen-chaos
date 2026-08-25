@@ -21,7 +21,7 @@
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { FACING_THRESHOLD, INTERACTION_RANGE } from './constants'
+import { FACING_THRESHOLD, INTERACTION_RANGE } from '../shared/constants'
 import { showMessage } from './fixtureMessage'
 import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
 import { InteractionResult } from './interactionRules'

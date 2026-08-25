@@ -20,7 +20,8 @@ import {
   FIXTURE_WIDTH,
   FRONT_ROW_DISTANCE,
   SIDE_WALL_DISTANCE
-} from './constants'
+} from '../shared/constants'
+import { MODELS } from '../shared/models'
 import { registerDeliveryCounter } from './deliveryCounter'
 import { createFixture } from './fixtures'
 import {
@@ -36,7 +37,6 @@ import {
   evaluateStoveInteraction,
   evaluateTrashBinInteraction
 } from './interactionRules'
-import { MODELS } from './models'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)

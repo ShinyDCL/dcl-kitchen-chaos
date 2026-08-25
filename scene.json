@@ -48,5 +48,9 @@
   "featureToggles": {
     "voiceChat": "enabled",
     "portableExperiences": "enabled"
-  }
+  },
+  "worldConfiguration": {
+    "name": "gardens.dcl.eth"
+  },
+  "authoritativeMultiplayer": true
 }

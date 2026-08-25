@@ -1,15 +1,20 @@
-import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
-import { Vector3 } from '@dcl/sdk/math'
+import { isServer } from '@dcl/sdk/network'
 
-import { SCENE_CENTER } from './constants'
-import { createSceneLayout } from './sceneLayout'
+// Static imports so registerMessages()/defineComponent() run during initial
+// module load, on both client and server — see the authoritative-server
+// skill's module-load-timing rule. Everything else is dynamically imported
+// per-branch below so server-only code (@dcl/sdk/server) never reaches the
+// client bundle, and vice versa.
+import './shared/messages'
+import './shared/schemas'
 
-export function main() {
-  const scene = engine.addEntity()
-  Transform.create(scene, {
-    position: Vector3.create(SCENE_CENTER, 0, SCENE_CENTER)
-  })
-  GltfContainer.create(scene, { src: 'assets/scene/models/Scene.glb' })
+export async function main() {
+  if (isServer()) {
+    const { initServer } = await import('./server/server')
+    initServer()
+    return
+  }
 
-  createSceneLayout(scene)
+  const { initClient } = await import('./client/setup')
+  initClient()
 }

@@ -3,7 +3,7 @@
 // below is a 0.1m placeholder until the real models are measured — edit
 // individual entries as accurate heights become available.
 
-import { MODELS } from './models'
+import { MODELS } from '../shared/models'
 
 export const DEFAULT_ITEM_HEIGHT = 0.1
 

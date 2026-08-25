@@ -24,12 +24,16 @@ export interface FixtureOptions {
   evaluateInteraction?: (fixtureEntity: Entity) => InteractionResult
 }
 
+let nextFixtureSyncId = 0
+const fixtureSyncIds = new Map<Entity, number>()
+
 export function createFixture(options: FixtureOptions): Entity {
   const { model, position, rotation, parent, height, displayModel, evaluateInteraction } = options
 
   const fixture = engine.addEntity()
   Transform.create(fixture, { position, rotation, parent })
   GltfContainer.create(fixture, { src: model })
+  fixtureSyncIds.set(fixture, nextFixtureSyncId++)
 
   if (displayModel) {
     const display = engine.addEntity()
@@ -48,4 +52,16 @@ export function createFixture(options: FixtureOptions): Entity {
   registerFocusableFixture(focusAnchor, evaluateInteraction ? () => evaluateInteraction(fixture) : undefined)
 
   return fixture
+}
+
+/**
+ * Stable numeric ID assigned in scene-build order — identical on every
+ * client, since createSceneLayout runs the same fixture-creation calls in
+ * the same order for everyone. Not used yet; it's the syncId a fixture will
+ * need once its own state (not just the player's held item) gets networked.
+ */
+export function getFixtureSyncId(fixture: Entity): number {
+  const id = fixtureSyncIds.get(fixture)
+  if (id === undefined) throw new Error('Entity is not a registered fixture')
+  return id
 }
