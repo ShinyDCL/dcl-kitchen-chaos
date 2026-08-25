@@ -127,6 +127,22 @@ export function startRenderingHeldItems(): void {
   systemRegistered = true
 }
 
+const lastSyncedHeldItems = new Map<string, string[]>() // last models actually observed from the synced component, per playerId
+
+/**
+ * Renders each player's held item, but only reacts to a player's synced
+ * state when it has actually changed since this was last observed — not
+ * whenever it merely differs from what's currently rendered. Right after
+ * this client's own optimistic applyLocally call, a live read of the local
+ * player's synced HeldItem is briefly stale (the server hasn't processed
+ * the setHeldItem message yet); comparing against "what's rendered"
+ * instead of "what was last observed" would treat that staleness as a
+ * real mismatch and revert the just-cleared hand back to holding the item,
+ * only to clear it again a moment later once the real update lands — the
+ * item visibly "detaches late." Gating on an actual change means a stale
+ * read is a no-op, and the real update (once it arrives) matches the
+ * already-applied local prediction, so nothing visibly reverts at all.
+ */
 function heldItemsSystem(): void {
   const localId = localPlayerId()
   const seenPlayerIds = new Set<string>()
@@ -134,7 +150,13 @@ function heldItemsSystem(): void {
   for (const [, data] of engine.getEntitiesWith(HeldItem)) {
     const playerId = data.playerId.toLowerCase()
     seenPlayerIds.add(playerId)
-    renderHeldItem(playerId, [...data.models])
+
+    const models = [...data.models]
+    const lastSynced = lastSyncedHeldItems.get(playerId) ?? []
+    if (sameModels(models, lastSynced)) continue // nothing new from the server since last frame
+    lastSyncedHeldItems.set(playerId, models)
+
+    renderHeldItem(playerId, models)
   }
 
   for (const playerId of renderedHeldItems.keys()) {

@@ -97,6 +97,7 @@ interface RenderedCook {
 
 const stoveVisuals = new Map<Entity, StoveVisuals>()
 const renderedCooks = new Map<Entity, RenderedCook>()
+const lastSyncedStates = new Map<Entity, { rawModel: string; startTimestamp: number }>()
 const registeredStoves: Entity[] = []
 
 export type StoveStatus = 'idle' | 'cooking' | 'done'
@@ -105,15 +106,24 @@ export type StoveStatus = 'idle' | 'cooking' | 'done'
 export function registerStove(stove: Entity): void {
   registeredStoves.push(stove)
   renderedCooks.set(stove, emptyRenderedCook())
+  lastSyncedStates.set(stove, { rawModel: '', startTimestamp: 0 })
   getOrCreateVisuals(stove) // build the persistent progress bar / smoke emitter up front, hidden/inactive
 }
 
+/**
+ * Reads from renderedCooks — this client's current belief, kept correct
+ * every frame by tickProgress — rather than a raw live poll of the synced
+ * component. interactionRules.ts calls this to decide whether cooking is
+ * allowed (drives the focus highlight's color/message); right after this
+ * client's own optimistic startCookingOnStove call, a raw poll is briefly
+ * stale (the server hasn't processed the intent yet), which would flip the
+ * highlight back to "idle" rules for a moment until the real update caught
+ * up.
+ */
 export function getStoveStatus(stove: Entity): StoveStatus {
-  const { rawModel, startTimestamp } = getSyncedState(stove)
-  if (rawModel === '') return 'idle'
-  const definition = getCookableItemDefinition(rawModel)
-  if (!definition) return 'idle' // shouldn't happen — unknown rawModel
-  return elapsedSeconds(startTimestamp) >= definition.cookDurationSeconds ? 'done' : 'cooking'
+  const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
+  if (rendered.rawModel === '') return 'idle'
+  return rendered.done ? 'done' : 'cooking'
 }
 
 export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
@@ -152,24 +162,46 @@ export function startRenderingStoves(): void {
 
 function stoveCookingSystem(): void {
   for (const stove of registeredStoves) {
-    reconcileStove(stove, getSyncedState(stove))
+    reconcileTransition(stove)
+    tickProgress(stove)
   }
 }
 
-function reconcileStove(stove: Entity, synced: { rawModel: string; startTimestamp: number }): void {
+/**
+ * Applies a rawModel/startTimestamp transition, but only when the SYNCED
+ * value has actually changed since this was last observed — not whenever
+ * it merely differs from what's currently rendered. Right after this
+ * client's own optimistic startCookingOnStove call, a live read is briefly
+ * stale (the server hasn't processed the intent yet); comparing against
+ * "what's rendered" instead of "what was last observed" would treat that
+ * staleness as a real mismatch and revert the optimistic visual, only to
+ * reapply it a moment later once the real update lands — a spurious
+ * flicker. Gating on an actual change means a stale read is a no-op, and
+ * the real update (once it arrives) is compared against the (usually
+ * already-matching) local prediction inside applySyncedState's caller, so
+ * nothing visibly rebuilds in the common, uncontested case.
+ */
+function reconcileTransition(stove: Entity): void {
+  const synced = getSyncedState(stove)
+  const lastSynced = lastSyncedStates.get(stove) ?? { rawModel: '', startTimestamp: 0 }
+  if (synced.rawModel === lastSynced.rawModel && synced.startTimestamp === lastSynced.startTimestamp) return
+  lastSyncedStates.set(stove, synced)
+
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
-
-  if (synced.rawModel !== rendered.rawModel) {
+  if (synced.rawModel !== rendered.rawModel || synced.startTimestamp !== rendered.startTimestamp) {
     applySyncedState(stove, synced)
-    return
   }
+}
 
-  if (synced.rawModel === '') return // idle, nothing more to do this frame
+/** Continuous per-frame progress, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
+function tickProgress(stove: Entity): void {
+  const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
+  if (rendered.rawModel === '') return // idle, nothing to advance
 
-  const definition = getCookableItemDefinition(synced.rawModel)
+  const definition = getCookableItemDefinition(rendered.rawModel)
   if (!definition) return // shouldn't happen — unknown rawModel
 
-  const progress = Math.min(elapsedSeconds(synced.startTimestamp) / definition.cookDurationSeconds, 1)
+  const progress = Math.min(elapsedSeconds(rendered.startTimestamp) / definition.cookDurationSeconds, 1)
   updateFill(getOrCreateVisuals(stove).progressBar, progress)
 
   if (progress >= 1 && !rendered.done) {

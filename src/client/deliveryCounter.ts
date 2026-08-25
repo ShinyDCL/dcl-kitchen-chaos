@@ -65,7 +65,7 @@ export function deliverHeldItem(): void {
 
   renderedModels = models
   renderedStartTimestamp = startTimestamp
-  rebuildItemEntities(models)
+  tickDeliveryAnimation() // builds/scales from the values just set, same as the system's per-frame call
 }
 
 function getSyncedState(): { models: string[]; startTimestamp: number } {
@@ -89,6 +89,8 @@ interface RenderedItem {
 let renderedItem: RenderedItem | null = null
 let renderedModels: string[] = []
 let renderedStartTimestamp = 0
+let lastSyncedModels: string[] = []
+let lastSyncedStartTimestamp = 0
 let checkmarkEntity: Entity | null = null
 let systemRegistered = false
 
@@ -100,20 +102,47 @@ export function startRenderingDeliveryCounter(): void {
 }
 
 function deliveryRenderSystem(): void {
-  const synced = getSyncedState()
-  const isSameDelivery = sameModels(synced.models, renderedModels) && synced.startTimestamp === renderedStartTimestamp
-  const withinItemWindow =
-    synced.models.length > 0 &&
-    elapsedSince(synced.startTimestamp) < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
+  reconcileDelivery()
+  tickDeliveryAnimation()
+}
 
-  if (!isSameDelivery || withinItemWindow !== (renderedItem !== null)) {
-    renderedModels = synced.models
-    renderedStartTimestamp = synced.startTimestamp
-    rebuildItemEntities(withinItemWindow ? synced.models : [])
+/**
+ * Points renderedModels/renderedStartTimestamp at the synced delivery, but
+ * only when the SYNCED value has actually changed since this was last
+ * observed — not whenever it merely differs from what's currently
+ * rendered. Right after this client's own optimistic deliverHeldItem call,
+ * a live read is briefly stale (the server hasn't processed the intent
+ * yet); comparing against "what's rendered" instead of "what was last
+ * observed" would treat that staleness as a real mismatch and revert the
+ * optimistic visual, only to reapply it a moment later once the real
+ * update lands — a spurious flicker. Gating on an actual change means a
+ * stale read is a no-op, and the real update (once it arrives) is compared
+ * against the usually-already-matching local prediction, so nothing
+ * visibly rebuilds in the common case.
+ */
+function reconcileDelivery(): void {
+  const synced = getSyncedState()
+  if (sameModels(synced.models, lastSyncedModels) && synced.startTimestamp === lastSyncedStartTimestamp) return
+  lastSyncedModels = synced.models
+  lastSyncedStartTimestamp = synced.startTimestamp
+
+  if (sameModels(synced.models, renderedModels) && synced.startTimestamp === renderedStartTimestamp) return
+  renderedModels = synced.models
+  renderedStartTimestamp = synced.startTimestamp
+}
+
+/** Continuous per-frame animation, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
+function tickDeliveryAnimation(): void {
+  const active = renderedModels.length > 0
+  const withinItemWindow =
+    active && elapsedSince(renderedStartTimestamp) < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
+
+  if (withinItemWindow !== (renderedItem !== null)) {
+    rebuildItemEntities(withinItemWindow ? renderedModels : [])
   }
 
-  if (renderedItem !== null) updateItemScale(synced.startTimestamp)
-  updateCheckmark(synced.models.length > 0, synced.startTimestamp)
+  if (renderedItem !== null) updateItemScale(renderedStartTimestamp)
+  updateCheckmark(active, renderedStartTimestamp)
 }
 
 function rebuildItemEntities(models: string[]): void {

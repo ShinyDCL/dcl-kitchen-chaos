@@ -14,13 +14,23 @@
 // the same time and have both stick, instead of whichever client's
 // computed-full-state push lands last silently discarding the other's.
 // A single reconciliation system, started by
-// startRenderingPreparationCounters, compares every registered counter's
-// synced state against what's currently rendered and rebuilds on any
-// mismatch — for the acting client this is normally a same-state no-op
-// once its own intent round-trips, but it's what makes the counter visible
-// to every OTHER player, and what folds in whatever else changed
-// concurrently (another player's own addition, a lost pickup race) that
-// this client's local prediction couldn't have known about yet.
+// startRenderingPreparationCounters, is what makes the counter visible to
+// every OTHER player, and what folds in whatever else changed concurrently
+// (another player's own addition, a lost pickup race) that this client's
+// local prediction couldn't have known about yet.
+//
+// It only reacts when the synced state itself has changed since the last
+// frame it was observed (lastSyncedStates) — NOT whenever it merely
+// differs from what's currently rendered. Right after this client's own
+// optimistic render, the synced read is briefly stale (the server hasn't
+// processed the intent yet), which would otherwise look identical to a
+// real mismatch and cause a spurious revert-then-reapply flicker: the
+// still-stale read reverts the optimistic visual, then the real update
+// lands a moment later and reapplies it. Gating on an actual change in the
+// synced value means a merely-stale read is a no-op, and once the real
+// update does arrive it's compared against the (usually already-matching)
+// local prediction inside renderCounter, so nothing visibly rebuilds at
+// all in the common, uncontested case.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -45,11 +55,13 @@ interface RenderedCounter extends CounterContents {
 
 const registeredCounters: Entity[] = []
 const renderedStates = new Map<Entity, RenderedCounter>()
+const lastSyncedStates = new Map<Entity, CounterContents>()
 
 /** Registers a preparation counter fixture so its state gets rendered and reconciled. Call once per counter during scene setup. */
 export function registerPreparationCounter(counter: Entity): void {
   registeredCounters.push(counter)
   renderedStates.set(counter, emptyRenderedCounter())
+  lastSyncedStates.set(counter, emptyContents())
 }
 
 /** Reconciles every registered counter's synced state against what's currently rendered. Call once during client setup. */
@@ -63,7 +75,12 @@ let reconcileSystemRegistered = false
 
 function reconcileCountersSystem(): void {
   for (const counter of registeredCounters) {
-    renderCounter(counter, getSyncedContents(counter))
+    const synced = getSyncedContents(counter)
+    const lastSynced = lastSyncedStates.get(counter) ?? emptyContents()
+    if (sameContents(synced, lastSynced)) continue // nothing new from the server since last frame
+
+    lastSyncedStates.set(counter, synced)
+    renderCounter(counter, synced)
   }
 }
 
@@ -72,9 +89,25 @@ export interface PreparationCounterSnapshot {
   ingredientCount: number
 }
 
+/**
+ * Reads the counter's contents for interaction-legality decisions
+ * (interactionRules.ts, which drives the focus highlight's color/message) —
+ * from renderedStates, this client's current belief, NOT a raw live poll of
+ * the synced component. Right after this client's own optimistic action, a
+ * raw poll is briefly stale (the server hasn't processed the intent yet);
+ * evaluating "is placing/picking up allowed" against that stale snapshot
+ * instead of the already-updated prediction is what caused the highlight
+ * to flip allowed/disallowed (and its message) for a moment after placing
+ * or picking something up, until the real update caught up.
+ */
 export function getPreparationCounterSnapshot(counter: Entity): PreparationCounterSnapshot {
-  const { hasPlate, ingredientModels } = getSyncedContents(counter)
+  const { hasPlate, ingredientModels } = getRenderedContents(counter)
   return { hasPlate, ingredientCount: ingredientModels.length }
+}
+
+function getRenderedContents(counter: Entity): CounterContents {
+  const rendered = renderedStates.get(counter)
+  return rendered ? { hasPlate: rendered.hasPlate, ingredientModels: [...rendered.ingredientModels] } : emptyContents()
 }
 
 function getSyncedContents(counter: Entity): CounterContents {
@@ -88,20 +121,20 @@ function getSyncedContents(counter: Entity): CounterContents {
 export function placePlateOnCounter(counter: Entity): void {
   takeHeldItem()
   void room.send('placePlateOnCounter', { counterId: getFixtureSyncId(counter) })
-  const { ingredientModels } = getSyncedContents(counter)
+  const { ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate: true, ingredientModels })
 }
 
 export function pickUpPlateFromCounter(counter: Entity): void {
   attachItemToPlayerHand(MODELS.plate)
   void room.send('pickUpPlateFromCounter', { counterId: getFixtureSyncId(counter) })
-  const { ingredientModels } = getSyncedContents(counter)
+  const { ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate: false, ingredientModels })
 }
 
 /** Picks up just the ingredient stack as an assembled item — the plate stays on the counter. */
 export function pickUpAssembledFromCounter(counter: Entity): void {
-  const { hasPlate, ingredientModels } = getSyncedContents(counter)
+  const { hasPlate, ingredientModels } = getRenderedContents(counter)
   attachAssembledItemToPlayerHand(ingredientModels)
   void room.send('pickUpAssembledFromCounter', { counterId: getFixtureSyncId(counter) })
   renderCounter(counter, { hasPlate, ingredientModels: [] })
@@ -111,7 +144,7 @@ export function placeIngredientOnCounter(counter: Entity): void {
   const placedModel = takeHeldItem()
   if (!placedModel) return
   void room.send('placeIngredientOnCounter', { counterId: getFixtureSyncId(counter), model: placedModel })
-  const { hasPlate, ingredientModels } = getSyncedContents(counter)
+  const { hasPlate, ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, placedModel] })
 }
 
@@ -120,7 +153,7 @@ export function placeAssembledOnCounter(counter: Entity): void {
   const models = takeHeldItemModels()
   if (models.length === 0) return
   void room.send('placeAssembledOnCounter', { counterId: getFixtureSyncId(counter), models })
-  const { hasPlate, ingredientModels } = getSyncedContents(counter)
+  const { hasPlate, ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
 }
 
@@ -166,6 +199,10 @@ function placeVisual(counter: Entity, model: string, yOffset: number): Entity {
 
 function emptyRenderedCounter(): RenderedCounter {
   return { hasPlate: false, ingredientModels: [], plateEntity: null, ingredientEntities: [] }
+}
+
+function emptyContents(): CounterContents {
+  return { hasPlate: false, ingredientModels: [] }
 }
 
 function sameContents(a: CounterContents, b: CounterContents): boolean {
