@@ -38,6 +38,7 @@ import {
   evaluateTrashBinInteraction
 } from './interactionRules'
 import { registerPreparationCounter } from './preparationCounters'
+import { registerStove } from './stoveCooking'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
@@ -121,6 +122,7 @@ function createFrontRow(parent: Entity): void {
     })
 
     if (kind === 'counter') registerPreparationCounter(fixture)
+    else registerStove(fixture)
   })
 }
 

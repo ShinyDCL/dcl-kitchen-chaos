@@ -41,3 +41,23 @@ export const PreparationCounterState = engine.defineComponent('game::Preparation
 if (isServer()) {
   PreparationCounterState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
 }
+
+/**
+ * One entity per stove. `rawModel` is '' while idle, otherwise the
+ * CookableIngredientDefinition.heldModel key (shared/ingredients.ts) for
+ * whatever's cooking — cookedModel/cookDurationSeconds are looked up from
+ * that, never sent over the wire. `startTimestamp` (server clock, ms) is
+ * when the cook began; every client derives progress/done-ness from
+ * `Date.now() - startTimestamp` locally instead of a per-tick synced
+ * counter. `stoveId` doubles as this entity's explicit syncEntity id, same
+ * reasoning as PreparationCounterState's counterId.
+ */
+export const StoveState = engine.defineComponent('game::StoveState', {
+  stoveId: Schemas.Int,
+  rawModel: Schemas.String,
+  startTimestamp: Schemas.Int64
+})
+
+if (isServer()) {
+  StoveState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}

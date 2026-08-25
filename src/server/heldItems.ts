@@ -26,11 +26,16 @@ export function initHeldItems(): void {
 
   room.onMessage('setHeldItem', (data, context) => {
     if (!context) return
-    const entity = getOrCreatePlayerEntity(context.from.toLowerCase())
-    const mutable = HeldItem.getMutableOrNull(entity)
-    if (!mutable) return
-    mutable.models = data.models
+    grantHeldItem(context.from.toLowerCase(), data.models)
   })
+}
+
+/** Sets a player's held item directly — used by other server modules that hand out an item as the result of a validated action (e.g. stoveCooking.ts's collectFromStove). */
+export function grantHeldItem(playerId: string, models: string[]): void {
+  const entity = getOrCreatePlayerEntity(playerId)
+  const mutable = HeldItem.getMutableOrNull(entity)
+  if (!mutable) return
+  mutable.models = models
 }
 
 function getOrCreatePlayerEntity(playerId: string): Entity {

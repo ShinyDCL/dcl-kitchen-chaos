@@ -1,7 +1,9 @@
-// Tracks whatever item is currently attached to the LOCAL player's right
-// hand, and renders it instantly with no network round-trip. Uses the
-// parent+child AvatarAttach pattern: an invisible parent tracks the hand
-// anchor, and one or more visible model entities sit under it.
+// Renders every player's held item — including the local player's own
+// hand — reconciled against the server-synced HeldItem component
+// (shared/schemas.ts) rather than held as local truth, the same pattern
+// preparationCounters.ts and stoveCooking.ts use. Uses the parent+child
+// AvatarAttach pattern: an invisible parent tracks the hand anchor for a
+// given avatarId, and one or more visible model entities sit under it.
 //
 // Most pickups are a single model (attachItemToPlayerHand). Picking up
 // everything off a plate on a preparation counter is an "assembled" stack
@@ -11,16 +13,20 @@
 // itemHeights.ts, the same way preparationCounters.ts stacks items on a
 // counter.
 //
-// This is server-authoritative multiplayer (see the authoritative-server
-// skill), not the serverless syncEntity pattern — so the local player's own
-// hand renders immediately from local state, and every change also sends a
-// setHeldItem message so the server can update the synced HeldItem
-// component (shared/schemas.ts) that everyone else reads. The second half
-// of this file, starting at startRenderingRemoteHeldItems, reacts to that
-// synced component to build/tear down the same kind of hand-anchored
-// visual for every OTHER player, since their state only arrives over the
-// network. The server doesn't validate WHICH model is legal to hold yet —
-// see server/heldItems.ts — so this is a visibility fix, not anti-cheat.
+// Local mutators (attachItemToPlayerHand, takeHeldItem, discardHeldItem,
+// ...) render the local player's hand immediately for zero-latency
+// feedback AND send a setHeldItem message so the server updates the synced
+// component everyone reads. The reconciliation system started by
+// startRenderingHeldItems compares every player's synced state (local
+// player included) against what's currently rendered and corrects any
+// mismatch — this is what makes the item visible to every OTHER player,
+// and what corrects THIS client's own guess if the server ends up
+// disagreeing with it (e.g. stoveCooking.ts's collectFromStove, which
+// deliberately renders nothing optimistically because a race there would
+// mean duplicating a scarce cooked item — see its comment). The server
+// still doesn't validate WHICH model is legal for the general
+// attach/discard path — see server/heldItems.ts — so outside of the stove
+// collect flow this remains a visibility fix, not anti-cheat.
 //
 // takeHeldItem only returns a model for a single-item hold — it returns
 // null for an assembled stack, since there's no single model to hand back;
@@ -38,15 +44,21 @@ import { getHandTransform } from './itemHandTransforms'
 import { getItemHeight } from './itemHeights'
 import { getLocalUserId } from './playerIdentity'
 
-// --- Local player's own held item ---
-
-interface LocalHeldItem {
+interface RenderedHeldItem {
   parent: Entity
   children: Entity[]
   models: string[]
 }
 
-let heldItem: LocalHeldItem | null = null
+const renderedHeldItems = new Map<string, RenderedHeldItem>() // keyed by lower-cased playerId
+
+function localPlayerId(): string {
+  return getLocalUserId().toLowerCase()
+}
+
+function localState(): RenderedHeldItem | undefined {
+  return renderedHeldItems.get(localPlayerId())
+}
 
 export function attachItemToPlayerHand(model: string): void {
   attachModelsToPlayerHand([model])
@@ -58,23 +70,104 @@ export function attachAssembledItemToPlayerHand(models: string[]): void {
 }
 
 function attachModelsToPlayerHand(models: string[]): void {
-  clearLocalVisuals()
-  if (models.length === 0) return
+  applyLocally(models)
+}
 
-  const parent = engine.addEntity()
-  AvatarAttach.create(parent, { anchorPointId: AvatarAnchorPointType.AAPT_RIGHT_HAND })
-
-  heldItem = { parent, children: buildHandStack(parent, models), models }
+/** Sends the local player's new hand contents to the server and renders it immediately, ahead of the round trip. */
+function applyLocally(models: string[]): void {
   void room.send('setHeldItem', { models })
+  renderHeldItem(localPlayerId(), models)
+}
+
+/** True if the player currently has anything in hand (single item or assembled stack). */
+export function hasHeldItem(): boolean {
+  return (localState()?.models.length ?? 0) > 0
+}
+
+/** True if the held item is a multi-model assembled stack rather than a single item. */
+export function isHoldingAssembledItem(): boolean {
+  return (localState()?.models.length ?? 0) > 1
+}
+
+/** Returns the held item's model if it's a single item, or null if empty-handed or holding an assembled stack. */
+export function peekHeldItemModel(): string | null {
+  const state = localState()
+  if (!state || state.models.length !== 1) return null
+  return state.models[0]
+}
+
+/** Removes a single-item hold and returns its model, or null if empty-handed or holding an assembled stack. */
+export function takeHeldItem(): string | null {
+  const model = peekHeldItemModel()
+  if (model === null) return null
+  applyLocally([])
+  return model
+}
+
+/** Removes the held item (single or assembled) and returns its models in stacking order, or an empty array if empty-handed. */
+export function takeHeldItemModels(): string[] {
+  const models = localState()?.models ?? []
+  applyLocally([])
+  return models
+}
+
+/** Removes whatever's held (single or assembled) without returning anything. */
+export function discardHeldItem(): void {
+  applyLocally([])
+}
+
+// --- Rendering, reconciled against the synced HeldItem component ---
+
+let systemRegistered = false
+
+/** Starts rendering every player's held item, local player included. Call once during client setup. */
+export function startRenderingHeldItems(): void {
+  if (systemRegistered) return
+  engine.addSystem(heldItemsSystem)
+  systemRegistered = true
+}
+
+function heldItemsSystem(): void {
+  const localId = localPlayerId()
+  const seenPlayerIds = new Set<string>()
+
+  for (const [, data] of engine.getEntitiesWith(HeldItem)) {
+    const playerId = data.playerId.toLowerCase()
+    seenPlayerIds.add(playerId)
+    renderHeldItem(playerId, [...data.models])
+  }
+
+  for (const playerId of renderedHeldItems.keys()) {
+    if (playerId === localId) continue // an unsynced local prediction is expected, not stale — see applyLocally
+    if (!seenPlayerIds.has(playerId)) renderHeldItem(playerId, [])
+  }
+}
+
+function renderHeldItem(playerId: string, models: string[]): void {
+  const existing = renderedHeldItems.get(playerId)
+  if (existing && sameModels(existing.models, models)) return
+  if (existing) removeVisual(existing)
+
+  if (models.length === 0) {
+    renderedHeldItems.delete(playerId)
+    return
+  }
+  renderedHeldItems.set(playerId, buildVisual(playerId, models))
+}
+
+function buildVisual(playerId: string, models: string[]): RenderedHeldItem {
+  const parent = engine.addEntity()
+  AvatarAttach.create(parent, { avatarId: playerId, anchorPointId: AvatarAnchorPointType.AAPT_RIGHT_HAND })
+
+  return { parent, children: buildHandStack(parent, models), models }
 }
 
 /**
  * Builds the visible model stack under a hand-anchor parent (already
- * AvatarAttach'd, either to the local player by default or to a specific
- * avatarId for a remote one) and returns its child entities, stackRoot
- * first. The bottom item's configured hand transform anchors the whole
- * stack; items above it are positioned purely by cumulative height, not
- * their own individual hand offsets.
+ * AvatarAttach'd) and returns its child entities, stackRoot first. The
+ * bottom item's configured hand transform anchors the whole stack; items
+ * above it are positioned purely by cumulative height, not their own
+ * individual hand offsets.
  */
 function buildHandStack(parent: Entity, models: string[]): Entity[] {
   const baseTransform = getHandTransform(models[0])
@@ -99,116 +192,7 @@ function buildHandStack(parent: Entity, models: string[]): Entity[] {
   return children
 }
 
-/** True if the player currently has anything in hand (single item or assembled stack). */
-export function hasHeldItem(): boolean {
-  return heldItem !== null
-}
-
-/** True if the held item is a multi-model assembled stack rather than a single item. */
-export function isHoldingAssembledItem(): boolean {
-  return (heldItem?.models.length ?? 0) > 1
-}
-
-/** Returns the held item's model if it's a single item, or null if empty-handed or holding an assembled stack. */
-export function peekHeldItemModel(): string | null {
-  if (!heldItem || heldItem.models.length !== 1) return null
-  return heldItem.models[0]
-}
-
-/** Removes a single-item hold and returns its model, or null if empty-handed or holding an assembled stack. */
-export function takeHeldItem(): string | null {
-  const model = peekHeldItemModel()
-  if (model === null) return null
-  clearHeldItem()
-  return model
-}
-
-/** Removes the held item (single or assembled) and returns its models in stacking order, or an empty array if empty-handed. */
-export function takeHeldItemModels(): string[] {
-  const models = heldItem?.models ?? []
-  clearHeldItem()
-  return models
-}
-
-/** Removes whatever's held (single or assembled) without returning anything. */
-export function discardHeldItem(): void {
-  clearHeldItem()
-}
-
-function clearHeldItem(): void {
-  if (heldItem === null) return
-  clearLocalVisuals()
-  void room.send('setHeldItem', { models: [] })
-}
-
-function clearLocalVisuals(): void {
-  if (heldItem === null) return
-  for (const child of heldItem.children) engine.removeEntity(child)
-  engine.removeEntity(heldItem.parent)
-  heldItem = null
-}
-
-// --- Every other player's held item, driven by the synced HeldItem component ---
-
-interface RemoteHeldItem {
-  parent: Entity
-  children: Entity[]
-  models: string[]
-}
-
-const remoteHeldItems = new Map<string, RemoteHeldItem>() // keyed by lower-cased playerId
-let remoteSystemRegistered = false
-
-/** Starts rendering every other player's held item. Call once during client setup. */
-export function startRenderingRemoteHeldItems(): void {
-  if (remoteSystemRegistered) return
-  engine.addSystem(remoteHeldItemsSystem)
-  remoteSystemRegistered = true
-}
-
-function remoteHeldItemsSystem(): void {
-  const localPlayerId = getLocalUserId().toLowerCase()
-  const seenPlayerIds = new Set<string>()
-
-  for (const [, data] of engine.getEntitiesWith(HeldItem)) {
-    const playerId = data.playerId.toLowerCase()
-    if (playerId === localPlayerId) continue // rendered instantly above, not from synced state
-    seenPlayerIds.add(playerId)
-    syncRemoteHeldItem(playerId, [...data.models])
-  }
-
-  for (const playerId of remoteHeldItems.keys()) {
-    if (!seenPlayerIds.has(playerId)) removeRemoteHeldItem(playerId)
-  }
-}
-
-function syncRemoteHeldItem(playerId: string, models: string[]): void {
-  const existing = remoteHeldItems.get(playerId)
-  if (existing && sameModels(existing.models, models)) return
-  if (existing) removeRemoteVisual(existing)
-
-  if (models.length === 0) {
-    remoteHeldItems.delete(playerId)
-    return
-  }
-  remoteHeldItems.set(playerId, buildRemoteVisual(playerId, models))
-}
-
-function removeRemoteHeldItem(playerId: string): void {
-  const existing = remoteHeldItems.get(playerId)
-  if (!existing) return
-  removeRemoteVisual(existing)
-  remoteHeldItems.delete(playerId)
-}
-
-function buildRemoteVisual(playerId: string, models: string[]): RemoteHeldItem {
-  const parent = engine.addEntity()
-  AvatarAttach.create(parent, { avatarId: playerId, anchorPointId: AvatarAnchorPointType.AAPT_RIGHT_HAND })
-
-  return { parent, children: buildHandStack(parent, models), models }
-}
-
-function removeRemoteVisual(item: RemoteHeldItem): void {
+function removeVisual(item: RenderedHeldItem): void {
   for (const child of item.children) engine.removeEntity(child)
   engine.removeEntity(item.parent)
 }

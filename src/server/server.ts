@@ -3,8 +3,10 @@
 
 import { initHeldItems } from './heldItems'
 import { initPreparationCounters } from './preparationCounters'
+import { initStoveCooking } from './stoveCooking'
 
 export function initServer(): void {
   initHeldItems()
   initPreparationCounters()
+  initStoveCooking()
 }

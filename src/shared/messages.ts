@@ -17,7 +17,20 @@ export const Messages = {
     counterId: Schemas.Int,
     hasPlate: Schemas.Boolean,
     ingredientModels: Schemas.Array(Schemas.String)
-  })
+  }),
+
+  // Start cooking a raw cookable at this stove. rawModel identifies which
+  // CookableIngredientDefinition (shared/ingredients.ts) — the server looks
+  // up cookedModel/cookDurationSeconds itself rather than trusting a
+  // client-supplied value, since collecting hands out the result.
+  startCookingOnStove: Schemas.Map({ stoveId: Schemas.Int, rawModel: Schemas.String }),
+
+  // Claim a finished stove's cooked item. The server checks the stove is
+  // actually done and not already collected before granting the cooked
+  // item to the sender's HeldItem — see server/stoveCooking.ts — which is
+  // what stops two players racing the same finished stove from both
+  // walking away with a copy.
+  collectFromStove: Schemas.Map({ stoveId: Schemas.Int })
 }
 
 export const room = registerMessages(Messages)

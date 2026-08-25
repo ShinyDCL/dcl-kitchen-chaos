@@ -1,11 +1,27 @@
 // Stove cooking: interacting with a stove while holding a cookable item
-// (see cookableItems.ts) starts a timed cook. A raw model appears on the
-// stove, a progress bar above it fills in as time passes, and a smoke
-// particle emitter runs for the duration. When done, the model swaps to
-// its cooked version, the checkmark appears, and smoke stops. A second
-// interact while done picks up the cooked item and resets the stove.
-// Interacting with a non-cookable item in hand, or while a cook is already
-// in progress, does nothing.
+// starts a timed cook. A raw model appears on the stove, a progress bar
+// above it fills in as time passes, and a smoke particle emitter runs for
+// the duration. When done, the model swaps to its cooked version, the
+// checkmark appears, and smoke stops. A second interact while done
+// collects the cooked item and resets the stove.
+//
+// Reconciled against the server-synced StoveState (shared/schemas.ts)
+// rather than held as local truth — see the authoritative-server skill.
+// startCookingOnStove sends the intent to the server AND renders the raw
+// item + progress bar locally right away, for zero-latency feedback, since
+// there's nothing scarce at stake if a race means the optimistic guess
+// gets corrected a moment later. collectFromStove deliberately does NOT
+// render anything optimistically: collecting hands out a scarce cooked
+// item, and the server (server/stoveCooking.ts) is what actually decides
+// who gets it when two players race a finished stove — rendering a guess
+// here would just be a guess that might not match who really won, so this
+// waits for the real outcome to arrive via the reconciliation system
+// below, same as it does for every other player's stove.
+//
+// Progress is derived every frame from `Date.now() - startTimestamp`
+// (server clock) rather than a per-tick synced counter, so there's no need
+// to broadcast progress continuously — only the start (and reset) of a
+// cook is ever sent over the network.
 //
 // Visibility for the progress bar / checkmark is controlled on just two
 // entities via VisibilityComponent's propagateToChildren — see the note
@@ -14,15 +30,9 @@
 // bar), toggled on/off via its `active` field rather than recreated per
 // cook.
 //
-// The progress bar is plain code-built geometry, which is simple and cheap
-// at this scale. Everything faces the player via the built-in Billboard
-// component (BM_Y) rather than manual rotation math. The checkmark is a
-// dedicated 3D model (MODELS.checkmark). The smoke emitter expects a soft
-// round puff texture at assets/scene/textures/Smoke.png (see constants.ts)
-// — without it, particles render as plain white squares.
-//
 // This is the ONLY system registered for stove cooking — a single
-// engine.addSystem call advances every active cook's timer and fill.
+// engine.addSystem call reconciles every registered stove's visuals against
+// its synced state and advances the progress fill.
 
 import {
   Billboard,
@@ -59,9 +69,12 @@ import {
   SMOKE_TEXTURE,
   STOVE_ITEM_OFFSET
 } from '../shared/constants'
-import { CookableIngredientDefinition } from '../shared/ingredients'
+import { CookableIngredientDefinition, getCookableItemDefinition } from '../shared/ingredients'
+import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
-import { attachItemToPlayerHand, takeHeldItem } from './heldItem'
+import { StoveState } from '../shared/schemas'
+import { getFixtureSyncId } from './fixtures'
+import { takeHeldItem } from './heldItem'
 import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {
@@ -70,76 +83,157 @@ interface ProgressBar {
   checkmarkAnchor: Entity // checkmark legs, no own VisibilityComponent — controlled via this entity's propagateToChildren
 }
 
-interface CookingState {
-  itemEntity: Entity
+interface StoveVisuals {
   progressBar: ProgressBar
   smokeEmitter: Entity
-  cookedModel: string
-  cookDurationSeconds: number
-  elapsedSeconds: number
-  done: boolean
+  itemEntity: Entity | null // the raw/cooked model currently sitting on the stove, or null while idle
 }
 
-const progressBars = new Map<Entity, ProgressBar>()
-const smokeEmitters = new Map<Entity, Entity>()
-const cookingStates = new Map<Entity, CookingState>()
-let systemRegistered = false
+interface RenderedCook {
+  rawModel: string // '' means idle — mirrors the synced field this is reconciled against
+  startTimestamp: number
+  done: boolean // local-only: whether the done transition (cooked model swap, checkmark, smoke off) has been applied
+}
+
+const stoveVisuals = new Map<Entity, StoveVisuals>()
+const renderedCooks = new Map<Entity, RenderedCook>()
+const registeredStoves: Entity[] = []
 
 export type StoveStatus = 'idle' | 'cooking' | 'done'
 
+/** Registers a stove fixture so its state gets rendered and reconciled. Call once per stove during scene setup. */
+export function registerStove(stove: Entity): void {
+  registeredStoves.push(stove)
+  renderedCooks.set(stove, emptyRenderedCook())
+  getOrCreateVisuals(stove) // build the persistent progress bar / smoke emitter up front, hidden/inactive
+}
+
 export function getStoveStatus(stove: Entity): StoveStatus {
-  const state = cookingStates.get(stove)
-  if (!state) return 'idle'
-  return state.done ? 'done' : 'cooking'
+  const { rawModel, startTimestamp } = getSyncedState(stove)
+  if (rawModel === '') return 'idle'
+  const definition = getCookableItemDefinition(rawModel)
+  if (!definition) return 'idle' // shouldn't happen — unknown rawModel
+  return elapsedSeconds(startTimestamp) >= definition.cookDurationSeconds ? 'done' : 'cooking'
 }
 
 export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
-  startCooking(stove, definition)
-}
-
-export function collectFromStove(stove: Entity): void {
-  const state = cookingStates.get(stove)
-  if (!state) return
-  collectCookedItem(stove, state)
-}
-
-function startCooking(stove: Entity, definition: CookableIngredientDefinition): void {
   takeHeldItem()
-
-  const itemEntity = engine.addEntity()
-  Transform.create(itemEntity, { position: STOVE_ITEM_OFFSET, parent: stove })
-  GltfContainer.create(itemEntity, { src: definition.stoveModel })
-
-  const progressBar = getOrCreateProgressBar(stove)
-  resetProgressBar(progressBar)
-
-  const smokeEmitter = getOrCreateSmokeEmitter(stove)
-  ParticleSystem.getMutable(smokeEmitter).active = true
-
-  cookingStates.set(stove, {
-    itemEntity,
-    progressBar,
-    smokeEmitter,
-    cookedModel: definition.cookedModel,
-    cookDurationSeconds: definition.cookDurationSeconds,
-    elapsedSeconds: 0,
-    done: false
-  })
-
-  ensureSystemRegistered()
+  void room.send('startCookingOnStove', { stoveId: getFixtureSyncId(stove), rawModel: definition.heldModel })
+  applySyncedState(stove, { rawModel: definition.heldModel, startTimestamp: Date.now() })
 }
 
-function collectCookedItem(stove: Entity, state: CookingState): void {
-  engine.removeEntity(state.itemEntity)
-  hideProgressBar(state.progressBar)
-  attachItemToPlayerHand(state.cookedModel)
-  cookingStates.delete(stove)
+/** Sends the collect intent to the server. Deliberately renders nothing optimistically — see the module comment. */
+export function collectFromStove(stove: Entity): void {
+  void room.send('collectFromStove', { stoveId: getFixtureSyncId(stove) })
+}
+
+function getSyncedState(stove: Entity): { rawModel: string; startTimestamp: number } {
+  const stoveId = getFixtureSyncId(stove)
+  for (const [, data] of engine.getEntitiesWith(StoveState)) {
+    if (data.stoveId === stoveId) return { rawModel: data.rawModel, startTimestamp: Number(data.startTimestamp) }
+  }
+  return { rawModel: '', startTimestamp: 0 }
+}
+
+function elapsedSeconds(startTimestamp: number): number {
+  return (Date.now() - startTimestamp) / 1000
+}
+
+// --- Rendering, reconciled against the synced StoveState component ---
+
+let systemRegistered = false
+
+/** Reconciles every registered stove's synced state against what's currently rendered. Call once during client setup. */
+export function startRenderingStoves(): void {
+  if (systemRegistered) return
+  engine.addSystem(stoveCookingSystem)
+  systemRegistered = true
+}
+
+function stoveCookingSystem(): void {
+  for (const stove of registeredStoves) {
+    reconcileStove(stove, getSyncedState(stove))
+  }
+}
+
+function reconcileStove(stove: Entity, synced: { rawModel: string; startTimestamp: number }): void {
+  const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
+
+  if (synced.rawModel !== rendered.rawModel) {
+    applySyncedState(stove, synced)
+    return
+  }
+
+  if (synced.rawModel === '') return // idle, nothing more to do this frame
+
+  const definition = getCookableItemDefinition(synced.rawModel)
+  if (!definition) return // shouldn't happen — unknown rawModel
+
+  const progress = Math.min(elapsedSeconds(synced.startTimestamp) / definition.cookDurationSeconds, 1)
+  updateFill(getOrCreateVisuals(stove).progressBar, progress)
+
+  if (progress >= 1 && !rendered.done) {
+    applyDoneVisual(stove, definition)
+    renderedCooks.set(stove, { ...rendered, done: true })
+  }
+}
+
+/** Applies a rawModel/startTimestamp change (idle->cooking or any->idle) to this stove's visuals. */
+function applySyncedState(stove: Entity, synced: { rawModel: string; startTimestamp: number }): void {
+  const visuals = getOrCreateVisuals(stove)
+
+  if (visuals.itemEntity !== null) {
+    engine.removeEntity(visuals.itemEntity)
+    visuals.itemEntity = null
+  }
+
+  if (synced.rawModel === '') {
+    hideProgressBar(visuals.progressBar)
+    ParticleSystem.getMutable(visuals.smokeEmitter).active = false
+    renderedCooks.set(stove, emptyRenderedCook())
+    return
+  }
+
+  const definition = getCookableItemDefinition(synced.rawModel)
+  const stoveModel = definition?.stoveModel ?? synced.rawModel
+
+  visuals.itemEntity = engine.addEntity()
+  Transform.create(visuals.itemEntity, { position: STOVE_ITEM_OFFSET, parent: stove })
+  GltfContainer.create(visuals.itemEntity, { src: stoveModel })
+
+  resetProgressBar(visuals.progressBar)
+  ParticleSystem.getMutable(visuals.smokeEmitter).active = true
+
+  const alreadyDone = definition !== undefined && elapsedSeconds(synced.startTimestamp) >= definition.cookDurationSeconds
+  renderedCooks.set(stove, { rawModel: synced.rawModel, startTimestamp: synced.startTimestamp, done: alreadyDone })
+  if (alreadyDone && definition) applyDoneVisual(stove, definition)
+}
+
+function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition): void {
+  const visuals = getOrCreateVisuals(stove)
+  if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: definition.cookedModel })
+  VisibilityComponent.getMutable(visuals.progressBar.checkmarkAnchor).visible = true
+  ParticleSystem.getMutable(visuals.smokeEmitter).active = false
+}
+
+function emptyRenderedCook(): RenderedCook {
+  return { rawModel: '', startTimestamp: 0, done: false }
+}
+
+function getOrCreateVisuals(stove: Entity): StoveVisuals {
+  const existing = stoveVisuals.get(stove)
+  if (existing) return existing
+
+  const visuals: StoveVisuals = {
+    progressBar: getOrCreateProgressBar(stove),
+    smokeEmitter: getOrCreateSmokeEmitter(stove),
+    itemEntity: null
+  }
+  stoveVisuals.set(stove, visuals)
+  return visuals
 }
 
 function getOrCreateProgressBar(stove: Entity): ProgressBar {
-  const existing = progressBars.get(stove)
-  if (existing) return existing
-
   const stoveWorldPosition = getWorldPosition(stove)
   const worldPosition = Vector3.create(
     stoveWorldPosition.x,
@@ -189,9 +283,7 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
   VisibilityComponent.create(checkmarkAnchor, { visible: false, propagateToChildren: true })
   createCheckmark(checkmarkAnchor)
 
-  const progressBar: ProgressBar = { root, fill, checkmarkAnchor }
-  progressBars.set(stove, progressBar)
-  return progressBar
+  return { root, fill, checkmarkAnchor }
 }
 
 function createCheckmark(parent: Entity): void {
@@ -202,9 +294,6 @@ function createCheckmark(parent: Entity): void {
 
 /** Persistent per-stove smoke emitter, created once and toggled via `active` rather than recreated per cook. */
 function getOrCreateSmokeEmitter(stove: Entity): Entity {
-  const existing = smokeEmitters.get(stove)
-  if (existing) return existing
-
   const emitter = engine.addEntity()
   Transform.create(emitter, { position: SMOKE_OFFSET, parent: stove })
   ParticleSystem.create(emitter, {
@@ -223,7 +312,6 @@ function getOrCreateSmokeEmitter(stove: Entity): Entity {
     blendMode: PBParticleSystem_BlendMode.PSB_ALPHA
   })
 
-  smokeEmitters.set(stove, emitter)
   return emitter
 }
 
@@ -245,31 +333,6 @@ function updateFill(progressBar: ProgressBar, progress: number): void {
   // Keep the fill's left edge fixed to the background's left edge as it
   // grows, instead of scaling outward from the center.
   transform.position = Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0.001)
-}
-
-function ensureSystemRegistered(): void {
-  if (systemRegistered) return
-  engine.addSystem(cookingSystem)
-  systemRegistered = true
-}
-
-function cookingSystem(dt: number): void {
-  if (cookingStates.size === 0) return
-
-  for (const [, state] of cookingStates) {
-    if (state.done) continue
-
-    state.elapsedSeconds += dt
-    const progress = Math.min(state.elapsedSeconds / state.cookDurationSeconds, 1)
-    updateFill(state.progressBar, progress)
-
-    if (progress >= 1) {
-      state.done = true
-      GltfContainer.createOrReplace(state.itemEntity, { src: state.cookedModel })
-      VisibilityComponent.getMutable(state.progressBar.checkmarkAnchor).visible = true
-      ParticleSystem.getMutable(state.smokeEmitter).active = false
-    }
-  }
 }
 
 function fadeToTransparent(color: Color4): Color4 {
