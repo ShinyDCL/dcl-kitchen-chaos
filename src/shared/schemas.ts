@@ -23,3 +23,21 @@ export const HeldItem = engine.defineComponent('game::HeldItem', {
 if (isServer()) {
   HeldItem.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
 }
+
+/**
+ * One entity per preparation counter — plate presence and the ingredient
+ * stack on top of it. `counterId` is the counter's stable fixture sync id
+ * (client/fixtures.ts's getFixtureSyncId) and doubles as this entity's
+ * explicit syncEntity id: counters are a small fixed set that exists for
+ * the scene's whole life, unlike per-player entities, so there's no need
+ * for the auto-allocate-and-match-by-field pattern HeldItem uses.
+ */
+export const PreparationCounterState = engine.defineComponent('game::PreparationCounterState', {
+  counterId: Schemas.Int,
+  hasPlate: Schemas.Boolean,
+  ingredientModels: Schemas.Array(Schemas.String)
+})
+
+if (isServer()) {
+  PreparationCounterState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}

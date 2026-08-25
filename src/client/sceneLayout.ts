@@ -37,6 +37,7 @@ import {
   evaluateStoveInteraction,
   evaluateTrashBinInteraction
 } from './interactionRules'
+import { registerPreparationCounter } from './preparationCounters'
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
@@ -110,7 +111,7 @@ function createFrontRow(parent: Entity): void {
   sequence.forEach((kind, index) => {
     const position = Vector3.create(-totalWidth / 2 + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, -FRONT_ROW_DISTANCE)
 
-    createFixture({
+    const fixture = createFixture({
       model: kind === 'stove' ? MODELS.stove : MODELS.counter,
       position,
       rotation,
@@ -118,6 +119,8 @@ function createFrontRow(parent: Entity): void {
       height: FIXTURE_HEIGHT,
       evaluateInteraction: kind === 'counter' ? evaluatePreparationCounterInteraction : evaluateStoveInteraction
     })
+
+    if (kind === 'counter') registerPreparationCounter(fixture)
   })
 }
 
@@ -139,7 +142,7 @@ function createIsland(parent: Entity): void {
   for (const row of rows) {
     const rotation = rotationDegrees(row.facingDegrees)
     for (const x of [-halfWidth, halfWidth]) {
-      createFixture({
+      const fixture = createFixture({
         model: MODELS.counter,
         position: Vector3.create(x, 0, row.z),
         rotation,
@@ -147,6 +150,7 @@ function createIsland(parent: Entity): void {
         height: FIXTURE_HEIGHT,
         evaluateInteraction: evaluatePreparationCounterInteraction
       })
+      registerPreparationCounter(fixture)
     }
   }
 }

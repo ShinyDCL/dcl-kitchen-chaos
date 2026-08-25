@@ -1,12 +1,14 @@
 // Client bootstrap — called once from index.ts's main() on the client
-// branch. Builds the scene and starts the systems that render state coming
-// from the server (see heldItem.ts's startRenderingRemoteHeldItems).
+// branch. Builds the scene, then starts the systems that reconcile visuals
+// against server-synced state (see heldItem.ts's startRenderingRemoteHeldItems
+// and preparationCounters.ts's startRenderingPreparationCounters).
 
 import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
 import { startRenderingRemoteHeldItems } from './heldItem'
+import { startRenderingPreparationCounters } from './preparationCounters'
 import { createSceneLayout } from './sceneLayout'
 
 export function initClient(): void {
@@ -18,4 +20,5 @@ export function initClient(): void {
 
   createSceneLayout(scene)
   startRenderingRemoteHeldItems()
+  startRenderingPreparationCounters()
 }
