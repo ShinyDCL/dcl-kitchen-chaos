@@ -4,16 +4,23 @@
 // what's allowed — see interactionRules.ts for that. Every action function
 // here assumes the caller already checked it's allowed.
 //
-// Each action function does two things: sends the counter's new full
-// contents to the server via setPreparationCounterState, and rebuilds this
-// client's own visuals immediately, for zero-latency feedback (see
-// applyLocally). A single reconciliation system, started by
+// Each action function does two things: sends a narrow intent to the
+// server (place a plate, pick up the ingredient stack, place this
+// ingredient, ...) and rebuilds this client's own visuals immediately, for
+// zero-latency feedback. The intent is deliberately NOT the counter's
+// whole computed new state — the server applies each intent atomically
+// against its own live state (see server/preparationCounters.ts), which is
+// what lets two players place different ingredients on the same counter at
+// the same time and have both stick, instead of whichever client's
+// computed-full-state push lands last silently discarding the other's.
+// A single reconciliation system, started by
 // startRenderingPreparationCounters, compares every registered counter's
 // synced state against what's currently rendered and rebuilds on any
-// mismatch — for the acting client this is normally a same-state no-op,
-// but it's what makes the counter visible to every OTHER player once their
-// update arrives, and what corrects this client's own guess if two
-// players' actions on the same counter race (the server's version wins).
+// mismatch — for the acting client this is normally a same-state no-op
+// once its own intent round-trips, but it's what makes the counter visible
+// to every OTHER player, and what folds in whatever else changed
+// concurrently (another player's own addition, a lost pickup race) that
+// this client's local prediction couldn't have known about yet.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -78,44 +85,43 @@ function getSyncedContents(counter: Entity): CounterContents {
   return { hasPlate: false, ingredientModels: [] }
 }
 
-/** Sends the new contents to the server and rebuilds this client's own visuals immediately, ahead of the round trip. */
-function applyLocally(counter: Entity, contents: CounterContents): void {
-  void room.send('setPreparationCounterState', { counterId: getFixtureSyncId(counter), ...contents })
-  renderCounter(counter, contents)
-}
-
 export function placePlateOnCounter(counter: Entity): void {
   takeHeldItem()
+  void room.send('placePlateOnCounter', { counterId: getFixtureSyncId(counter) })
   const { ingredientModels } = getSyncedContents(counter)
-  applyLocally(counter, { hasPlate: true, ingredientModels })
+  renderCounter(counter, { hasPlate: true, ingredientModels })
 }
 
 export function pickUpPlateFromCounter(counter: Entity): void {
   attachItemToPlayerHand(MODELS.plate)
+  void room.send('pickUpPlateFromCounter', { counterId: getFixtureSyncId(counter) })
   const { ingredientModels } = getSyncedContents(counter)
-  applyLocally(counter, { hasPlate: false, ingredientModels })
+  renderCounter(counter, { hasPlate: false, ingredientModels })
 }
 
 /** Picks up just the ingredient stack as an assembled item — the plate stays on the counter. */
 export function pickUpAssembledFromCounter(counter: Entity): void {
   const { hasPlate, ingredientModels } = getSyncedContents(counter)
   attachAssembledItemToPlayerHand(ingredientModels)
-  applyLocally(counter, { hasPlate, ingredientModels: [] })
+  void room.send('pickUpAssembledFromCounter', { counterId: getFixtureSyncId(counter) })
+  renderCounter(counter, { hasPlate, ingredientModels: [] })
 }
 
 export function placeIngredientOnCounter(counter: Entity): void {
   const placedModel = takeHeldItem()
   if (!placedModel) return
+  void room.send('placeIngredientOnCounter', { counterId: getFixtureSyncId(counter), model: placedModel })
   const { hasPlate, ingredientModels } = getSyncedContents(counter)
-  applyLocally(counter, { hasPlate, ingredientModels: [...ingredientModels, placedModel] })
+  renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, placedModel] })
 }
 
 /** Places every item from a held assembled stack onto the counter's existing stack, on top of whatever's already there. */
 export function placeAssembledOnCounter(counter: Entity): void {
   const models = takeHeldItemModels()
   if (models.length === 0) return
+  void room.send('placeAssembledOnCounter', { counterId: getFixtureSyncId(counter), models })
   const { hasPlate, ingredientModels } = getSyncedContents(counter)
-  applyLocally(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
+  renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
 }
 
 // --- Rendering: full rebuild whenever a counter's contents differ from what's rendered ---

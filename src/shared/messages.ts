@@ -11,13 +11,19 @@ export const Messages = {
   // means they've emptied their hand (placed, cooked, discarded, ...).
   setHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String) }),
 
-  // A preparation counter's new full contents, sent after the client
-  // decides locally what changed (see client/preparationCounters.ts).
-  setPreparationCounterState: Schemas.Map({
-    counterId: Schemas.Int,
-    hasPlate: Schemas.Boolean,
-    ingredientModels: Schemas.Array(Schemas.String)
-  }),
+  // Preparation counter intents. Each names the specific change rather
+  // than asserting the counter's whole new contents, so the server can
+  // apply it atomically against its own live state — see
+  // server/preparationCounters.ts. This is what stops two players placing
+  // different ingredients on the same counter at once from clobbering each
+  // other: both used to compute their "new full state" from the same
+  // stale synced snapshot and push it wholesale, so whichever message the
+  // server processed last silently discarded the other's addition.
+  placePlateOnCounter: Schemas.Map({ counterId: Schemas.Int }),
+  pickUpPlateFromCounter: Schemas.Map({ counterId: Schemas.Int }),
+  pickUpAssembledFromCounter: Schemas.Map({ counterId: Schemas.Int }),
+  placeIngredientOnCounter: Schemas.Map({ counterId: Schemas.Int, model: Schemas.String }),
+  placeAssembledOnCounter: Schemas.Map({ counterId: Schemas.Int, models: Schemas.Array(Schemas.String) }),
 
   // Start cooking a raw cookable at this stove. rawModel identifies which
   // CookableIngredientDefinition (shared/ingredients.ts) — the server looks
