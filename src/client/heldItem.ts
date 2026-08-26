@@ -116,6 +116,43 @@ export function discardHeldItem(): void {
   applyLocally([])
 }
 
+let pendingRestoreModels: string[] | null = null
+
+/**
+ * Like takeHeldItem, but for an action paired with a server-arbitrated
+ * fixture intent whose outcome isn't known yet. Clears the local hand
+ * prediction immediately (so the player can't reuse the item before the
+ * round trip) WITHOUT broadcasting setHeldItem — the paired intent's own
+ * server handler grants the empty hand on success or sends actionRejected
+ * on failure, which restorePendingHeldItem uses to put the item back.
+ * Unconditional broadcasting here would let the hand-clear succeed
+ * regardless of the fixture action's outcome — how items used to vanish
+ * or duplicate in a race.
+ */
+export function takeHeldItemPending(): string | null {
+  const model = peekHeldItemModel()
+  if (model === null) return null
+  pendingRestoreModels = [model]
+  renderHeldItem(localPlayerId(), [])
+  return model
+}
+
+/** Assembled-stack version of takeHeldItemPending — see its comment. */
+export function takeHeldItemModelsPending(): string[] {
+  const models = localState()?.models ?? []
+  if (models.length === 0) return models
+  pendingRestoreModels = models
+  renderHeldItem(localPlayerId(), [])
+  return models
+}
+
+/** Restores whatever the most recent *Pending call cleared, when its paired fixture action was rejected by the server. */
+function restorePendingHeldItem(): void {
+  if (pendingRestoreModels === null) return
+  renderHeldItem(localPlayerId(), pendingRestoreModels)
+  pendingRestoreModels = null
+}
+
 // --- Rendering, reconciled against the synced HeldItem component ---
 
 let systemRegistered = false
@@ -124,6 +161,7 @@ let systemRegistered = false
 export function startRenderingHeldItems(): void {
   if (systemRegistered) return
   engine.addSystem(heldItemsSystem)
+  room.onMessage('actionRejected', () => restorePendingHeldItem())
   systemRegistered = true
 }
 

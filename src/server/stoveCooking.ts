@@ -6,10 +6,13 @@
 // same cook — resetting rawModel to '' before granting the item means a
 // second, already-queued collect message for the same cook sees an idle
 // stove and no-ops, which is what stops two players racing a finished
-// stove from both walking away with a copy. Starting a cook is only
-// rejected if the stove isn't actually idle or rawModel isn't a real
-// cookable — there's nothing scarce to duplicate there, so that part does
-// mirror the simpler relay pattern.
+// stove from both walking away with a copy.
+//
+// startCookingOnStove grants the empty hand only once the cook actually
+// starts, replying actionRejected otherwise (not idle, or invalid
+// rawModel) so the client restores what it took out — see heldItem.ts's
+// takeHeldItemPending. Otherwise a losing player's ingredient could be
+// destroyed on a rejected cook.
 //
 // Explicit sync id per stove, same reasoning as preparationCounters.ts:
 // stoves are a small fixed set that exists for the scene's whole life, so
@@ -31,14 +34,21 @@ export function initStoveCooking(): void {
   room.onMessage('startCookingOnStove', (data, context) => {
     if (!context) return
     const definition = getCookableItemDefinition(data.rawModel)
-    if (!definition) return // not a real cookable — ignore
+    if (!definition) {
+      void room.send('actionRejected', {}, { to: [context.from] }) // not a real cookable
+      return
+    }
 
     const entity = getOrCreateStoveEntity(data.stoveId)
     const state = StoveState.getMutableOrNull(entity)
-    if (!state || state.rawModel !== '') return // already cooking or done — ignore
+    if (!state || state.rawModel !== '') {
+      void room.send('actionRejected', {}, { to: [context.from] }) // already cooking or done
+      return
+    }
 
     state.rawModel = data.rawModel
     state.startTimestamp = Date.now()
+    grantHeldItem(context.from.toLowerCase(), [])
   })
 
   room.onMessage('collectFromStove', (data, context) => {

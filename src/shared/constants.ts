@@ -86,3 +86,10 @@ export const DELIVERY_ITEM_SIT_DURATION = 1 // seconds the delivered item sits u
 export const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds — item shrinks away over this long, once sitting ends
 export const DELIVERY_CHECKMARK_DURATION = 0.8 // seconds — checkmark spin+scale animation length
 export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the delivery pad
+
+// The 1.4s sit+shrink window can be fully eaten by network/CRDT latency
+// before another client observes it — see reconcileDelivery in
+// deliveryCounter.ts. A delivery first seen within this many seconds of
+// its window closing is treated as "late, not historical" and replays
+// from when it was observed, instead of never showing at all.
+export const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5

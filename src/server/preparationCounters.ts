@@ -9,13 +9,17 @@
 // concurrent intents for the same counter are simply applied in the order
 // the server receives them, each building on the true latest state.
 //
-// Pickups grant the item directly via heldItems.ts's grantHeldItem (like
-// stoveCooking.ts's collectFromStove) rather than trusting the requesting
-// client's own setHeldItem broadcast — for the same reason: two players
-// both trying to pick up the same stack at once must result in only one of
-// them actually getting it, which falls out for free here since the first
-// message processed empties the counter and the second then finds nothing
-// left to pick up.
+// Every handler grants/clears the held item itself via grantHeldItem,
+// never trusting the client's own setHeldItem broadcast:
+// - Pickups grant only on success, so two players racing the same stack
+//   leaves the second with nothing left to take.
+// - placePlateOnCounter grants the empty hand only on success, replying
+//   actionRejected otherwise so the client restores what it optimistically
+//   took out (see heldItem.ts's takeHeldItemPending) — otherwise a losing
+//   player's plate could be destroyed on a rejected placement.
+// - placeIngredientOnCounter/placeAssembledOnCounter can't be rejected
+//   today, but still grant here rather than via client broadcast, so a
+//   future legality check doesn't reopen the same hole.
 //
 // Unlike per-player entities, preparation counters are a small fixed set
 // that exists for the scene's whole life, so each uses an EXPLICIT sync id
@@ -37,10 +41,15 @@ const counterEntities = new Map<number, Entity>()
 export function initPreparationCounters(): void {
   reconcileCounterEntities()
 
-  room.onMessage('placePlateOnCounter', (data) => {
+  room.onMessage('placePlateOnCounter', (data, context) => {
+    if (!context) return
     const state = getMutableState(data.counterId)
-    if (!state || state.hasPlate) return // already has a plate — ignore
+    if (!state || state.hasPlate) {
+      void room.send('actionRejected', {}, { to: [context.from] })
+      return
+    }
     state.hasPlate = true
+    grantHeldItem(context.from.toLowerCase(), [])
   })
 
   room.onMessage('pickUpPlateFromCounter', (data, context) => {
@@ -60,16 +69,20 @@ export function initPreparationCounters(): void {
     grantHeldItem(context.from.toLowerCase(), models)
   })
 
-  room.onMessage('placeIngredientOnCounter', (data) => {
+  room.onMessage('placeIngredientOnCounter', (data, context) => {
+    if (!context) return
     const state = getMutableState(data.counterId)
     if (!state) return
     state.ingredientModels = [...state.ingredientModels, data.model]
+    grantHeldItem(context.from.toLowerCase(), [])
   })
 
-  room.onMessage('placeAssembledOnCounter', (data) => {
+  room.onMessage('placeAssembledOnCounter', (data, context) => {
+    if (!context) return
     const state = getMutableState(data.counterId)
     if (!state) return
     state.ingredientModels = [...state.ingredientModels, ...data.models]
+    grantHeldItem(context.from.toLowerCase(), [])
   })
 }
 

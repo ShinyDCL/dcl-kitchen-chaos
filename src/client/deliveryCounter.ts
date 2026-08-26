@@ -29,6 +29,7 @@ import {
   DELIVERY_CHECKMARK_Y_OFFSET,
   DELIVERY_ITEM_SHRINK_DURATION,
   DELIVERY_ITEM_SIT_DURATION,
+  DELIVERY_LATE_ARRIVAL_GRACE_SECONDS,
   FIXTURE_HEIGHT
 } from '../shared/constants'
 import { room } from '../shared/messages'
@@ -87,6 +88,7 @@ interface RenderedItem {
 }
 
 let renderedItem: RenderedItem | null = null
+let builtStartTimestamp = 0 // startTimestamp currently reflected by renderedItem — detects a new delivery arriving while one is still showing
 let renderedModels: string[] = []
 let renderedStartTimestamp = 0
 let lastSyncedModels: string[] = []
@@ -119,6 +121,12 @@ function deliveryRenderSystem(): void {
  * stale read is a no-op, and the real update (once it arrives) is compared
  * against the usually-already-matching local prediction, so nothing
  * visibly rebuilds in the common case.
+ *
+ * If a delivery's 1.4s window has already closed by the time it's first
+ * observed (latency ate the whole window), it's re-anchored to start now
+ * instead of never showing — but only within
+ * DELIVERY_LATE_ARRIVAL_GRACE_SECONDS of closing, so a player joining long
+ * after the fact sees stale state as nothing, not a replay.
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
@@ -128,17 +136,33 @@ function reconcileDelivery(): void {
 
   if (sameModels(synced.models, renderedModels) && synced.startTimestamp === renderedStartTimestamp) return
   renderedModels = synced.models
-  renderedStartTimestamp = synced.startTimestamp
+  renderedStartTimestamp = arrivedLateButRecently(synced) ? Date.now() : synced.startTimestamp
 }
 
-/** Continuous per-frame animation, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
+function arrivedLateButRecently(synced: { models: string[]; startTimestamp: number }): boolean {
+  if (synced.models.length === 0) return false
+  const windowDuration = DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
+  const elapsed = elapsedSince(synced.startTimestamp)
+  return elapsed >= windowDuration && elapsed < windowDuration + DELIVERY_LATE_ARRIVAL_GRACE_SECONDS
+}
+
+/**
+ * Continuous per-frame animation, derived purely from what's rendered —
+ * never a fresh synced read. Rebuilds when withinItemWindow flips OR a new
+ * delivery's timestamp differs from the one built — the latter covers a
+ * second delivery landing while the first is still animating, where
+ * withinItemWindow stays true throughout and would otherwise never
+ * trigger a rebuild.
+ */
 function tickDeliveryAnimation(): void {
   const active = renderedModels.length > 0
   const withinItemWindow =
     active && elapsedSince(renderedStartTimestamp) < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
 
-  if (withinItemWindow !== (renderedItem !== null)) {
+  const isNewDelivery = withinItemWindow && renderedStartTimestamp !== builtStartTimestamp
+  if (withinItemWindow !== (renderedItem !== null) || isNewDelivery) {
     rebuildItemEntities(withinItemWindow ? renderedModels : [])
+    builtStartTimestamp = renderedStartTimestamp
   }
 
   if (renderedItem !== null) updateItemScale(renderedStartTimestamp)

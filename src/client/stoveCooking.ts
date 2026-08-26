@@ -74,7 +74,7 @@ import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
 import { StoveState } from '../shared/schemas'
 import { getFixtureSyncId } from './fixtures'
-import { takeHeldItem } from './heldItem'
+import { takeHeldItemPending } from './heldItem'
 import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {
@@ -127,7 +127,7 @@ export function getStoveStatus(stove: Entity): StoveStatus {
 }
 
 export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
-  takeHeldItem()
+  takeHeldItemPending()
   void room.send('startCookingOnStove', { stoveId: getFixtureSyncId(stove), rawModel: definition.heldModel })
   applySyncedState(stove, { rawModel: definition.heldModel, startTimestamp: Date.now() })
 }
@@ -180,6 +180,14 @@ function stoveCookingSystem(): void {
  * the real update (once it arrives) is compared against the (usually
  * already-matching) local prediction inside applySyncedState's caller, so
  * nothing visibly rebuilds in the common, uncontested case.
+ *
+ * If only startTimestamp changes for the same rawModel, that's this
+ * client's own optimistic guess being corrected to the server's
+ * (always-later) authoritative value. Adopted immediately for
+ * tickProgress's "done" check, but without tearing down/rebuilding the
+ * item entity or reseeding the bar — same cook, nothing to rebuild, and
+ * doing so caused a visible pop/rewind (most noticeable on mobile's
+ * higher latency).
  */
 function reconcileTransition(stove: Entity): void {
   const synced = getSyncedState(stove)
@@ -188,9 +196,15 @@ function reconcileTransition(stove: Entity): void {
   lastSyncedStates.set(stove, synced)
 
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
-  if (synced.rawModel !== rendered.rawModel || synced.startTimestamp !== rendered.startTimestamp) {
-    applySyncedState(stove, synced)
+
+  if (synced.rawModel === rendered.rawModel) {
+    if (synced.startTimestamp !== rendered.startTimestamp) {
+      renderedCooks.set(stove, { ...rendered, startTimestamp: synced.startTimestamp })
+    }
+    return
   }
+
+  applySyncedState(stove, synced)
 }
 
 /** Continuous per-frame progress, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
@@ -233,10 +247,14 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   Transform.create(visuals.itemEntity, { position: STOVE_ITEM_OFFSET, parent: stove })
   GltfContainer.create(visuals.itemEntity, { src: stoveModel })
 
-  resetProgressBar(visuals.progressBar)
+  // Seed the true elapsed progress right away instead of always starting
+  // at 0 and correcting next tick — otherwise a late observer sees a
+  // 0% flash before jumping to the real value.
+  const progress = definition ? Math.min(elapsedSeconds(synced.startTimestamp) / definition.cookDurationSeconds, 1) : 0
+  resetProgressBar(visuals.progressBar, progress)
   ParticleSystem.getMutable(visuals.smokeEmitter).active = true
 
-  const alreadyDone = definition !== undefined && elapsedSeconds(synced.startTimestamp) >= definition.cookDurationSeconds
+  const alreadyDone = progress >= 1
   renderedCooks.set(stove, { rawModel: synced.rawModel, startTimestamp: synced.startTimestamp, done: alreadyDone })
   if (alreadyDone && definition) applyDoneVisual(stove, definition)
 }
@@ -347,10 +365,10 @@ function getOrCreateSmokeEmitter(stove: Entity): Entity {
   return emitter
 }
 
-function resetProgressBar(progressBar: ProgressBar): void {
+function resetProgressBar(progressBar: ProgressBar, progress: number): void {
   VisibilityComponent.getMutable(progressBar.root).visible = true
   VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = false
-  updateFill(progressBar, 0)
+  updateFill(progressBar, progress)
 }
 
 function hideProgressBar(progressBar: ProgressBar): void {

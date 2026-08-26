@@ -40,7 +40,7 @@ import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
 import { PreparationCounterState } from '../shared/schemas'
 import { getFixtureSyncId } from './fixtures'
-import { attachAssembledItemToPlayerHand, attachItemToPlayerHand, takeHeldItem, takeHeldItemModels } from './heldItem'
+import { takeHeldItemModelsPending, takeHeldItemPending } from './heldItem'
 import { getItemHeight } from './itemHeights'
 
 interface CounterContents {
@@ -119,14 +119,19 @@ function getSyncedContents(counter: Entity): CounterContents {
 }
 
 export function placePlateOnCounter(counter: Entity): void {
-  takeHeldItem()
+  takeHeldItemPending()
   void room.send('placePlateOnCounter', { counterId: getFixtureSyncId(counter) })
   const { ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate: true, ingredientModels })
 }
 
+// Pickups below deliberately don't render the hand optimistically — the
+// server's grantHeldItem only fires if the pickup is legal, and
+// heldItem.ts's reconciliation fills the hand once confirmed. Predicting
+// it here would broadcast an unconditional setHeldItem regardless of
+// success, which is how a losing player used to end up with a duplicate.
+
 export function pickUpPlateFromCounter(counter: Entity): void {
-  attachItemToPlayerHand(MODELS.plate)
   void room.send('pickUpPlateFromCounter', { counterId: getFixtureSyncId(counter) })
   const { ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate: false, ingredientModels })
@@ -135,13 +140,12 @@ export function pickUpPlateFromCounter(counter: Entity): void {
 /** Picks up just the ingredient stack as an assembled item — the plate stays on the counter. */
 export function pickUpAssembledFromCounter(counter: Entity): void {
   const { hasPlate, ingredientModels } = getRenderedContents(counter)
-  attachAssembledItemToPlayerHand(ingredientModels)
   void room.send('pickUpAssembledFromCounter', { counterId: getFixtureSyncId(counter) })
   renderCounter(counter, { hasPlate, ingredientModels: [] })
 }
 
 export function placeIngredientOnCounter(counter: Entity): void {
-  const placedModel = takeHeldItem()
+  const placedModel = takeHeldItemPending()
   if (!placedModel) return
   void room.send('placeIngredientOnCounter', { counterId: getFixtureSyncId(counter), model: placedModel })
   const { hasPlate, ingredientModels } = getRenderedContents(counter)
@@ -150,7 +154,7 @@ export function placeIngredientOnCounter(counter: Entity): void {
 
 /** Places every item from a held assembled stack onto the counter's existing stack, on top of whatever's already there. */
 export function placeAssembledOnCounter(counter: Entity): void {
-  const models = takeHeldItemModels()
+  const models = takeHeldItemModelsPending()
   if (models.length === 0) return
   void room.send('placeAssembledOnCounter', { counterId: getFixtureSyncId(counter), models })
   const { hasPlate, ingredientModels } = getRenderedContents(counter)

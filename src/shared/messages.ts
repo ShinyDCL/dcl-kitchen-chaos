@@ -7,9 +7,19 @@ import { Schemas } from '@dcl/sdk/ecs'
 import { registerMessages } from '@dcl/sdk/network'
 
 export const Messages = {
-  // The full stack now in the sender's hand, bottom to top; an empty array
-  // means they've emptied their hand (placed, cooked, discarded, ...).
+  // The full stack now in the sender's hand, bottom to top; empty means
+  // empty-handed. Only for actions with no paired fixture-side legality
+  // check (ingredient pickups, trash discard) — actions contested by a
+  // counter/stove instead grant/clear the hand from that fixture message's
+  // own handler, with actionRejected as the rollback (see heldItem.ts's
+  // takeHeldItemPending).
   setHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String) }),
+
+  // Server -> sender only: their fixture intent (placing, starting a cook)
+  // was rejected because someone else's action landed first. Restores
+  // whatever was optimistically taken out of hand — see heldItem.ts's
+  // takeHeldItemPending/restorePendingHeldItem.
+  actionRejected: Schemas.Map({}),
 
   // Preparation counter intents. Each names the specific change rather
   // than asserting the counter's whole new contents, so the server can
