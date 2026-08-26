@@ -3,10 +3,12 @@
 
 import { initDeliveryCounter } from './deliveryCounter'
 import { initHeldItems } from './heldItems'
+import { initPlayerRoster } from './playerRoster'
 import { initPreparationCounters } from './preparationCounters'
 import { initStoveCooking } from './stoveCooking'
 
 export function initServer(): void {
+  initPlayerRoster()
   initHeldItems()
   initPreparationCounters()
   initStoveCooking()

@@ -79,3 +79,43 @@ export const DeliveryState = engine.defineComponent('game::DeliveryState', {
 if (isServer()) {
   DeliveryState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
 }
+
+export enum PlayerRoleValue {
+  Play = 'play',
+  Spectate = 'spectate'
+}
+
+/**
+ * One entity per player who has picked a role this session, matched by the
+ * `playerId` field — same per-player pattern as HeldItem, and for the same
+ * reason (an explicit/hashed sync id is unsafe on a long-running server). A
+ * player has no entity at all until they've made a choice; server code
+ * treats that as not-yet-decided rather than defaulting to either role.
+ */
+export const PlayerRole = engine.defineComponent('game::PlayerRole', {
+  playerId: Schemas.String,
+  role: Schemas.EnumString(PlayerRoleValue, PlayerRoleValue.Spectate)
+})
+
+if (isServer()) {
+  PlayerRole.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}
+
+// Reserved sync id for GameState, the one non-fixture singleton — kept well
+// clear of client/fixtures.ts's contiguous-from-0 fixture id space so it
+// can never collide no matter how many fixtures the scene grows to.
+export const GAME_STATE_SYNC_ID = 100000
+
+/**
+ * Singleton — how many currently-connected players are in the 'play' role.
+ * Server-derived each tick from live PlayerIdentityData (the engine's own
+ * view of who's actually connected) intersected with PlayerRole, so a
+ * disconnect is reflected for free with no explicit leave message needed.
+ */
+export const GameState = engine.defineComponent('game::GameState', {
+  activePlayerCount: Schemas.Int
+})
+
+if (isServer()) {
+  GameState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}
