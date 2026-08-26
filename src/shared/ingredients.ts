@@ -67,6 +67,13 @@ export function getCookableItemDefinition(heldModel: string): CookableIngredient
   return HELD_MODEL_TO_DEFINITION.get(heldModel)
 }
 
+/** The model an ingredient key (shared/recipes.ts) must resolve to — the cooked model for a cookable, otherwise its one model. */
+export function getRequiredModelForIngredient(key: string): string | undefined {
+  const definition = INGREDIENTS[key]
+  if (!definition) return undefined
+  return definition.cookable ? definition.cookedModel : definition.model
+}
+
 export type ItemCategory = 'nonCookable' | 'rawCookable' | 'cookedCookable' | 'plate'
 
 export function classifyItem(model: string): ItemCategory {

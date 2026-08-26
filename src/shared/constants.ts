@@ -93,3 +93,22 @@ export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the del
 // its window closing is treated as "late, not historical" and replays
 // from when it was observed, instead of never showing at all.
 export const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
+
+// A failed delivery shows a red X (two crossed boxes) instead of the
+// checkmark model — no art for this yet, same timing/position otherwise.
+export const CROSSMARK_BAR_LENGTH = 0.5
+export const CROSSMARK_BAR_THICKNESS = 0.08
+export const CROSSMARK_COLOR = Color4.create(0.9, 0.15, 0.15, 1)
+
+// --- Recipe queue ---
+
+// Active recipe count clamps to this range based on active player count — see recipeQueue.ts.
+export const MIN_QUEUE_SIZE = 1
+export const MAX_QUEUE_SIZE = 5
+
+// Coins paid to every active player per delivery, scaled by the recipe's difficulty tier.
+export const BASE_RECIPE_PAYOUT = 10
+
+// Difficulty tier = 1 + floor(streak / STREAK_DIFFICULTY_STEP), capped at MAX_DIFFICULTY_TIER.
+export const STREAK_DIFFICULTY_STEP = 3
+export const MAX_DIFFICULTY_TIER = 3

@@ -1,8 +1,13 @@
 // Delivery counter: interacting while holding something takes it out of
 // the player's hand and places it on the counter, where it sits unchanged
 // for DELIVERY_ITEM_SIT_DURATION, then shrinks away over
-// DELIVERY_ITEM_SHRINK_DURATION while a checkmark (the same model used on
-// stoves) spins and scales up above the pad. No scoring/order system yet.
+// DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales up
+// above the pad — a checkmark if the delivery matched an active recipe
+// (server-decided, see recipeQueue.ts), or a code-drawn red crossmark (no
+// model for this yet) if it didn't. renderedSuccess defaults optimistically
+// to true on send since the real verdict is server-only; the ~1s sit delay
+// is normally enough for it to land before the mark appears, and
+// reconciliation corrects it if not.
 //
 // Reconciled against the server-synced DeliveryState (shared/schemas.ts)
 // rather than held as local truth — see the authoritative-server skill.
@@ -21,10 +26,13 @@
 // collectFromStove, nothing scarce is at stake here, so predicting
 // optimistically is safe.
 
-import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
+import { engine, Entity, GltfContainer, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
+  CROSSMARK_BAR_LENGTH,
+  CROSSMARK_BAR_THICKNESS,
+  CROSSMARK_COLOR,
   DELIVERY_CHECKMARK_DURATION,
   DELIVERY_CHECKMARK_Y_OFFSET,
   DELIVERY_ITEM_SHRINK_DURATION,
@@ -66,14 +74,15 @@ export function deliverHeldItem(): void {
 
   renderedModels = models
   renderedStartTimestamp = startTimestamp
+  renderedSuccess = true // optimistic guess — see header comment
   tickDeliveryAnimation() // builds/scales from the values just set, same as the system's per-frame call
 }
 
-function getSyncedState(): { models: string[]; startTimestamp: number } {
+function getSyncedState(): { models: string[]; startTimestamp: number; success: boolean } {
   for (const [, data] of engine.getEntitiesWith(DeliveryState)) {
-    return { models: [...data.models], startTimestamp: Number(data.startTimestamp) }
+    return { models: [...data.models], startTimestamp: Number(data.startTimestamp), success: data.success }
   }
-  return { models: [], startTimestamp: 0 }
+  return { models: [], startTimestamp: 0, success: true }
 }
 
 function elapsedSince(startTimestamp: number): number {
@@ -91,9 +100,12 @@ let renderedItem: RenderedItem | null = null
 let builtStartTimestamp = 0 // startTimestamp currently reflected by renderedItem — detects a new delivery arriving while one is still showing
 let renderedModels: string[] = []
 let renderedStartTimestamp = 0
+let renderedSuccess = true
 let lastSyncedModels: string[] = []
 let lastSyncedStartTimestamp = 0
+let lastSyncedSuccess = true
 let checkmarkEntity: Entity | null = null
+let crossmarkEntity: Entity | null = null
 let systemRegistered = false
 
 /** Reconciles the delivery counter's synced state against what's currently rendered. Call once during client setup. */
@@ -130,13 +142,24 @@ function deliveryRenderSystem(): void {
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
-  if (sameModels(synced.models, lastSyncedModels) && synced.startTimestamp === lastSyncedStartTimestamp) return
+  const syncedChanged =
+    !sameModels(synced.models, lastSyncedModels) ||
+    synced.startTimestamp !== lastSyncedStartTimestamp ||
+    synced.success !== lastSyncedSuccess
+  if (!syncedChanged) return
   lastSyncedModels = synced.models
   lastSyncedStartTimestamp = synced.startTimestamp
+  lastSyncedSuccess = synced.success
 
-  if (sameModels(synced.models, renderedModels) && synced.startTimestamp === renderedStartTimestamp) return
+  const renderedMatches =
+    sameModels(synced.models, renderedModels) &&
+    synced.startTimestamp === renderedStartTimestamp &&
+    synced.success === renderedSuccess
+  if (renderedMatches) return
+
   renderedModels = synced.models
   renderedStartTimestamp = arrivedLateButRecently(synced) ? Date.now() : synced.startTimestamp
+  renderedSuccess = synced.success
 }
 
 function arrivedLateButRecently(synced: { models: string[]; startTimestamp: number }): boolean {
@@ -166,7 +189,7 @@ function tickDeliveryAnimation(): void {
   }
 
   if (renderedItem !== null) updateItemScale(renderedStartTimestamp)
-  updateCheckmark(active, renderedStartTimestamp)
+  updateResultMark(active, renderedStartTimestamp, renderedSuccess)
 }
 
 function rebuildItemEntities(models: string[]): void {
@@ -207,27 +230,31 @@ function updateItemScale(startTimestamp: number): void {
   Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 
-/** The checkmark's whole spin+scale animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
-function updateCheckmark(active: boolean, startTimestamp: number): void {
+/** The result mark's whole spin+scale animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
+function updateResultMark(active: boolean, startTimestamp: number, success: boolean): void {
   if (checkmarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
-  const checkmark = getOrCreateCheckmark()
+  const shown = success ? getOrCreateCheckmark() : getOrCreateCrossmark()
+  const hidden = success ? getOrCreateCrossmark() : getOrCreateCheckmark()
+
   if (!active) {
-    VisibilityComponent.getMutable(checkmark).visible = false
+    VisibilityComponent.getMutable(shown).visible = false
+    VisibilityComponent.getMutable(hidden).visible = false
     return
   }
 
   // Scale up then back down across the duration — a simple triangle curve
   // peaking at the midpoint. Starts once the item finishes sitting.
   const t = (elapsedSince(startTimestamp) - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_CHECKMARK_DURATION
+  VisibilityComponent.getMutable(hidden).visible = false
   if (t < 0 || t > 1) {
-    VisibilityComponent.getMutable(checkmark).visible = false
+    VisibilityComponent.getMutable(shown).visible = false
     return
   }
 
-  VisibilityComponent.getMutable(checkmark).visible = true
+  VisibilityComponent.getMutable(shown).visible = true
   const scale = t < 0.5 ? t / 0.5 : (1 - t) / 0.5
-  Transform.getMutable(checkmark).scale = Vector3.create(scale, scale, scale)
+  Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
 }
 
 function getOrCreateCheckmark(): Entity {
@@ -244,6 +271,39 @@ function getOrCreateCheckmark(): Entity {
 
   checkmarkEntity = checkmark
   return checkmark
+}
+
+/** Two crossed boxes forming a red X — stands in for the checkmark model on a failed delivery until there's real art for it. */
+function getOrCreateCrossmark(): Entity {
+  if (crossmarkEntity !== null) return crossmarkEntity
+
+  const crossmark = engine.addEntity()
+  Transform.create(crossmark, {
+    position: checkmarkWorldPosition ?? Vector3.Zero(),
+    scale: Vector3.Zero(),
+    rotation: Quaternion.fromEulerDegrees(0, 90, 0)
+  })
+  VisibilityComponent.create(crossmark, { visible: false })
+
+  for (const barAngle of [45, -45]) {
+    const bar = engine.addEntity()
+    Transform.create(bar, {
+      scale: Vector3.create(CROSSMARK_BAR_LENGTH, CROSSMARK_BAR_THICKNESS, CROSSMARK_BAR_THICKNESS),
+      rotation: Quaternion.fromEulerDegrees(0, 0, barAngle),
+      parent: crossmark
+    })
+    MeshRenderer.setBox(bar)
+    Material.setPbrMaterial(bar, {
+      albedoColor: CROSSMARK_COLOR,
+      emissiveColor: CROSSMARK_COLOR,
+      emissiveIntensity: 0.1,
+      metallic: 0,
+      roughness: 0.8
+    })
+  }
+
+  crossmarkEntity = crossmark
+  return crossmark
 }
 
 function sameModels(a: string[], b: string[]): boolean {

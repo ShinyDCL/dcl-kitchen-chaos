@@ -1,18 +1,13 @@
 // Owns every player's PlayerRole and the derived GameState.activePlayerCount.
-// Unlike heldItems.ts, there's no legality check here — a role choice is
-// never contested, so the handler just writes what the client sent.
+// No legality check on the role itself — it's never contested.
 //
-// activePlayerCount comes from intersecting PlayerRole ('play' entries)
-// with engine.getEntitiesWith(PlayerIdentityData) — the engine's own live
-// view of who is actually connected right now. This is what makes a
-// disconnect (tab closed, connection dropped, no explicit "leave" message)
-// reflected for free: the moment a player's PlayerIdentityData entity is
-// gone, they drop out of the count on the very next tick.
+// activePlayerCount intersects PlayerRole ('play' entries) with live
+// PlayerIdentityData (who's actually connected), so a disconnect drops a
+// player from the count for free, no explicit "leave" message needed.
 //
 // isPlayerAllowedToAct is the server-side half of spectator gating — the
-// client already hides highlight/interaction for a spectator (see
-// focusManager.ts), but every other server module calls this too so a
-// modified client can't bypass that by sending intents directly.
+// client already hides highlight/interaction (see focusManager.ts), but
+// every server module calls this too so a modified client can't bypass it.
 
 import { engine, Entity, EntityUtils, PlayerIdentityData, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
@@ -45,20 +40,35 @@ export function isPlayerAllowedToAct(playerId: string): boolean {
   return PlayerRole.getOrNull(entity)?.role === PlayerRoleValue.Play
 }
 
-function recomputeActivePlayerCount(): void {
+/** Lower-cased playerIds of every currently-connected 'play'-role player. */
+export function getActivePlayerIds(): string[] {
+  const connectedIds = getConnectedPlayerIds()
+  const activeIds: string[] = []
+  for (const [, role] of engine.getEntitiesWith(PlayerRole)) {
+    if (role.role === PlayerRoleValue.Play && connectedIds.has(role.playerId.toLowerCase())) {
+      activeIds.push(role.playerId.toLowerCase())
+    }
+  }
+  return activeIds
+}
+
+/** GameState's mutable data, for other modules that own a field on it (recipeQueue.ts's streak). */
+export function getGameStateMutable() {
+  return GameState.getMutableOrNull(getOrCreateGameStateEntity())
+}
+
+function getConnectedPlayerIds(): Set<string> {
   const connectedIds = new Set<string>()
   for (const [, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
     connectedIds.add(identity.address.toLowerCase())
   }
+  return connectedIds
+}
 
-  let activePlayerCount = 0
-  for (const [, role] of engine.getEntitiesWith(PlayerRole)) {
-    if (role.role === PlayerRoleValue.Play && connectedIds.has(role.playerId.toLowerCase())) {
-      activePlayerCount++
-    }
-  }
+function recomputeActivePlayerCount(): void {
+  const activePlayerCount = getActivePlayerIds().length
 
-  const mutable = GameState.getMutableOrNull(getOrCreateGameStateEntity())
+  const mutable = getGameStateMutable()
   if (mutable && mutable.activePlayerCount !== activePlayerCount) {
     mutable.activePlayerCount = activePlayerCount
   }
@@ -102,7 +112,7 @@ function getOrCreateGameStateEntity(): Entity {
   if (gameStateEntity !== null && GameState.getOrNull(gameStateEntity) !== null) return gameStateEntity
 
   const entity = engine.addEntity()
-  GameState.create(entity, { activePlayerCount: 0 })
+  GameState.create(entity, { activePlayerCount: 0, streak: 0 })
   syncEntity(entity, [GameState.componentId], GAME_STATE_SYNC_ID)
   gameStateEntity = entity
   return entity

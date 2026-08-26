@@ -1,6 +1,7 @@
-// Recipe queue HUD — cards along the top-left, newest on the left. Purely
-// a rendering layer for now: SAMPLE_RECIPES is a frozen sample list, no
-// server, no live countdown.
+// Recipe queue HUD — cards along the top-left, newest slot first. Reads
+// straight from the synced RecipeSlotState entities every frame (see
+// recipeQueue.ts); no local prediction to protect, so no reconcile step
+// like heldItem.ts's. Only visible to players in the 'play' role.
 //
 // Ingredients stack vertically (bottom-to-top) so cards stay narrow enough
 // for several to fit on a phone screen. The stack uses absolute positioning
@@ -19,18 +20,27 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { getIngredientAtlasUvs, Recipe, SAMPLE_RECIPES } from '../shared/recipes'
+import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
+import { RecipeSlotState } from '../shared/schemas'
+import { isLocalPlayerPlaying } from './playerRoleState'
 
 const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
-const MAX_VISIBLE_RECIPES = 5
 const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
 const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8)
 const TIMER_BAR_HEIGHT = 8
 const TIMER_BAR_BORDER_RADIUS = 4
 const TIMER_BAR_MARGIN_TOP = 8
 
-const SAMPLE_TIMER_MAX_SECONDS = 90 // just for a frozen sample fill % — not a real countdown yet
+// Two fixed zones (green/red) instead of a single growing fill — a dark
+// mask anchored to the right shrinks as progress increases, revealing
+// whether the deadline reached is still safely green or overdue in red.
+// Mask is nearly opaque so the edge stays sharp on a small bar.
+const TIMER_ZONE_GREEN_PERCENT = 75
+const TIMER_ZONE_RED_PERCENT = 25
+const TIMER_ZONE_GREEN_COLOR = Color4.create(0.2, 0.85, 0.3, 1)
+const TIMER_ZONE_RED_COLOR = Color4.create(0.9, 0.2, 0.2, 1)
+const TIMER_MASK_COLOR = Color4.create(0, 0, 0, 0.92)
 
 interface RecipeCardLayout {
   cardWidth: number
@@ -82,9 +92,28 @@ function startPlatformDetection(): void {
   })
 }
 
+interface ActiveRecipe {
+  recipe: Recipe
+  generatedAt: number
+}
+
+/** Every active queue slot's recipe, resolved from RecipeSlotState.recipeId, newest-generated first — slotIndex is a fixed per-slot identity, not recency, so sorting by generatedAt is what actually puts the newest card on the left. */
+function getActiveRecipes(): ActiveRecipe[] {
+  const active: ActiveRecipe[] = []
+  for (const [, data] of engine.getEntitiesWith(RecipeSlotState)) {
+    if (!data.active) continue
+    const recipe = getRecipeById(data.recipeId)
+    if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
+    active.push({ recipe, generatedAt: Number(data.generatedAt) })
+  }
+  return active.sort((a, b) => b.generatedAt - a.generatedAt)
+}
+
 function RecipesUI() {
+  if (!isLocalPlayerPlaying()) return null // spectators (and anyone who hasn't chosen Play yet) don't see the queue at all
+
   const layout = currentLayout
-  const recipes = SAMPLE_RECIPES.slice(0, MAX_VISIBLE_RECIPES)
+  const recipes = getActiveRecipes()
 
   return (
     <UiEntity uiTransform={{ width: '100%', height: '100%' }}>
@@ -101,15 +130,23 @@ function RecipesUI() {
           alignItems: 'flex-start'
         }}
       >
-        {recipes.map((recipe) => (
-          <RecipeCard recipe={recipe} layout={layout} />
+        {recipes.map(({ recipe, generatedAt }) => (
+          <RecipeCard recipe={recipe} generatedAt={generatedAt} layout={layout} />
         ))}
       </UiEntity>
     </UiEntity>
   )
 }
 
-function RecipeCard({ recipe, layout }: { recipe: Recipe; layout: RecipeCardLayout }) {
+function RecipeCard({
+  recipe,
+  generatedAt,
+  layout
+}: {
+  recipe: Recipe
+  generatedAt: number
+  layout: RecipeCardLayout
+}) {
   return (
     <UiEntity
       uiTransform={{
@@ -124,7 +161,7 @@ function RecipeCard({ recipe, layout }: { recipe: Recipe; layout: RecipeCardLayo
       uiBackground={{ color: CARD_BACKGROUND }}
     >
       <IngredientStack ingredients={recipe.ingredients} layout={layout} />
-      <TimerBar seconds={recipe.timerSeconds} />
+      <TimerBar timerSeconds={recipe.timerSeconds} generatedAt={generatedAt} />
     </UiEntity>
   )
 }
@@ -162,8 +199,10 @@ function IngredientStack({ ingredients, layout }: { ingredients: string[]; layou
   )
 }
 
-function TimerBar({ seconds }: { seconds: number }) {
-  const progress = Math.min(seconds / SAMPLE_TIMER_MAX_SECONDS, 1)
+function TimerBar({ timerSeconds, generatedAt }: { timerSeconds: number; generatedAt: number }) {
+  const elapsedSeconds = (Date.now() - generatedAt) / 1000
+  const progress = Math.min(elapsedSeconds / timerSeconds, 1)
+  const maskWidthPercent = (1 - progress) * 100
 
   return (
     <UiEntity
@@ -171,13 +210,27 @@ function TimerBar({ seconds }: { seconds: number }) {
         width: '100%',
         height: TIMER_BAR_HEIGHT,
         margin: { top: TIMER_BAR_MARGIN_TOP },
-        borderRadius: TIMER_BAR_BORDER_RADIUS
+        flexDirection: 'row',
+        borderRadius: TIMER_BAR_BORDER_RADIUS,
+        overflow: 'hidden'
       }}
-      uiBackground={{ color: Color4.create(1, 1, 1, 0.2) }}
     >
       <UiEntity
-        uiTransform={{ width: `${progress * 100}%`, height: '100%', borderRadius: TIMER_BAR_BORDER_RADIUS }}
-        uiBackground={{ color: Color4.create(0.2, 0.85, 0.3, 1) }}
+        uiTransform={{ width: `${TIMER_ZONE_GREEN_PERCENT}%`, height: '100%' }}
+        uiBackground={{ color: TIMER_ZONE_GREEN_COLOR }}
+      />
+      <UiEntity
+        uiTransform={{ width: `${TIMER_ZONE_RED_PERCENT}%`, height: '100%' }}
+        uiBackground={{ color: TIMER_ZONE_RED_COLOR }}
+      />
+      <UiEntity
+        uiTransform={{
+          positionType: 'absolute',
+          position: { top: 0, right: 0 },
+          width: `${maskWidthPercent}%`,
+          height: '100%'
+        }}
+        uiBackground={{ color: TIMER_MASK_COLOR }}
       />
     </UiEntity>
   )

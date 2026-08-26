@@ -1,20 +1,43 @@
-// Hardcoded sample recipe data for the recipe queue UI. Ingredient keys
-// match shared/ingredients.ts's INGREDIENTS, so recipes stay in the same
-// vocabulary as the kitchen.
+// Recipe definitions for the recipe queue — recipeQueue.ts picks from
+// these by difficulty tier to fill queue slots; recipesUi.tsx resolves a
+// slot's recipeId back to one to render it. Ingredient keys match
+// shared/ingredients.ts's INGREDIENTS.
+
+import { MAX_DIFFICULTY_TIER, STREAK_DIFFICULTY_STEP } from './constants'
 
 export interface Recipe {
   id: string
   ingredients: string[] // bottom-to-top assembly order; keys into shared/ingredients.ts's INGREDIENTS
-  timerSeconds: number // frozen sample value for now — not yet a live countdown
+  timerSeconds: number // shown as a countdown in the HUD; not currently a hard expiry
+  difficulty: number // 1..MAX_DIFFICULTY_TIER — which streak tier this can be picked for
 }
 
 export const SAMPLE_RECIPES: Recipe[] = [
-  { id: 'classic', ingredients: ['bunBottom', 'patty', 'cheese', 'bunTop'], timerSeconds: 45 },
-  { id: 'garden', ingredients: ['bunBottom', 'patty', 'tomato', 'onion', 'salad', 'bunTop'], timerSeconds: 60 },
-  { id: 'breakfast', ingredients: ['bunBottom', 'egg', 'cheese', 'bunTop'], timerSeconds: 30 },
-  { id: 'loaded', ingredients: ['bunBottom', 'patty', 'cheese', 'tomato', 'cucumber', 'onion', 'bunTop'], timerSeconds: 75 },
-  { id: 'simple', ingredients: ['bunBottom', 'patty', 'bunTop'], timerSeconds: 20 }
+  { id: 'simple', ingredients: ['bunBottom', 'patty', 'bunTop'], timerSeconds: 20, difficulty: 1 },
+  { id: 'classic', ingredients: ['bunBottom', 'patty', 'cheese', 'bunTop'], timerSeconds: 45, difficulty: 1 },
+  { id: 'breakfast', ingredients: ['bunBottom', 'egg', 'cheese', 'bunTop'], timerSeconds: 30, difficulty: 1 },
+  { id: 'garden', ingredients: ['bunBottom', 'patty', 'tomato', 'onion', 'salad', 'bunTop'], timerSeconds: 60, difficulty: 2 },
+  { id: 'loaded', ingredients: ['bunBottom', 'patty', 'cheese', 'tomato', 'cucumber', 'onion', 'bunTop'], timerSeconds: 75, difficulty: 3 }
 ]
+
+const RECIPES_BY_ID = new Map(SAMPLE_RECIPES.map((recipe) => [recipe.id, recipe]))
+
+/** Looks up a recipe by id — resolves a synced RecipeSlotState's recipeId for rendering. */
+export function getRecipeById(id: string): Recipe | undefined {
+  return RECIPES_BY_ID.get(id)
+}
+
+/** Difficulty tier for the current streak: 1 + one tier per STREAK_DIFFICULTY_STEP successful deliveries, capped at MAX_DIFFICULTY_TIER. */
+export function getDifficultyForStreak(streak: number): number {
+  return Math.min(1 + Math.floor(streak / STREAK_DIFFICULTY_STEP), MAX_DIFFICULTY_TIER)
+}
+
+/** Picks a random recipe at the given difficulty, falling back to the whole pool if that tier is empty (e.g. no recipes defined for it yet). */
+export function pickRandomRecipeByDifficulty(difficulty: number): Recipe {
+  const pool = SAMPLE_RECIPES.filter((recipe) => recipe.difficulty === difficulty)
+  const source = pool.length > 0 ? pool : SAMPLE_RECIPES
+  return source[Math.floor(Math.random() * source.length)]
+}
 
 // IngredientAtlas.png: 512x512, 4x8 grid of 128x64 cells. Only column 0
 // and column 1's bottom row (bunTop) are populated — rest is reserved.

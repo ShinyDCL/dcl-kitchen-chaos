@@ -66,14 +66,15 @@ if (isServer()) {
  * Singleton — the scene only ever creates one delivery counter (see
  * client/sceneLayout.ts). `models` is what was last delivered (bottom to
  * top), empty meaning nothing to show right now. `startTimestamp` (server
- * clock, ms) is when that delivery landed; every client derives both the
- * item sit/shrink animation and the checkmark flourish from
- * `Date.now() - startTimestamp`, the same reasoning as StoveState, so
- * there's no separate phase/progress field to keep in sync.
+ * clock, ms) is when that delivery landed; every client derives the item
+ * sit/shrink animation and the checkmark/crossmark flourish from
+ * `Date.now() - startTimestamp`. `success` (see recipeQueue.ts) picks
+ * checkmark vs crossmark.
  */
 export const DeliveryState = engine.defineComponent('game::DeliveryState', {
   models: Schemas.Array(Schemas.String),
-  startTimestamp: Schemas.Int64
+  startTimestamp: Schemas.Int64,
+  success: Schemas.Boolean
 })
 
 if (isServer()) {
@@ -107,15 +108,48 @@ if (isServer()) {
 export const GAME_STATE_SYNC_ID = 100000
 
 /**
- * Singleton — how many currently-connected players are in the 'play' role.
- * Server-derived each tick from live PlayerIdentityData (the engine's own
- * view of who's actually connected) intersected with PlayerRole, so a
- * disconnect is reflected for free with no explicit leave message needed.
+ * Singleton. `activePlayerCount` is currently-connected 'play'-role
+ * players, recomputed each tick so a disconnect is reflected for free.
+ * `streak` counts consecutive successful deliveries scene-wide, reset to 0
+ * on a miss — see recipeQueue.ts.
  */
 export const GameState = engine.defineComponent('game::GameState', {
-  activePlayerCount: Schemas.Int
+  activePlayerCount: Schemas.Int,
+  streak: Schemas.Int
 })
 
 if (isServer()) {
   GameState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}
+
+/** One entity per player's coin balance, matched by `playerId` like HeldItem/PlayerRole. Session-only — no Storage persistence yet. */
+export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
+  playerId: Schemas.String,
+  coins: Schemas.Int
+})
+
+if (isServer()) {
+  PlayerCoins.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+}
+
+// Reserved sync ids for the MAX_QUEUE_SIZE recipe queue slots. Slot i uses
+// RECIPE_SLOT_SYNC_ID_BASE + i.
+export const RECIPE_SLOT_SYNC_ID_BASE = 100001
+
+/**
+ * One entity per recipe queue slot (a fixed set — MAX_QUEUE_SIZE — same
+ * explicit-id pattern as PreparationCounterState). `active` is toggled by
+ * recipeQueue.ts; `recipeId` looks up shared/recipes.ts (inactive slots
+ * leave it '' and clients skip rendering); `generatedAt` (server clock,
+ * ms) drives the HUD's countdown.
+ */
+export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
+  slotIndex: Schemas.Int,
+  active: Schemas.Boolean,
+  recipeId: Schemas.String,
+  generatedAt: Schemas.Int64
+})
+
+if (isServer()) {
+  RecipeSlotState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
 }
