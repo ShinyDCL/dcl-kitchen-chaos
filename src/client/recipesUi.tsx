@@ -3,6 +3,19 @@
 // recipeQueue.ts); no local prediction to protect, so no reconcile step
 // like heldItem.ts's. Only visible to players in the 'play' role.
 //
+// The server broadcasts 'recipeDelivered'/'recipeGenerated' once each, and
+// each client times its own success/new-recipe highlight locally from
+// receipt — not a shared server deadline latency could cut short. A
+// celebrating card and its slot's own live card are independent entries
+// (see getActiveRecipes) — normally the server delays regenerating a
+// delivered slot until the celebration's about done, but if a client sees
+// the live update early anyway, both just render at once rather than one
+// hiding the other. pendingNewFlashSlots guards the case where the
+// 'recipeGenerated' message beats the RecipeSlotState sync update itself.
+//
+// Card background eases between normal/new/success via getCardBackground's
+// per-slot lerp state — cheap, since this UI rebuilds fully every frame.
+//
 // Ingredients stack vertically (bottom-to-top) so cards stay narrow enough
 // for several to fit on a phone screen. The stack uses absolute positioning
 // with an explicitly computed height rather than flex + negative margins,
@@ -18,8 +31,10 @@
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
-import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
+import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
+import { RECIPE_NEW_FLASH_SECONDS, RECIPE_SUCCESS_CELEBRATION_SECONDS } from '../shared/constants'
+import { room } from '../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
 import { RecipeSlotState } from '../shared/schemas'
 import { isLocalPlayerPlaying } from './playerRoleState'
@@ -28,9 +43,25 @@ const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
 const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
 const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8)
+const CARD_SUCCESS_BACKGROUND = Color4.create(0.1, 0.55, 0.2, 0.9)
+const CARD_NEW_BACKGROUND = Color4.create(0.15, 0.4, 0.85, 0.9) // blue — distinct from success green and the timer bar's red
+const CARD_COLOR_TRANSITION_SECONDS = 0.3
 const TIMER_BAR_HEIGHT = 8
 const TIMER_BAR_BORDER_RADIUS = 4
 const TIMER_BAR_MARGIN_TOP = 8
+
+const SUCCESS_TITLE_FONT_SIZE = 14
+const SUCCESS_TITLE_HEIGHT = 18 // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
+const SUCCESS_SUBTEXT_FONT_SIZE = 11
+const SUCCESS_SUBTEXT_HEIGHT = 14
+const SUCCESS_LINE_GAP = 2
+const SUCCESS_MESSAGE_MARGIN_TOP = 2
+const SUCCESS_TEXT_COLOR = Color4.White()
+
+const NEW_BADGE_FONT_SIZE = 14
+const NEW_BADGE_HEIGHT = 18
+const NEW_BADGE_MARGIN_TOP = 2
+const NEW_BADGE_TEXT_COLOR = Color4.White()
 
 // Two fixed zones (green/red) instead of a single growing fill — a dark
 // mask anchored to the right shrinks as progress increases, revealing
@@ -81,6 +112,21 @@ let currentLayout: RecipeCardLayout = DESKTOP_LAYOUT
 export function setupRecipesUi(): void {
   ReactEcsRenderer.setUiRenderer(RecipesUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'interactable' })
   startPlatformDetection()
+
+  room.onMessage('recipeDelivered', (data) => {
+    const recipe = getRecipeById(data.recipeId)
+    if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
+    successOverrides.set(data.slotIndex, {
+      recipe,
+      deliveredByName: data.deliveredByName,
+      generatedAt: Number(data.generatedAt),
+      endsAt: Date.now() + RECIPE_SUCCESS_CELEBRATION_SECONDS * 1000
+    })
+  })
+
+  room.onMessage('recipeGenerated', (data) => {
+    pendingNewFlashSlots.add(data.slotIndex)
+  })
 }
 
 /** Polls until getPlatform() resolves (null briefly at startup), then locks in the layout once. */
@@ -92,21 +138,123 @@ function startPlatformDetection(): void {
   })
 }
 
-interface ActiveRecipe {
+interface SuccessOverride {
   recipe: Recipe
-  generatedAt: number
+  deliveredByName: string
+  generatedAt: number // the delivered recipe's own generatedAt, not celebration start — keeps its row position instead of jumping to the front
+  endsAt: number
 }
 
-/** Every active queue slot's recipe, resolved from RecipeSlotState.recipeId, newest-generated first — slotIndex is a fixed per-slot identity, not recency, so sorting by generatedAt is what actually puts the newest card on the left. */
+// Keyed by slotIndex — client-local timing, see the file header comment.
+const successOverrides = new Map<number, SuccessOverride>()
+
+// Keyed by slotIndex — a slot that got 'recipeGenerated' but hasn't been
+// rendered yet (still covered by its own success celebration). The flash
+// timer only starts once actually rendered, so a refill right after this
+// client's own delivery still gets its full flash instead of elapsing
+// unseen underneath the longer celebration.
+const pendingNewFlashSlots = new Set<number>()
+
+// Keyed by slotIndex, value is when the "New!" flash ends locally, once started.
+const newRecipeFlashUntil = new Map<number, number>()
+
+type CardVisualState = 'normal' | 'new' | 'success'
+
+interface ActiveRecipe {
+  cardKey: string // unique per rendered card — a celebrating slot and its already-regenerated live slot can render simultaneously, so slotIndex alone isn't unique
+  recipe: Recipe
+  generatedAt: number
+  visualState: CardVisualState
+  deliveredByName: string
+}
+
+/**
+ * Newest first by generatedAt. A celebrating override and its slot's live
+ * state are independent entries, not mutually exclusive — if the server's
+ * regenerated recipe becomes visible before this client's own celebration
+ * ends (latency skew), both simply show at once instead of one hiding
+ * the other.
+ */
 function getActiveRecipes(): ActiveRecipe[] {
+  const now = Date.now()
   const active: ActiveRecipe[] = []
+
+  for (const [slotIndex, override] of successOverrides) {
+    if (now >= override.endsAt) {
+      successOverrides.delete(slotIndex)
+      continue
+    }
+    active.push({
+      cardKey: `success-${slotIndex}`,
+      recipe: override.recipe,
+      generatedAt: override.generatedAt,
+      visualState: 'success',
+      deliveredByName: override.deliveredByName
+    })
+  }
+
   for (const [, data] of engine.getEntitiesWith(RecipeSlotState)) {
     if (!data.active) continue
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
-    active.push({ recipe, generatedAt: Number(data.generatedAt) })
+
+    let isNew: boolean
+    if (pendingNewFlashSlots.delete(data.slotIndex)) {
+      newRecipeFlashUntil.set(data.slotIndex, now + RECIPE_NEW_FLASH_SECONDS * 1000)
+      isNew = true
+    } else {
+      const flashUntil = newRecipeFlashUntil.get(data.slotIndex)
+      isNew = flashUntil !== undefined && now < flashUntil
+      if (flashUntil !== undefined && !isNew) newRecipeFlashUntil.delete(data.slotIndex)
+    }
+
+    active.push({
+      cardKey: `live-${data.slotIndex}`,
+      recipe,
+      generatedAt: Number(data.generatedAt),
+      visualState: isNew ? 'new' : 'normal',
+      deliveredByName: ''
+    })
   }
+
   return active.sort((a, b) => b.generatedAt - a.generatedAt)
+}
+
+// Keyed by slotIndex — an in-progress background ease; see getCardBackground.
+interface CardColorTransition {
+  fromColor: Color4
+  toColor: Color4
+  state: CardVisualState
+  startedAt: number
+}
+const cardColorTransitions = new Map<string, CardColorTransition>()
+
+function visualStateColor(state: CardVisualState): Color4 {
+  if (state === 'success') return CARD_SUCCESS_BACKGROUND
+  if (state === 'new') return CARD_NEW_BACKGROUND
+  return CARD_BACKGROUND
+}
+
+/** The card background for this card, easing toward `state`'s color whenever `state` just changed, rather than snapping instantly. */
+function getCardBackground(cardKey: string, state: CardVisualState): Color4 {
+  const now = Date.now()
+  const existing = cardColorTransitions.get(cardKey)
+  const targetColor = visualStateColor(state)
+
+  if (!existing || existing.state !== state) {
+    // Start from the current eased color, not the old target, so a state change mid-fade doesn't jump.
+    const fromColor = existing ? lerpTransitionColor(existing, now) : targetColor
+    const transition: CardColorTransition = { fromColor, toColor: targetColor, state, startedAt: now }
+    cardColorTransitions.set(cardKey, transition)
+    return fromColor
+  }
+
+  return lerpTransitionColor(existing, now)
+}
+
+function lerpTransitionColor(transition: CardColorTransition, now: number): Color4 {
+  const t = Math.min((now - transition.startedAt) / (CARD_COLOR_TRANSITION_SECONDS * 1000), 1)
+  return Color4.lerp(transition.fromColor, transition.toColor, t)
 }
 
 function RecipesUI() {
@@ -130,8 +278,15 @@ function RecipesUI() {
           alignItems: 'flex-start'
         }}
       >
-        {recipes.map(({ recipe, generatedAt }) => (
-          <RecipeCard recipe={recipe} generatedAt={generatedAt} layout={layout} />
+        {recipes.map(({ cardKey, recipe, generatedAt, visualState, deliveredByName }) => (
+          <RecipeCard
+            cardKey={cardKey}
+            recipe={recipe}
+            generatedAt={generatedAt}
+            visualState={visualState}
+            deliveredByName={deliveredByName}
+            layout={layout}
+          />
         ))}
       </UiEntity>
     </UiEntity>
@@ -139,14 +294,22 @@ function RecipesUI() {
 }
 
 function RecipeCard({
+  cardKey,
   recipe,
   generatedAt,
+  visualState,
+  deliveredByName,
   layout
 }: {
+  cardKey: string
   recipe: Recipe
   generatedAt: number
+  visualState: CardVisualState
+  deliveredByName: string
   layout: RecipeCardLayout
 }) {
+  const background = getCardBackground(cardKey, visualState)
+
   return (
     <UiEntity
       uiTransform={{
@@ -158,10 +321,59 @@ function RecipeCard({
         margin: { right: layout.cardGap },
         borderRadius: CARD_BORDER_RADIUS
       }}
-      uiBackground={{ color: CARD_BACKGROUND }}
+      uiBackground={{ color: background }}
     >
       <IngredientStack ingredients={recipe.ingredients} layout={layout} />
-      <TimerBar timerSeconds={recipe.timerSeconds} generatedAt={generatedAt} />
+      {visualState === 'success' ? (
+        <SuccessMessage deliveredByName={deliveredByName} />
+      ) : visualState === 'new' ? (
+        <NewBadge />
+      ) : (
+        <TimerBar timerSeconds={recipe.timerSeconds} generatedAt={generatedAt} />
+      )}
+    </UiEntity>
+  )
+}
+
+function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
+  return (
+    <UiEntity
+      uiTransform={{
+        width: '100%',
+        height: SUCCESS_TITLE_HEIGHT + SUCCESS_LINE_GAP + SUCCESS_SUBTEXT_HEIGHT,
+        flexDirection: 'column',
+        alignItems: 'center',
+        margin: { top: SUCCESS_MESSAGE_MARGIN_TOP }
+      }}
+    >
+      <Label
+        value="Success!"
+        fontSize={SUCCESS_TITLE_FONT_SIZE}
+        color={SUCCESS_TEXT_COLOR}
+        textAlign="middle-center"
+        uiTransform={{ width: '100%', height: SUCCESS_TITLE_HEIGHT }}
+      />
+      <Label
+        value={`by ${deliveredByName}`}
+        fontSize={SUCCESS_SUBTEXT_FONT_SIZE}
+        color={SUCCESS_TEXT_COLOR}
+        textAlign="middle-center"
+        uiTransform={{ width: '100%', height: SUCCESS_SUBTEXT_HEIGHT, margin: { top: SUCCESS_LINE_GAP } }}
+      />
+    </UiEntity>
+  )
+}
+
+function NewBadge() {
+  return (
+    <UiEntity uiTransform={{ width: '100%', height: NEW_BADGE_HEIGHT, alignItems: 'center', margin: { top: NEW_BADGE_MARGIN_TOP } }}>
+      <Label
+        value="New!"
+        fontSize={NEW_BADGE_FONT_SIZE}
+        color={NEW_BADGE_TEXT_COLOR}
+        textAlign="middle-center"
+        uiTransform={{ width: '100%', height: NEW_BADGE_HEIGHT }}
+      />
     </UiEntity>
   )
 }

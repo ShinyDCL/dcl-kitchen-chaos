@@ -11,6 +11,7 @@
 
 import { engine, Entity, EntityUtils, PlayerIdentityData, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
+import { getPlayer } from '@dcl/sdk/src/players'
 
 import { room } from '../shared/messages'
 import { GAME_STATE_SYNC_ID, GameState, PlayerRole, PlayerRoleValue } from '../shared/schemas'
@@ -55,6 +56,12 @@ export function getActivePlayerIds(): string[] {
 /** GameState's mutable data, for other modules that own a field on it (recipeQueue.ts's streak). */
 export function getGameStateMutable() {
   return GameState.getMutableOrNull(getOrCreateGameStateEntity())
+}
+
+/** Display name for a player address, used in the recipe HUD's "delivered by" message. */
+export function getPlayerDisplayName(playerId: string): string {
+  const name = getPlayer({ userId: playerId })?.name
+  return name && name.length > 0 ? name : 'A player'
 }
 
 function getConnectedPlayerIds(): Set<string> {

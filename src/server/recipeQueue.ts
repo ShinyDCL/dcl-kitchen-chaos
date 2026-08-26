@@ -12,23 +12,35 @@
 // timeout resets nothing (only a wrong delivery resets the streak).
 //
 // evaluateDelivery is called by deliveryCounter.ts, which still owns
-// DeliveryState/the visual timing — a match pays every active player, a
-// miss resets the streak; either way the delivery still visually lands.
+// DeliveryState/the visual timing — a match pays every active player and
+// broadcasts 'recipeDelivered'; a miss just resets the streak.
+// generateRecipeForSlot always broadcasts 'recipeGenerated'; clients time
+// their own highlight locally instead of racing a shared server deadline
+// latency could cut short.
+//
+// A match deactivates its slot immediately but defers regenerating it for
+// RECIPE_SUCCESS_CELEBRATION_SECONDS (pendingRegenerations, resolved in
+// growQueueSystem) — otherwise the new recipe's real clock (generatedAt)
+// would already be running while every client's celebration still hides
+// it, so its timer bar would show as already-elapsed the moment it
+// finally appears.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { BASE_RECIPE_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE } from '../shared/constants'
+import { BASE_RECIPE_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, RECIPE_SUCCESS_CELEBRATION_SECONDS } from '../shared/constants'
 import { getRequiredModelForIngredient } from '../shared/ingredients'
+import { room } from '../shared/messages'
 import { getDifficultyForStreak, getRecipeById, pickRandomRecipeByDifficulty, Recipe } from '../shared/recipes'
 import { RECIPE_SLOT_SYNC_ID_BASE, RecipeSlotState } from '../shared/schemas'
 import { grantCoins } from './playerCoins'
-import { getActivePlayerIds, getGameStateMutable } from './playerRoster'
+import { getActivePlayerIds, getGameStateMutable, getPlayerDisplayName } from './playerRoster'
 
 type SlotState = ReturnType<typeof RecipeSlotState.getMutable>
 type GameStateMutable = NonNullable<ReturnType<typeof getGameStateMutable>>
 
 const slotEntities = new Map<number, Entity>()
+const pendingRegenerations = new Map<number, number>() // slotIndex -> server timestamp when it's eligible to regenerate
 
 export function initRecipeQueue(): void {
   reconcileSlotEntities()
@@ -38,7 +50,7 @@ export function initRecipeQueue(): void {
 }
 
 /** Called from deliveryCounter.ts's deliverHeldItem handler. Returns whether the delivered stack matched an active recipe. */
-export function evaluateDelivery(models: string[]): boolean {
+export function evaluateDelivery(models: string[], delivererId: string): boolean {
   const gameState = getGameStateMutable()
   if (!gameState) return false
 
@@ -51,7 +63,17 @@ export function evaluateDelivery(models: string[]): boolean {
   gameState.streak += 1
   const recipe = getRecipeById(matched.state.recipeId)
   grantCoins(getActivePlayerIds(), recipe ? BASE_RECIPE_PAYOUT * recipe.difficulty : BASE_RECIPE_PAYOUT)
-  advanceSlot(matched.state, gameState)
+
+  void room.send('recipeDelivered', {
+    slotIndex: matched.state.slotIndex,
+    recipeId: matched.state.recipeId,
+    deliveredByName: getPlayerDisplayName(delivererId),
+    generatedAt: matched.state.generatedAt
+  })
+
+  matched.state.active = false
+  matched.state.recipeId = ''
+  pendingRegenerations.set(matched.state.slotIndex, Date.now() + RECIPE_SUCCESS_CELEBRATION_SECONDS * 1000)
 
   return true
 }
@@ -61,9 +83,20 @@ function growQueueSystem(): void {
   if (!gameState) return
 
   const target = getTargetQueueSize(gameState.activePlayerCount)
+  const now = Date.now()
+
   for (let slotIndex = 0; slotIndex < MAX_QUEUE_SIZE; slotIndex++) {
     const state = RecipeSlotState.getMutableOrNull(getOrCreateSlotEntity(slotIndex))
     if (!state) continue
+
+    const readyAt = pendingRegenerations.get(slotIndex)
+    if (readyAt !== undefined) {
+      if (now >= readyAt) {
+        pendingRegenerations.delete(slotIndex)
+        advanceSlot(state, gameState)
+      }
+      continue // still pausing after its own delivery, or just regenerated — either way, not a plain inactive slot to grow into below
+    }
 
     if (!state.active) {
       if (slotIndex < target) generateRecipeForSlot(state, gameState.streak)
@@ -97,11 +130,14 @@ function getTargetQueueSize(activePlayerCount: number): number {
   return activePlayerCount <= 0 ? 0 : clamp(activePlayerCount, MIN_QUEUE_SIZE, MAX_QUEUE_SIZE)
 }
 
+/** The single place a slot gets a new recipe — also broadcasts recipeGenerated for the client's "New!" flash. */
 function generateRecipeForSlot(state: SlotState, streak: number): void {
   const recipe = pickRandomRecipeByDifficulty(getDifficultyForStreak(streak))
   state.active = true
   state.recipeId = recipe.id
   state.generatedAt = Date.now()
+
+  void room.send('recipeGenerated', { slotIndex: state.slotIndex, recipeId: recipe.id })
 }
 
 function findMatchingActiveSlot(models: string[]): { state: SlotState } | null {

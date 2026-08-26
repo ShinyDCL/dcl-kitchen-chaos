@@ -23,7 +23,7 @@ export function initDeliveryCounter(): void {
 
   room.onMessage('deliverHeldItem', (data, context) => {
     if (!context || !isPlayerAllowedToAct(context.from)) return
-    const success = evaluateDelivery(data.models)
+    const success = evaluateDelivery(data.models, context.from)
 
     const entity = getOrCreateDeliveryEntity(data.deliveryCounterId)
     const mutable = DeliveryState.getMutableOrNull(entity)

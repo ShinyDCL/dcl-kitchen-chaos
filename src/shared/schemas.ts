@@ -141,7 +141,9 @@ export const RECIPE_SLOT_SYNC_ID_BASE = 100001
  * explicit-id pattern as PreparationCounterState). `active` is toggled by
  * recipeQueue.ts; `recipeId` looks up shared/recipes.ts (inactive slots
  * leave it '' and clients skip rendering); `generatedAt` (server clock,
- * ms) drives the HUD's countdown.
+ * ms) drives the HUD's countdown. A delivery advances the slot
+ * immediately — the HUD's success celebration is timed client-side off
+ * the recipeDelivered broadcast, not a field on this component.
  */
 export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
   slotIndex: Schemas.Int,

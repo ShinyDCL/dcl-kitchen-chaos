@@ -61,7 +61,21 @@ export const Messages = {
   // so no legality check is needed beyond that. deliveryCounterId is only
   // used to pick a syncEntity id that doesn't collide with any other
   // fixture's — see server/deliveryCounter.ts.
-  deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int })
+  deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int }),
+
+  // Server -> all: broadcast on a matched delivery. Each client times its
+  // own success celebration locally from receipt, not a shared deadline
+  // latency could cut short — see recipeQueue.ts/recipesUi.tsx.
+  recipeDelivered: Schemas.Map({
+    slotIndex: Schemas.Int,
+    recipeId: Schemas.String,
+    deliveredByName: Schemas.String,
+    generatedAt: Schemas.Int64 // the delivered recipe's own generatedAt, so its card keeps its row position instead of jumping to the front
+  }),
+
+  // Server -> all: broadcast whenever a slot gets a fresh recipe. Same
+  // local-timing reasoning as recipeDelivered, for a brief "New!" flash.
+  recipeGenerated: Schemas.Map({ slotIndex: Schemas.Int, recipeId: Schemas.String })
 }
 
 export const room = registerMessages(Messages)
