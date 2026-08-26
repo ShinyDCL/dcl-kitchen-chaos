@@ -17,6 +17,12 @@
 // This is the ONLY system registered for the pickup feature — a single
 // engine.addSystem call handles proximity, facing, evaluation, and input
 // for every fixture.
+//
+// Spectators skip all of this (see isLocalPlayerPlaying) — no highlight,
+// no evaluation, no input — gated here rather than per-fixture in
+// interactionRules.ts, so every fixture kind is covered by one check.
+// Rendering game state (held items, counter/stove/delivery visuals) is
+// untouched by this — those reconcile from synced state regardless of role.
 
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -25,6 +31,7 @@ import { FACING_THRESHOLD, INTERACTION_RANGE } from '../shared/constants'
 import { showMessage } from './fixtureMessage'
 import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
 import { InteractionResult } from './interactionRules'
+import { isLocalPlayerPlaying } from './playerRoleState'
 import { getWorldPosition, getWorldRotation } from './worldPosition'
 
 interface FocusableFixture {
@@ -104,6 +111,14 @@ function pickBestCandidate(candidates: FixtureCandidate[]): FocusableFixture | n
 }
 
 function focusSystem(): void {
+  if (!isLocalPlayerPlaying()) {
+    if (focusedFixtureId !== null) {
+      focusedFixtureId = null
+      hideHighlight()
+    }
+    return
+  }
+
   const playerTransform = Transform.getOrNull(engine.PlayerEntity)
   if (!playerTransform) return
 

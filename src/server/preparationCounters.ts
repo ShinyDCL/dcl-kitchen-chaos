@@ -35,6 +35,7 @@ import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
 import { PreparationCounterState } from '../shared/schemas'
 import { grantHeldItem } from './heldItems'
+import { isPlayerAllowedToAct } from './playerRoster'
 
 const counterEntities = new Map<number, Entity>()
 
@@ -42,7 +43,7 @@ export function initPreparationCounters(): void {
   reconcileCounterEntities()
 
   room.onMessage('placePlateOnCounter', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state || state.hasPlate) {
       void room.send('actionRejected', {}, { to: [context.from] })
@@ -53,7 +54,7 @@ export function initPreparationCounters(): void {
   })
 
   room.onMessage('pickUpPlateFromCounter', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state || !state.hasPlate) return // no plate to pick up — ignore
     state.hasPlate = false
@@ -61,7 +62,7 @@ export function initPreparationCounters(): void {
   })
 
   room.onMessage('pickUpAssembledFromCounter', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state || state.ingredientModels.length === 0) return // nothing to pick up — ignore
     const models = state.ingredientModels
@@ -70,7 +71,7 @@ export function initPreparationCounters(): void {
   })
 
   room.onMessage('placeIngredientOnCounter', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state) return
     state.ingredientModels = [...state.ingredientModels, data.model]
@@ -78,7 +79,7 @@ export function initPreparationCounters(): void {
   })
 
   room.onMessage('placeAssembledOnCounter', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state) return
     state.ingredientModels = [...state.ingredientModels, ...data.models]

@@ -18,6 +18,7 @@ import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../shared/messages'
 import { HeldItem } from '../shared/schemas'
+import { isPlayerAllowedToAct } from './playerRoster'
 
 const playerEntities = new Map<string, Entity>()
 
@@ -25,7 +26,7 @@ export function initHeldItems(): void {
   reconcilePlayerEntities()
 
   room.onMessage('setHeldItem', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     grantHeldItem(context.from.toLowerCase(), data.models)
   })
 }

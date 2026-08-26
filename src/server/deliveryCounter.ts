@@ -14,6 +14,7 @@ import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../shared/messages'
 import { DeliveryState } from '../shared/schemas'
+import { isPlayerAllowedToAct } from './playerRoster'
 
 let deliveryEntity: Entity | null = null
 
@@ -21,7 +22,7 @@ export function initDeliveryCounter(): void {
   reconcileDeliveryEntity()
 
   room.onMessage('deliverHeldItem', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const entity = getOrCreateDeliveryEntity(data.deliveryCounterId)
     const mutable = DeliveryState.getMutableOrNull(entity)
     if (!mutable) return

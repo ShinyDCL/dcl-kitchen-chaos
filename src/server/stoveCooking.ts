@@ -25,6 +25,7 @@ import { getCookableItemDefinition } from '../shared/ingredients'
 import { room } from '../shared/messages'
 import { StoveState } from '../shared/schemas'
 import { grantHeldItem } from './heldItems'
+import { isPlayerAllowedToAct } from './playerRoster'
 
 const stoveEntities = new Map<number, Entity>()
 
@@ -32,7 +33,7 @@ export function initStoveCooking(): void {
   reconcileStoveEntities()
 
   room.onMessage('startCookingOnStove', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const definition = getCookableItemDefinition(data.rawModel)
     if (!definition) {
       void room.send('actionRejected', {}, { to: [context.from] }) // not a real cookable
@@ -52,7 +53,7 @@ export function initStoveCooking(): void {
   })
 
   room.onMessage('collectFromStove', (data, context) => {
-    if (!context) return
+    if (!context || !isPlayerAllowedToAct(context.from)) return
     const entity = stoveEntities.get(data.stoveId)
     if (entity === undefined) return
 

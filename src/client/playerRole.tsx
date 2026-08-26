@@ -1,26 +1,21 @@
-// Entry role choice (Play/Spectate) and a persistent switcher, reconciled
-// against the server-synced PlayerRole component (shared/schemas.ts) — the
-// same optimistic-then-reconciled pattern heldItem.ts uses for the local
-// player's hand. Practice is intentionally not wired in here yet: it's
-// meant to be a fully local tutorial flow with no server interaction, and
-// gets its own entry point once built.
+// Entry role choice (Play/Spectate) and a persistent switcher — pure UI;
+// the role state itself lives in playerRoleState.ts. Practice is
+// intentionally not wired in here yet: it's meant to be a fully local
+// tutorial flow with no server interaction, and gets its own entry point
+// once built.
 //
-// A player is spectator by default the moment they connect — applyRole
-// sends that as soon as setupPlayerRoleUi runs, so a player who never
-// touches the entry prompt still ends up with a real synced PlayerRole
-// instead of leaving the server guessing. The prompt itself only asks
-// whether they'd rather Play; dismissing it (either button) is separate
-// from the role change itself, and the area around it stays click-through
-// so choosing not to answer yet doesn't block movement or interaction.
+// The prompt only asks whether they'd rather Play; dismissing it (either
+// button) is separate from the role change itself, and the area around it
+// stays click-through so choosing not to answer yet doesn't block movement
+// or interaction.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Button, Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { room } from '../shared/messages'
-import { PlayerRole, PlayerRoleValue } from '../shared/schemas'
-import { getLocalUserId } from './playerIdentity'
+import { PlayerRoleValue } from '../shared/schemas'
+import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from './playerRoleState'
 
 const PANEL_BACKGROUND = Color4.create(0.1, 0.1, 0.1, 0.95)
 const PANEL_BORDER_RADIUS = 16
@@ -42,8 +37,6 @@ const MOBILE_SWITCHER_LAYOUT: SwitcherLayout = { width: 220, height: 64, fontSiz
 
 let currentSwitcherLayout: SwitcherLayout = DESKTOP_SWITCHER_LAYOUT
 
-let localRole: PlayerRoleValue = PlayerRoleValue.Spectate
-let lastSyncedRole: PlayerRoleValue | null = null // last role actually observed from the synced component
 let showEntryOverlay = true
 
 export function setupPlayerRoleUi(): void {
@@ -65,8 +58,7 @@ export function setupPlayerRoleUi(): void {
     screenInset: 'interactable'
   })
 
-  applyRole(PlayerRoleValue.Spectate)
-  engine.addSystem(reconcileLocalRoleSystem)
+  startPlayerRoleSync()
   startPlatformDetection()
 }
 
@@ -77,34 +69,6 @@ function startPlatformDetection(): void {
     engine.removeSystem(detectPlatform)
     currentSwitcherLayout = isMobile() ? MOBILE_SWITCHER_LAYOUT : DESKTOP_SWITCHER_LAYOUT
   })
-}
-
-/**
- * Only reacts to the synced role when it has actually changed since last
- * observed — not whenever it merely differs from localRole. Right after
- * chooseRole's optimistic set, a live read of the synced PlayerRole is
- * briefly stale (the server hasn't processed setPlayerRole yet); comparing
- * against "what's rendered" instead of "what was last observed" would treat
- * that staleness as a real mismatch and revert the just-applied choice back
- * to the old role, only to flip again once the real update lands — the
- * button visibly twitches. Gating on an actual change makes the stale read
- * a no-op, so nothing reverts.
- */
-function reconcileLocalRoleSystem(): void {
-  const localId = getLocalUserId().toLowerCase()
-  for (const [, data] of engine.getEntitiesWith(PlayerRole)) {
-    if (data.playerId.toLowerCase() !== localId) continue
-    if (data.role === lastSyncedRole) return // nothing new from the server since last frame
-    lastSyncedRole = data.role
-    localRole = data.role
-    return
-  }
-}
-
-/** Sets the local role and sends it to the server, without touching whether the entry prompt is showing. */
-function applyRole(role: PlayerRoleValue): void {
-  localRole = role
-  void room.send('setPlayerRole', { role })
 }
 
 /** Called from the entry prompt's buttons — applies the choice and dismisses the prompt. */
@@ -169,7 +133,7 @@ function RoleSwitcherRenderer() {
 }
 
 function RoleSwitcher() {
-  const isPlaying = localRole === PlayerRoleValue.Play
+  const isPlaying = getLocalPlayerRole() === PlayerRoleValue.Play
   const otherRole = isPlaying ? PlayerRoleValue.Spectate : PlayerRoleValue.Play
   const label = isPlaying ? 'Spectate' : 'Join'
   const layout = currentSwitcherLayout

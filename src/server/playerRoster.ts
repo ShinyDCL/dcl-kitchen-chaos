@@ -8,6 +8,11 @@
 // disconnect (tab closed, connection dropped, no explicit "leave" message)
 // reflected for free: the moment a player's PlayerIdentityData entity is
 // gone, they drop out of the count on the very next tick.
+//
+// isPlayerAllowedToAct is the server-side half of spectator gating — the
+// client already hides highlight/interaction for a spectator (see
+// focusManager.ts), but every other server module calls this too so a
+// modified client can't bypass that by sending intents directly.
 
 import { engine, Entity, EntityUtils, PlayerIdentityData, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
@@ -31,6 +36,13 @@ export function initPlayerRoster(): void {
   })
 
   engine.addSystem(recomputeActivePlayerCount)
+}
+
+/** Whether the given player is currently allowed to act on fixtures — i.e. their PlayerRole is 'play'. */
+export function isPlayerAllowedToAct(playerId: string): boolean {
+  const entity = playerEntities.get(playerId.toLowerCase())
+  if (entity === undefined) return false
+  return PlayerRole.getOrNull(entity)?.role === PlayerRoleValue.Play
 }
 
 function recomputeActivePlayerCount(): void {
