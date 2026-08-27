@@ -1,10 +1,10 @@
 // Assembles the full kitchen layout: ingredient counters along the left and
-// right walls (left wall's last slot is a delivery counter instead of a
-// 5th ingredient, since bacon isn't implemented), a front row alternating
-// preparation counters and stoves, a plate/trash wall at the back, and a
-// 2x2 preparation-counter island in the middle. All positions/rotations
-// are local to `parent` (the scene root), matching the existing
-// world-placement pattern.
+// right walls (the right wall's first slot is a plate counter, ahead of
+// its ingredients), a front row alternating preparation counters and
+// stoves, a 2x2 preparation-counter island in the middle, and a back/
+// entrance wall with a trash bin, a walkway gap, and the delivery counter.
+// All positions/rotations are local to `parent` (the scene root), matching
+// the existing world-placement pattern.
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -45,8 +45,8 @@ function rotationDegrees(degrees: number): Quaternion {
 }
 
 export function createSceneLayout(parent: Entity): void {
-  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X)
-  createLeftWall(parent)
+  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X, true)
+  createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
   createFrontRow(parent)
   createBackWall(parent)
   createIsland(parent)
@@ -55,48 +55,39 @@ export function createSceneLayout(parent: Entity): void {
 /**
  * Places a row of ingredient counters along one wall (fixed X), spaced
  * edge-to-edge along Z and centered on Z=0, all facing toward the room's
- * center.
+ * center. When includePlateCounter is set, a plate counter takes the first
+ * slot ahead of the ingredients.
  */
-function createSideWall(parent: Entity, x: number, ingredients: IngredientDefinition[], facingDegrees: number): void {
-  const totalDepth = (ingredients.length - 1) * FIXTURE_WIDTH
+function createSideWall(
+  parent: Entity,
+  x: number,
+  ingredients: IngredientDefinition[],
+  facingDegrees: number,
+  includePlateCounter = false
+): void {
+  const slotCount = ingredients.length + (includePlateCounter ? 1 : 0)
+  const totalDepth = (slotCount - 1) * FIXTURE_WIDTH
   const startZ = -totalDepth / 2
   const rotation = rotationDegrees(facingDegrees)
 
+  let nextSlot = 0
+  if (includePlateCounter) {
+    createFixture({
+      model: MODELS.counter,
+      position: Vector3.create(x, 0, startZ),
+      rotation,
+      parent,
+      height: FIXTURE_HEIGHT,
+      displayModel: MODELS.plateDisplay,
+      evaluateInteraction: () => evaluatePlateCounterInteraction()
+    })
+    nextSlot = 1
+  }
+
   ingredients.forEach((definition, index) => {
-    const position = Vector3.create(x, 0, startZ + index * FIXTURE_WIDTH)
+    const position = Vector3.create(x, 0, startZ + (nextSlot + index) * FIXTURE_WIDTH)
     createIngredientCounter(position, rotation, parent, definition)
   })
-}
-
-/**
- * Places the left wall: 4 ingredient counters plus a delivery counter in
- * the 5th slot — where bacon's counter used to be — using the same 5-slot
- * spacing as the right wall so both walls stay aligned.
- */
-function createLeftWall(parent: Entity): void {
-  const slotCount = RIGHT_SIDE_INGREDIENTS.length
-  const totalDepth = (slotCount - 1) * FIXTURE_WIDTH
-  const startZ = -totalDepth / 2
-  const rotation = rotationDegrees(FACE_POSITIVE_X)
-  const x = -SIDE_WALL_DISTANCE
-
-  LEFT_SIDE_INGREDIENTS.forEach((definition, index) => {
-    const position = Vector3.create(x, 0, startZ + index * FIXTURE_WIDTH)
-    createIngredientCounter(position, rotation, parent, definition)
-  })
-
-  const deliveryPosition = Vector3.create(x, 0, startZ + LEFT_SIDE_INGREDIENTS.length * FIXTURE_WIDTH)
-  const deliveryCounter = createFixture({
-    model: MODELS.counter,
-    position: deliveryPosition,
-    rotation,
-    parent,
-    height: FIXTURE_HEIGHT,
-    displayModel: MODELS.deliveryPad,
-    evaluateInteraction: () => evaluateDeliveryCounterInteraction()
-  })
-
-  registerDeliveryCounter(deliveryCounter)
 }
 
 /**
@@ -107,10 +98,10 @@ function createLeftWall(parent: Entity): void {
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
   const totalWidth = sequence.length * FIXTURE_WIDTH
-  const rotation = rotationDegrees(FACE_POSITIVE_Z)
+  const rotation = rotationDegrees(FACE_NEGATIVE_Z)
 
   sequence.forEach((kind, index) => {
-    const position = Vector3.create(-totalWidth / 2 + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, -FRONT_ROW_DISTANCE)
+    const position = Vector3.create(-totalWidth / 2 + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, FRONT_ROW_DISTANCE)
 
     const fixture = createFixture({
       model: kind === 'stove' ? MODELS.stove : MODELS.counter,
@@ -158,30 +149,23 @@ function createIsland(parent: Entity): void {
 }
 
 /**
- * Places the back wall: 2 plate counters plus a trash bin — the trash bin
+ * Places the back wall (the entrance wall): a trash bin, a 4-counter-wide
+ * gap left open as a walkway, then the delivery counter. The trash bin
  * uses the same width/depth/height allotment as a counter even though its
- * model is visually smaller, so it lines up seamlessly in the same row.
+ * model is visually smaller, so it still lines up with the delivery
+ * counter's slot.
  */
 function createBackWall(parent: Entity): void {
-  const sequence: Array<'plate' | 'trash'> = ['plate', 'plate', 'trash']
+  const sequence: Array<'trash' | 'gap' | 'delivery'> = ['trash', 'gap', 'gap', 'gap', 'gap', 'delivery']
   const totalWidth = sequence.length * FIXTURE_WIDTH
   const startX = -totalWidth / 2
-  const rotation = rotationDegrees(FACE_NEGATIVE_Z)
+  const rotation = rotationDegrees(FACE_POSITIVE_Z)
 
   sequence.forEach((kind, index) => {
-    const position = Vector3.create(startX + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, BACK_WALL_DISTANCE)
+    if (kind === 'gap') return
+    const position = Vector3.create(startX + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, -BACK_WALL_DISTANCE)
 
-    if (kind === 'plate') {
-      createFixture({
-        model: MODELS.counter,
-        position,
-        rotation,
-        parent,
-        height: FIXTURE_HEIGHT,
-        displayModel: MODELS.plateDisplay,
-        evaluateInteraction: () => evaluatePlateCounterInteraction()
-      })
-    } else {
+    if (kind === 'trash') {
       createFixture({
         model: MODELS.trashBin,
         position,
@@ -190,6 +174,17 @@ function createBackWall(parent: Entity): void {
         height: FIXTURE_HEIGHT,
         evaluateInteraction: () => evaluateTrashBinInteraction()
       })
+    } else {
+      const deliveryCounter = createFixture({
+        model: MODELS.counter,
+        position,
+        rotation,
+        parent,
+        height: FIXTURE_HEIGHT,
+        displayModel: MODELS.deliveryPad,
+        evaluateInteraction: () => evaluateDeliveryCounterInteraction()
+      })
+      registerDeliveryCounter(deliveryCounter)
     }
   })
 }

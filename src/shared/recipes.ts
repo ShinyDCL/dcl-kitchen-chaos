@@ -14,10 +14,10 @@ export interface Recipe {
 
 export const SAMPLE_RECIPES: Recipe[] = [
   // Difficulty 1 — quick, one or no cooked ingredients.
-  { id: 'cheesemelt', ingredients: ['bunBottom', 'cheese', 'bunTop'], timerSeconds: 15, difficulty: 1 },
-  { id: 'simple', ingredients: ['bunBottom', 'patty', 'bunTop'], timerSeconds: 20, difficulty: 1 },
+  { id: 'cheesemelt', ingredients: ['bunBottom', 'cheese', 'bunTop'], timerSeconds: 30, difficulty: 1 },
+  { id: 'simple', ingredients: ['bunBottom', 'patty', 'bunTop'], timerSeconds: 35, difficulty: 1 },
   { id: 'classic', ingredients: ['bunBottom', 'patty', 'cheese', 'bunTop'], timerSeconds: 45, difficulty: 1 },
-  { id: 'breakfast', ingredients: ['bunBottom', 'egg', 'cheese', 'bunTop'], timerSeconds: 30, difficulty: 1 },
+  { id: 'breakfast', ingredients: ['bunBottom', 'egg', 'cheese', 'bunTop'], timerSeconds: 35, difficulty: 1 },
   {
     id: 'veggie',
     ingredients: ['bunBottom', 'salad', 'tomato', 'cucumber', 'bunTop'],
@@ -32,40 +32,40 @@ export const SAMPLE_RECIPES: Recipe[] = [
     timerSeconds: 60,
     difficulty: 2
   },
-  { id: 'double', ingredients: ['bunBottom', 'patty', 'patty', 'cheese', 'bunTop'], timerSeconds: 50, difficulty: 2 },
-  { id: 'brunch', ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'bunTop'], timerSeconds: 55, difficulty: 2 },
-  { id: 'picnic', ingredients: ['bunBottom', 'patty', 'onion', 'cucumber', 'bunTop'], timerSeconds: 48, difficulty: 2 },
-  { id: 'eggstra', ingredients: ['bunBottom', 'egg', 'egg', 'cheese', 'bunTop'], timerSeconds: 52, difficulty: 2 },
+  { id: 'double', ingredients: ['bunBottom', 'patty', 'patty', 'cheese', 'bunTop'], timerSeconds: 60, difficulty: 2 },
+  { id: 'brunch', ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'bunTop'], timerSeconds: 65, difficulty: 2 },
+  { id: 'picnic', ingredients: ['bunBottom', 'patty', 'onion', 'cucumber', 'bunTop'], timerSeconds: 58, difficulty: 2 },
+  { id: 'eggstra', ingredients: ['bunBottom', 'egg', 'egg', 'cheese', 'bunTop'], timerSeconds: 62, difficulty: 2 },
 
   // Difficulty 3 — long ingredient stacks, both cookables, or multiple duplicate cookables.
   {
     id: 'loaded',
     ingredients: ['bunBottom', 'patty', 'cheese', 'tomato', 'cucumber', 'onion', 'bunTop'],
-    timerSeconds: 75,
+    timerSeconds: 85,
     difficulty: 3
   },
   {
     id: 'supreme',
     ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'tomato', 'onion', 'salad', 'bunTop'],
-    timerSeconds: 90,
+    timerSeconds: 100,
     difficulty: 3
   },
   {
     id: 'megastack',
     ingredients: ['bunBottom', 'patty', 'patty', 'cheese', 'tomato', 'onion', 'cucumber', 'bunTop'],
-    timerSeconds: 85,
+    timerSeconds: 95,
     difficulty: 3
   },
   {
     id: 'farmhouse',
     ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'tomato', 'salad', 'bunTop'],
-    timerSeconds: 78,
+    timerSeconds: 88,
     difficulty: 3
   },
   {
     id: 'tripledeck',
     ingredients: ['bunBottom', 'patty', 'patty', 'patty', 'cheese', 'cheese', 'bunTop'],
-    timerSeconds: 95,
+    timerSeconds: 105,
     difficulty: 3
   }
 ]

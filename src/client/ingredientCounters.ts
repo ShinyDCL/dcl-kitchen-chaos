@@ -19,18 +19,18 @@ export interface IngredientDefinition {
 }
 
 export const RIGHT_SIDE_INGREDIENTS: IngredientDefinition[] = [
-  { displayModel: MODELS.tomatoDisplay, sliceModel: MODELS.tomatoSlice },
-  { displayModel: MODELS.onionDisplay, sliceModel: MODELS.onionSlice },
-  { displayModel: MODELS.cucumberDisplay, sliceModel: MODELS.cucumberSlice },
-  { displayModel: MODELS.saladDisplay, sliceModel: MODELS.saladLeaf },
-  { displayModel: MODELS.cheeseDisplay, sliceModel: MODELS.cheeseSlice }
+  { displayModel: MODELS.bunBottomDisplay, sliceModel: MODELS.bunBottom },
+  { displayModel: MODELS.bunTopDisplay, sliceModel: MODELS.bunTop },
+  { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg },
+  { displayModel: MODELS.pattyDisplay, sliceModel: MODELS.pattyRaw }
 ]
 
 export const LEFT_SIDE_INGREDIENTS: IngredientDefinition[] = [
-  { displayModel: MODELS.pattyDisplay, sliceModel: MODELS.pattyRaw },
-  { displayModel: MODELS.bunBottomDisplay, sliceModel: MODELS.bunBottom },
-  { displayModel: MODELS.bunTopDisplay, sliceModel: MODELS.bunTop },
-  { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg }
+  { displayModel: MODELS.cheeseDisplay, sliceModel: MODELS.cheeseSlice },
+  { displayModel: MODELS.onionDisplay, sliceModel: MODELS.onionSlice },
+  { displayModel: MODELS.cucumberDisplay, sliceModel: MODELS.cucumberSlice },
+  { displayModel: MODELS.saladDisplay, sliceModel: MODELS.saladLeaf },
+  { displayModel: MODELS.tomatoDisplay, sliceModel: MODELS.tomatoSlice }
 ]
 
 export function createIngredientCounter(

@@ -1,6 +1,6 @@
 // A single reusable focus-highlight entity, moved to whichever fixture is
 // currently focused. Colored green when interacting is currently allowed,
-// red when it isn't — see focusManager.ts, which re-evaluates this every
+// gray when it isn't — see focusManager.ts, which re-evaluates this every
 // frame the fixture stays focused (not just on focus change), since
 // allowed/disallowed can change while looking at the same fixture (e.g.
 // the player picks something up while still facing a stove).
@@ -10,7 +10,7 @@ import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { HIGHLIGHT_DEPTH, HIGHLIGHT_THICKNESS, HIGHLIGHT_WIDTH } from '../shared/constants'
 
-const ALLOWED_COLOR = Color4.create(0, 1, 0.3, 1)
+const ALLOWED_COLOR = Color4.create(0.28, 1, 0.22, 1)
 const DISALLOWED_COLOR = Color4.create(0.5, 0.5, 0.5, 1)
 
 let highlightEntity: Entity | null = null

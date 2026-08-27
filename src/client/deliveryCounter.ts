@@ -2,10 +2,10 @@
 // counter, where it sits for DELIVERY_ITEM_SIT_DURATION, then shrinks away
 // over DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales
 // up — a checkmark if the delivery matched an active recipe (server-
-// decided, see recipeQueue.ts), or a code-drawn red crossmark otherwise.
-// renderedSuccess defaults optimistically to true since the real verdict
-// is server-only; the ~1s sit delay is normally enough for it to land
-// first, and reconciliation corrects it if not.
+// decided, see recipeQueue.ts), or a crossmark otherwise. renderedSuccess
+// defaults optimistically to true since the real verdict is server-only;
+// the ~1s sit delay is normally enough for it to land first, and
+// reconciliation corrects it if not.
 //
 // Reconciled against the server-synced DeliveryState rather than held as
 // local truth — see the authoritative-server skill. Only one delivery
@@ -24,13 +24,10 @@
 // item before accepting (see server/deliveryCounter.ts) and rejects
 // (restoring the hand) rather than trusting the claim outright.
 
-import { engine, Entity, GltfContainer, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
+import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
-  CROSSMARK_BAR_LENGTH,
-  CROSSMARK_BAR_THICKNESS,
-  CROSSMARK_COLOR,
   DELIVERY_CHECKMARK_DURATION,
   DELIVERY_CHECKMARK_Y_OFFSET,
   DELIVERY_ITEM_SHRINK_DURATION,
@@ -265,34 +262,17 @@ function getOrCreateCheckmark(): Entity {
   return checkmark
 }
 
-/** Two crossed boxes forming a red X — stands in for the checkmark model on a failed delivery until there's real art for it. */
 function getOrCreateCrossmark(): Entity {
   if (crossmarkEntity !== null) return crossmarkEntity
 
   const crossmark = engine.addEntity()
   Transform.create(crossmark, {
     position: checkmarkWorldPosition ?? Vector3.Zero(),
-    scale: Vector3.Zero(),
-    rotation: Quaternion.fromEulerDegrees(0, 90, 0)
+    scale: Vector3.Zero()
   })
+  GltfContainer.create(crossmark, { src: MODELS.crossmark })
   VisibilityComponent.create(crossmark, { visible: false })
-
-  for (const barAngle of [45, -45]) {
-    const bar = engine.addEntity()
-    Transform.create(bar, {
-      scale: Vector3.create(CROSSMARK_BAR_LENGTH, CROSSMARK_BAR_THICKNESS, CROSSMARK_BAR_THICKNESS),
-      rotation: Quaternion.fromEulerDegrees(0, 0, barAngle),
-      parent: crossmark
-    })
-    MeshRenderer.setBox(bar)
-    Material.setPbrMaterial(bar, {
-      albedoColor: CROSSMARK_COLOR,
-      emissiveColor: CROSSMARK_COLOR,
-      emissiveIntensity: 0.1,
-      metallic: 0,
-      roughness: 0.8
-    })
-  }
+  Billboard.create(crossmark, { billboardMode: BillboardMode.BM_Y })
 
   crossmarkEntity = crossmark
   return crossmark

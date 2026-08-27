@@ -4,6 +4,7 @@ export const MODELS = {
   stove: 'assets/scene/models/Stove.glb',
   trashBin: 'assets/scene/models/TrashBin.glb',
   checkmark: 'assets/scene/models/Checkmark.glb',
+  crossmark: 'assets/scene/models/Crossmark.glb',
 
   // Pickup items (attached to player's hand)
   cucumberSlice: 'assets/scene/models/CucumberSlice.glb',

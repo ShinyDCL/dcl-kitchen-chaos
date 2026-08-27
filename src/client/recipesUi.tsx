@@ -34,9 +34,11 @@ import { isLocalPlayerPlaying } from './playerRoleState'
 
 const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
+const SUCCESS_GREEN = Color4.create(0.2, 0.85, 0.3, 1) // shared base hue for every "success" signal on this HUD
+
 const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
 const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8)
-const CARD_SUCCESS_BACKGROUND = Color4.create(0.1, 0.55, 0.2, 0.9)
+const CARD_SUCCESS_BACKGROUND = Color4.create(SUCCESS_GREEN.r, SUCCESS_GREEN.g, SUCCESS_GREEN.b, 0.9)
 const CARD_NEW_BACKGROUND = Color4.create(0.15, 0.4, 0.85, 0.9) // blue — distinct from success green and the timer bar's red
 const CARD_COLOR_TRANSITION_SECONDS = 0.3
 const TIMER_BAR_HEIGHT = 8
@@ -62,7 +64,6 @@ const NEW_BADGE_TEXT_COLOR = Color4.White()
 // Mask is nearly opaque so the edge stays sharp on a small bar.
 const TIMER_ZONE_GREEN_PERCENT = 75
 const TIMER_ZONE_RED_PERCENT = 25
-const TIMER_ZONE_GREEN_COLOR = Color4.create(0.2, 0.85, 0.3, 1)
 const TIMER_ZONE_RED_COLOR = Color4.create(0.9, 0.2, 0.2, 1)
 const TIMER_MASK_COLOR = Color4.create(0, 0, 0, 0.92)
 
@@ -422,7 +423,7 @@ function TimerBar({ timerSeconds, generatedAt }: { timerSeconds: number; generat
     >
       <UiEntity
         uiTransform={{ width: `${TIMER_ZONE_GREEN_PERCENT}%`, height: '100%' }}
-        uiBackground={{ color: TIMER_ZONE_GREEN_COLOR }}
+        uiBackground={{ color: SUCCESS_GREEN }}
       />
       <UiEntity
         uiTransform={{ width: `${TIMER_ZONE_RED_PERCENT}%`, height: '100%' }}

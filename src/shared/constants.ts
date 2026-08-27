@@ -1,6 +1,6 @@
 import { Color4, Vector3 } from '@dcl/sdk/math'
 
-export const GRID_SIZE = 1 // square grid (rows = columns)
+export const GRID_SIZE = 2 // square grid (rows = columns)
 export const PARCEL_SIZE = 16 // parcel size in meters
 export const SCENE_SIZE = GRID_SIZE * PARCEL_SIZE // scene size in meters
 export const SCENE_CENTER = SCENE_SIZE / 2 // center point in scene
@@ -56,7 +56,9 @@ export const PROGRESS_BAR_HEIGHT = 0.1
 export const PROGRESS_BAR_THICKNESS = 0.02
 export const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // floats above the cooking item
 export const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
-export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
+export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.165, 0.596, 0.133, 1)
+export const PROGRESS_BAR_FILL_OVERSCALE = 1.01
+export const PROGRESS_BAR_BACKGROUND_RECESS = 0.001
 
 // Smoke particles shown above a stove while cooking. Rate/lifetime tuned
 // to keep the steady-state count around 11 per stove (~33 scene-wide with
@@ -89,12 +91,6 @@ export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the del
 // deliveryCounter.ts. Seen within this many seconds of closing, it's
 // treated as late (not historical) and replays from when observed.
 export const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
-
-// A failed delivery shows a red X (two crossed boxes) instead of the
-// checkmark model — no art for this yet, same timing/position otherwise.
-export const CROSSMARK_BAR_LENGTH = 0.5
-export const CROSSMARK_BAR_THICKNESS = 0.08
-export const CROSSMARK_COLOR = Color4.create(0.9, 0.15, 0.15, 1)
 
 // --- Recipe queue ---
 

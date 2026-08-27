@@ -35,7 +35,9 @@ import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
   PROGRESS_BAR_BACKGROUND_COLOR,
+  PROGRESS_BAR_BACKGROUND_RECESS,
   PROGRESS_BAR_FILL_COLOR,
+  PROGRESS_BAR_FILL_OVERSCALE,
   PROGRESS_BAR_HEIGHT,
   PROGRESS_BAR_THICKNESS,
   PROGRESS_BAR_WIDTH,
@@ -277,6 +279,7 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
 
   const background = engine.addEntity()
   Transform.create(background, {
+    position: Vector3.create(0, 0, PROGRESS_BAR_BACKGROUND_RECESS),
     scale: Vector3.create(PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, PROGRESS_BAR_THICKNESS),
     parent: root
   })
@@ -355,10 +358,12 @@ function hideProgressBar(progressBar: ProgressBar): void {
 function updateFill(progressBar: ProgressBar, progress: number): void {
   const fillWidth = Math.max(PROGRESS_BAR_WIDTH * progress, 0.001) // avoid a zero-scale mesh
   const transform = Transform.getMutable(progressBar.fill)
-  transform.scale = Vector3.create(fillWidth, PROGRESS_BAR_HEIGHT, PROGRESS_BAR_THICKNESS)
-  // Keep the fill's left edge fixed to the background's left edge as it
-  // grows, instead of scaling outward from the center.
-  transform.position = Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0.001)
+  transform.scale = Vector3.create(
+    fillWidth * PROGRESS_BAR_FILL_OVERSCALE,
+    PROGRESS_BAR_HEIGHT * PROGRESS_BAR_FILL_OVERSCALE,
+    PROGRESS_BAR_THICKNESS * PROGRESS_BAR_FILL_OVERSCALE
+  )
+  transform.position = Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0)
 }
 
 function fadeToTransparent(color: Color4): Color4 {
