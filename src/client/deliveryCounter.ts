@@ -43,7 +43,7 @@ import {
   FIXTURE_HEIGHT
 } from '../shared/constants'
 import { room } from '../shared/messages'
-import { MODELS } from '../shared/models'
+import { MODELS, sameModels } from '../shared/models'
 import { DeliveryState } from '../shared/schemas'
 import { getFixtureSyncId } from './fixtures'
 import { takeHeldItemModelsPending } from './heldItem'
@@ -306,8 +306,4 @@ function getOrCreateCrossmark(): Entity {
 
   crossmarkEntity = crossmark
   return crossmark
-}
-
-function sameModels(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((model, index) => model === b[index])
 }

@@ -39,6 +39,7 @@ import { AvatarAnchorPointType, AvatarAttach, engine, Entity, GltfContainer, Tra
 import { Vector3 } from '@dcl/sdk/math'
 
 import { room } from '../shared/messages'
+import { sameModels } from '../shared/models'
 import { HeldItem } from '../shared/schemas'
 import { getHandTransform } from './itemHandTransforms'
 import { getItemHeight } from './itemHeights'
@@ -255,8 +256,4 @@ function buildHandStack(parent: Entity, models: string[]): Entity[] {
 function removeVisual(item: RenderedHeldItem): void {
   for (const child of item.children) engine.removeEntity(child)
   engine.removeEntity(item.parent)
-}
-
-function sameModels(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((model, index) => model === b[index])
 }

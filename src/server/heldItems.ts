@@ -46,10 +46,6 @@ export function getHeldItemModels(playerId: string): string[] {
   return models ? [...models] : []
 }
 
-export function sameModels(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((model, index) => model === b[index])
-}
-
 function getOrCreatePlayerEntity(playerId: string): Entity {
   const cached = playerEntities.get(playerId)
   if (cached !== undefined && HeldItem.getOrNull(cached) !== null) return cached

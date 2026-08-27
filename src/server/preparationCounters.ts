@@ -34,9 +34,9 @@ import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/
 import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../shared/messages'
-import { MODELS } from '../shared/models'
+import { MODELS, sameModels } from '../shared/models'
 import { PreparationCounterState } from '../shared/schemas'
-import { getHeldItemModels, grantHeldItem, sameModels } from './heldItems'
+import { getHeldItemModels, grantHeldItem } from './heldItems'
 import { isPlayerAllowedToAct } from './playerRoster'
 
 const counterEntities = new Map<number, Entity>()

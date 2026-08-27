@@ -33,3 +33,8 @@ export const MODELS = {
   plateDisplay: 'assets/scene/models/PlateDisplay.glb',
   deliveryPad: 'assets/scene/models/DeliveryPad.glb'
 } as const
+
+/** Order-sensitive equality for a stack of model paths — used wherever a held/placed/delivered item stack needs to be compared against another (client and server). */
+export function sameModels(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((model, index) => model === b[index])
+}

@@ -31,6 +31,7 @@ import { syncEntity } from '@dcl/sdk/network'
 import { BASE_RECIPE_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, RECIPE_SUCCESS_CELEBRATION_SECONDS } from '../shared/constants'
 import { getRequiredModelForIngredient } from '../shared/ingredients'
 import { room } from '../shared/messages'
+import { sameModels } from '../shared/models'
 import { getDifficultyForStreak, getRecipeById, pickRandomRecipeByDifficulty, Recipe } from '../shared/recipes'
 import { RECIPE_SLOT_SYNC_ID_BASE, RecipeSlotState } from '../shared/schemas'
 import { grantCoins } from './playerCoins'
@@ -181,10 +182,6 @@ function reconcileSlotEntities(): void {
     if (entityNumber < RESERVED_STATIC_ENTITIES) continue
     slotEntities.set(data.slotIndex, entity)
   }
-}
-
-function sameModels(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((model, index) => model === b[index])
 }
 
 function clamp(value: number, min: number, max: number): number {

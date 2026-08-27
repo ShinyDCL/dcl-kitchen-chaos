@@ -17,8 +17,9 @@ import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../shared/messages'
+import { sameModels } from '../shared/models'
 import { DeliveryState } from '../shared/schemas'
-import { getHeldItemModels, grantHeldItem, sameModels } from './heldItems'
+import { getHeldItemModels, grantHeldItem } from './heldItems'
 import { isPlayerAllowedToAct } from './playerRoster'
 import { evaluateDelivery } from './recipeQueue'
 
