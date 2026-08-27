@@ -115,10 +115,18 @@ function isSlotExpired(state: SlotState): boolean {
   return elapsedSeconds >= recipe.timerSeconds
 }
 
-/** Refills the slot if the queue isn't over target, otherwise retires it. */
+/**
+ * Refills the slot if the queue isn't over target, otherwise retires it.
+ * Counts active slots OTHER than this one, rather than relying on
+ * state.active — the two callers reach here with different active
+ * flags for THIS slot (isSlotExpired's is still true; the deferred
+ * pendingRegenerations path already set it false back in
+ * evaluateDelivery), which would otherwise make the target comparison
+ * off-by-one for one of the two call sites.
+ */
 function advanceSlot(state: SlotState, gameState: GameStateMutable): void {
   const target = getTargetQueueSize(gameState.activePlayerCount)
-  if (countActiveSlots() <= target) {
+  if (countOtherActiveSlots(state.slotIndex) < target) {
     generateRecipeForSlot(state, gameState.streak)
   } else {
     state.active = false
@@ -156,10 +164,11 @@ function getRequiredModels(recipe: Recipe): string[] {
   return recipe.ingredients.map((key) => getRequiredModelForIngredient(key) ?? key)
 }
 
-function countActiveSlots(): number {
+function countOtherActiveSlots(excludeSlotIndex: number): number {
   let count = 0
   for (const entity of slotEntities.values()) {
-    if (RecipeSlotState.getOrNull(entity)?.active) count++
+    const state = RecipeSlotState.getOrNull(entity)
+    if (state?.active && state.slotIndex !== excludeSlotIndex) count++
   }
   return count
 }
