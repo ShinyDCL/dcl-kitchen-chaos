@@ -55,13 +55,12 @@ export const Messages = {
   // walking away with a copy.
   collectFromStove: Schemas.Map({ stoveId: Schemas.Int }),
 
-  // Deliver whatever's just been taken out of the sender's hand (already
-  // removed client-side via takeHeldItemModels before this is sent). The
-  // server just timestamps it into the synced DeliveryState everyone
-  // animates from — unlike the stove, nothing scarce is handed out here,
-  // so no legality check is needed beyond that. deliveryCounterId is only
-  // used to pick a syncEntity id that doesn't collide with any other
-  // fixture's — see server/deliveryCounter.ts.
+  // Deliver whatever's held. The server verifies `models` against the
+  // sender's real HeldItem before accepting it (see
+  // server/deliveryCounter.ts) rather than trusting the claim, then
+  // timestamps it into the synced DeliveryState everyone animates from.
+  // deliveryCounterId just picks a syncEntity id that doesn't collide with
+  // any other fixture's.
   deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int }),
 
   // Server -> all: broadcast on a matched delivery. Each client times its

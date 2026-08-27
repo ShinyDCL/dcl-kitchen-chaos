@@ -1,17 +1,16 @@
 // Owns the scene's single DeliveryState. A true singleton (see
 // client/sceneLayout.ts), so unlike preparationCounters.ts/stoveCooking.ts
-// there's no per-fixture Map — one lazily-created entity, keyed by
-// whatever explicit sync id the client's fixture got (getFixtureSyncId).
+// there's no per-fixture Map — one lazily-created entity, keyed by the
+// client's fixture sync id.
+//
 // The claimed models are verified against the player's real held item
-// (heldItems.ts's getHeldItemModels) before being trusted — a modified
-// client could otherwise claim to be delivering items it never actually
-// held, matching any recipe for free. A mismatch is rejected outright
-// (actionRejected, restoring the client's optimistically-cleared hand);
-// this is separate from a verified-but-wrong delivery (an honestly held
-// combination that just doesn't match a recipe), which still "succeeds"
-// visually and consumes the hand — recipeQueue.ts's evaluateDelivery
-// decides that verdict (DeliveryState.success) so every client shows the
-// right flourish.
+// (heldItems.ts's getHeldItemModels) before being trusted, rejecting
+// outright on a mismatch — otherwise a modified client could claim to be
+// delivering items it never held, matching any recipe for free. That's
+// distinct from a verified-but-wrong delivery (an honestly held
+// combination that just misses the recipe), which still "succeeds"
+// visually and consumes the hand — recipeQueue.ts's evaluateDelivery picks
+// that verdict.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'

@@ -58,15 +58,12 @@ export const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // floats above the co
 export const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
 export const PROGRESS_BAR_FILL_COLOR = Color4.create(0.1, 0.9, 0.2, 1)
 
-// Smoke particles shown above a stove while something is cooking. Kept
-// light for mobile: rate/lifetime are tuned so the steady-state count per
-// stove stays around 11, and with at most 3 stoves cooking at once that's
-// roughly 33 live particles scene-wide — still trivial against the
-// engine's particle budget.
-// Emission point sits below STOVE_ITEM_OFFSET, inside the stove model
-// (hidden from the player), so particles have drifted horizontally a bit
-// by the time they emerge above the visible pan surface — spawning
-// directly at the item made the smoke read as a single thin column.
+// Smoke particles shown above a stove while cooking. Rate/lifetime tuned
+// to keep the steady-state count around 11 per stove (~33 scene-wide with
+// 3 stoves cooking at once) — trivial against the particle budget.
+// Emission point sits below STOVE_ITEM_OFFSET, inside the stove model, so
+// particles drift horizontally before emerging above the pan — spawning
+// directly at the item read as a single thin column.
 export const SMOKE_OFFSET = Vector3.create(STOVE_ITEM_OFFSET.x, STOVE_ITEM_OFFSET.y - 0.1, STOVE_ITEM_OFFSET.z)
 export const SMOKE_SPAWN_RADIUS = 0.12 // small spawn volume instead of a single point, for spread from frame one
 export const SMOKE_RATE = 6 // particles per second
@@ -89,9 +86,8 @@ export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the del
 
 // The 1.4s sit+shrink window can be fully eaten by network/CRDT latency
 // before another client observes it — see reconcileDelivery in
-// deliveryCounter.ts. A delivery first seen within this many seconds of
-// its window closing is treated as "late, not historical" and replays
-// from when it was observed, instead of never showing at all.
+// deliveryCounter.ts. Seen within this many seconds of closing, it's
+// treated as late (not historical) and replays from when observed.
 export const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 
 // A failed delivery shows a red X (two crossed boxes) instead of the

@@ -43,12 +43,9 @@ export function startPlayerRoleSync(): void {
 /**
  * Only reacts to the synced role when it has actually changed since last
  * observed — not whenever it merely differs from localRole. Right after
- * applyRole's optimistic set, a live read of the synced PlayerRole is
- * briefly stale (the server hasn't processed setPlayerRole yet); comparing
- * against "what's rendered" instead of "what was last observed" would treat
- * that staleness as a real mismatch and revert the just-applied choice back
- * to the old role, only to flip again once the real update lands — visibly
- * twitching. Gating on an actual change makes the stale read a no-op.
+ * applyRole's optimistic set, a live read is briefly stale; gating on an
+ * actual change makes that a no-op instead of visibly flipping back to the
+ * old role for a moment.
  */
 function reconcileLocalRoleSystem(): void {
   const localId = getLocalUserId().toLowerCase()

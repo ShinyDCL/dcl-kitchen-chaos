@@ -34,10 +34,10 @@ export const RECIPE_SLOT_SYNC_ID_BASE = 100001 // + slotIndex, one id per MAX_QU
 
 /**
  * One entity per player who has held something this session. `models` is
- * the full stack currently in that player's hand, bottom to top — empty
- * means empty-handed. Entities are matched by the `playerId` field (a
- * lower-cased wallet address), never by network/sync id — see the
- * authoritative-server skill's per-player synced entity pattern.
+ * the full stack in hand, bottom to top — empty means empty-handed.
+ * Matched by the `playerId` field (a lower-cased wallet address), never by
+ * network/sync id — see the authoritative-server skill's per-player
+ * synced entity pattern.
  */
 export const HeldItem = engine.defineComponent('game::HeldItem', {
   playerId: Schemas.String,
@@ -48,11 +48,10 @@ lockToServer(HeldItem)
 
 /**
  * One entity per preparation counter — plate presence and the ingredient
- * stack on top of it. `counterId` is the counter's stable fixture sync id
- * (client/fixtures.ts's getFixtureSyncId) and doubles as this entity's
- * explicit syncEntity id: counters are a small fixed set that exists for
- * the scene's whole life, unlike per-player entities, so there's no need
- * for the auto-allocate-and-match-by-field pattern HeldItem uses.
+ * stack on top of it. `counterId` (client/fixtures.ts's getFixtureSyncId)
+ * doubles as this entity's explicit syncEntity id: counters are a small
+ * fixed set for the scene's whole life, unlike per-player entities, so
+ * there's no need for HeldItem's auto-allocate-and-match-by-field pattern.
  */
 export const PreparationCounterState = engine.defineComponent('game::PreparationCounterState', {
   counterId: Schemas.Int,

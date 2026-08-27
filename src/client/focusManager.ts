@@ -1,28 +1,17 @@
 // Tracks all interactable fixtures and, every frame, focuses the single
-// nearest one within INTERACTION_RANGE (preferring one the player is
-// roughly facing when several are in range — see FACING_THRESHOLD).
+// nearest one within INTERACTION_RANGE, preferring one the player is
+// roughly facing (FACING_THRESHOLD) when several are in range.
 //
-// Each focused fixture is re-evaluated every frame via its `evaluate`
-// callback (not just when focus changes), since an InteractionResult can
-// change while still looking at the same fixture — e.g. picking something
-// up while facing a stove changes whether cooking is now allowed. The
-// highlight's position/rotation only update on focus change (cheap); its
-// color updates every frame from the fresh evaluation (also cheap — one
-// shared entity, not per-fixture).
+// A focused fixture's `evaluate` callback re-runs every frame, not just on
+// focus change — its InteractionResult can change while still looking at
+// it (e.g. picking something up changes whether cooking is now allowed).
+// On interact: `perform` runs if allowed, otherwise `message` shows via
+// the on-screen message UI.
 //
-// On an interact-button press: if the current evaluation says allowed,
-// its `perform` runs; otherwise its `message` (if any) is shown via the
-// on-screen message UI.
-//
-// This is the ONLY system registered for the pickup feature — a single
-// engine.addSystem call handles proximity, facing, evaluation, and input
-// for every fixture.
-//
-// Spectators skip all of this (see isLocalPlayerPlaying) — no highlight,
-// no evaluation, no input — gated here rather than per-fixture in
-// interactionRules.ts, so every fixture kind is covered by one check.
-// Rendering game state (held items, counter/stove/delivery visuals) is
-// untouched by this — those reconcile from synced state regardless of role.
+// Spectators are gated out here (isLocalPlayerPlaying) rather than
+// per-fixture in interactionRules.ts, so one check covers every kind.
+// Rendering (held items, counter/stove/delivery visuals) reconciles from
+// synced state regardless of role, so it's unaffected.
 
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'

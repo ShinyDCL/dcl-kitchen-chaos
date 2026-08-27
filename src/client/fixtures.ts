@@ -57,8 +57,8 @@ export function createFixture(options: FixtureOptions): Entity {
 /**
  * Stable numeric ID assigned in scene-build order — identical on every
  * client, since createSceneLayout runs the same fixture-creation calls in
- * the same order for everyone. Not used yet; it's the syncId a fixture will
- * need once its own state (not just the player's held item) gets networked.
+ * the same order for everyone. Used as the explicit syncEntity id for
+ * fixture-owned state (PreparationCounterState, StoveState, DeliveryState).
  */
 export function getFixtureSyncId(fixture: Entity): number {
   const id = fixtureSyncIds.get(fixture)

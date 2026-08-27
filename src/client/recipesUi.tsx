@@ -1,32 +1,25 @@
 // Recipe queue HUD — cards along the top-left, newest slot first. Reads
-// straight from the synced RecipeSlotState entities every frame (see
-// recipeQueue.ts); no local prediction to protect, so no reconcile step
-// like heldItem.ts's. Only visible to players in the 'play' role.
+// straight from the synced RecipeSlotState entities every frame; no local
+// prediction to protect, so no reconcile step like heldItem.ts's. Only
+// visible to players in the 'play' role.
 //
 // The server broadcasts 'recipeDelivered'/'recipeGenerated' once each, and
-// each client times its own success/new-recipe highlight locally from
-// receipt — not a shared server deadline latency could cut short. A
-// celebrating card and its slot's own live card are independent entries
-// (see getActiveRecipes) — normally the server delays regenerating a
-// delivered slot until the celebration's about done, but if a client sees
-// the live update early anyway, both just render at once rather than one
-// hiding the other. pendingNewFlashSlots guards the case where the
-// 'recipeGenerated' message beats the RecipeSlotState sync update itself.
+// each client times its success/new-recipe highlight locally from receipt
+// — not a shared server deadline latency could cut short. A celebrating
+// card and its slot's live card are independent entries (getActiveRecipes)
+// — if a client sees the live update before its own celebration ends
+// (latency skew), both just render at once. pendingNewFlashSlots guards
+// the case where 'recipeGenerated' beats the RecipeSlotState sync itself.
 //
 // Card background eases between normal/new/success via getCardBackground's
-// per-slot lerp state — cheap, since this UI rebuilds fully every frame.
+// per-card lerp state — cheap, since this UI rebuilds fully every frame.
 //
-// Ingredients stack vertically (bottom-to-top) so cards stay narrow enough
-// for several to fit on a phone screen. The stack uses absolute positioning
-// with an explicitly computed height rather than flex + negative margins,
-// since flex's 'auto' height isn't reliable with negative margins.
+// Ingredients stack bottom-to-top via absolute positioning with an
+// explicitly computed height, not flex + negative margins — flex's 'auto'
+// height isn't reliable with those.
 //
-// screenInset: 'interactable' keeps the HUD clear of Decentraland's own UI
-// (minimap, profile, sidebar) — 'device' only avoids hardware notches.
-//
-// DESKTOP_LAYOUT/MOBILE_LAYOUT hold platform-tuned sizing from on-device
-// testing. getPlatform() resolves asynchronously, so currentLayout starts
-// as desktop and updates once the platform is known.
+// DESKTOP_LAYOUT/MOBILE_LAYOUT hold platform-tuned sizing; currentLayout
+// starts as desktop and updates once getPlatform() resolves.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'

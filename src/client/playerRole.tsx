@@ -1,13 +1,10 @@
 // Entry role choice (Play/Spectate) and a persistent switcher — pure UI;
-// the role state itself lives in playerRoleState.ts. Practice is
-// intentionally not wired in here yet: it's meant to be a fully local
-// tutorial flow with no server interaction, and gets its own entry point
-// once built.
+// the role state itself lives in playerRoleState.ts. Practice isn't wired
+// in yet: it's meant to be a fully local tutorial flow with no server
+// interaction, and gets its own entry point once built.
 //
-// The prompt only asks whether they'd rather Play; dismissing it (either
-// button) is separate from the role change itself, and the area around it
-// stays click-through so choosing not to answer yet doesn't block movement
-// or interaction.
+// The area around the prompt stays click-through so choosing not to answer
+// yet doesn't block movement or interaction.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'

@@ -34,7 +34,7 @@ export interface InteractionResult {
 }
 
 // --- Ingredient counters ---
-// Always allowed to interact with, except a slot with no model yet (bacon).
+// Always allowed to interact with, except a slot with no model yet.
 
 export function evaluateIngredientCounterInteraction(sliceModel: string | undefined): InteractionResult {
   if (!sliceModel) return { allowed: false, message: 'Not available yet' }
@@ -130,8 +130,8 @@ export function evaluateTrashBinInteraction(): InteractionResult {
 }
 
 // --- Delivery counter ---
-// Allowed whenever holding anything; plays a success flourish. No
-// scoring/order system yet, so this always "succeeds" regardless of what's held.
+// Allowed whenever holding anything; the checkmark/crossmark flourish is
+// decided server-side against the active recipe queue (see recipeQueue.ts).
 
 export function evaluateDeliveryCounterInteraction(): InteractionResult {
   if (!hasHeldItem()) return { allowed: false, message: 'Nothing to deliver' }

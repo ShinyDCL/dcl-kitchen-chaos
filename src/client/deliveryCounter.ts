@@ -1,32 +1,28 @@
-// Delivery counter: interacting while holding something takes it out of
-// the player's hand and places it on the counter, where it sits unchanged
-// for DELIVERY_ITEM_SIT_DURATION, then shrinks away over
-// DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales up
-// above the pad — a checkmark if the delivery matched an active recipe
-// (server-decided, see recipeQueue.ts), or a code-drawn red crossmark (no
-// model for this yet) if it didn't. renderedSuccess defaults optimistically
-// to true on send since the real verdict is server-only; the ~1s sit delay
-// is normally enough for it to land before the mark appears, and
-// reconciliation corrects it if not.
+// Delivery counter: interacting while holding something places it on the
+// counter, where it sits for DELIVERY_ITEM_SIT_DURATION, then shrinks away
+// over DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales
+// up — a checkmark if the delivery matched an active recipe (server-
+// decided, see recipeQueue.ts), or a code-drawn red crossmark otherwise.
+// renderedSuccess defaults optimistically to true since the real verdict
+// is server-only; the ~1s sit delay is normally enough for it to land
+// first, and reconciliation corrects it if not.
 //
-// Reconciled against the server-synced DeliveryState (shared/schemas.ts)
-// rather than held as local truth — see the authoritative-server skill.
-// Only one delivery counter exists in the scene, so this keeps simple
-// module-level state rather than a Map keyed by fixture, unlike
-// stoveCooking.ts's per-stove state.
+// Reconciled against the server-synced DeliveryState rather than held as
+// local truth — see the authoritative-server skill. Only one delivery
+// counter exists in the scene, so this keeps simple module-level state
+// rather than a Map keyed by fixture, unlike stoveCooking.ts's per-stove
+// state.
 //
-// Both animations (item sit+shrink, checkmark spin+scale) are pure
-// functions of `Date.now() - startTimestamp`, so nothing but the delivery
-// itself (models + one timestamp) is ever sent over the network — every
-// client, including the delivering player's own, derives the same
-// animation frame from that one shared instant, and a client that joins
-// mid-animation picks it up at the right point instead of restarting it.
-// deliverHeldItem still renders the item locally right away, ahead of the
-// round trip, for zero-latency feedback. The hand-clear itself goes
-// through takeHeldItemModelsPending rather than broadcasting — the server
-// now verifies the claimed models against the player's real held item
-// before accepting the delivery (see server/deliveryCounter.ts) and
-// rejects (restoring the hand) rather than trusting the claim outright.
+// Both animations are pure functions of `Date.now() - startTimestamp`, so
+// only the delivery itself (models + one timestamp) is ever sent over the
+// network — every client derives the same animation frame from that one
+// shared instant, and a client joining mid-animation picks it up at the
+// right point instead of restarting it. deliverHeldItem still renders the
+// item locally right away for zero-latency feedback. The hand-clear goes
+// through takeHeldItemModelsPending rather than broadcasting, since the
+// server now verifies the claimed models against the player's real held
+// item before accepting (see server/deliveryCounter.ts) and rejects
+// (restoring the hand) rather than trusting the claim outright.
 
 import { engine, Entity, GltfContainer, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -124,19 +120,13 @@ function deliveryRenderSystem(): void {
 
 /**
  * Points renderedModels/renderedStartTimestamp at the synced delivery, but
- * only when the SYNCED value has actually changed since this was last
- * observed — not whenever it merely differs from what's currently
- * rendered. Right after this client's own optimistic deliverHeldItem call,
- * a live read is briefly stale (the server hasn't processed the intent
- * yet); comparing against "what's rendered" instead of "what was last
- * observed" would treat that staleness as a real mismatch and revert the
- * optimistic visual, only to reapply it a moment later once the real
- * update lands — a spurious flicker. Gating on an actual change means a
- * stale read is a no-op, and the real update (once it arrives) is compared
- * against the usually-already-matching local prediction, so nothing
- * visibly rebuilds in the common case.
+ * only when it has actually changed since last observed — not whenever it
+ * merely differs from what's rendered. Right after this client's own
+ * optimistic deliverHeldItem, a live read is briefly stale; gating on an
+ * actual change makes that a no-op instead of a spurious revert-then-
+ * reapply flicker.
  *
- * If a delivery's 1.4s window has already closed by the time it's first
+ * If a delivery's 1.4s window already closed by the time it's first
  * observed (latency ate the whole window), it's re-anchored to start now
  * instead of never showing — but only within
  * DELIVERY_LATE_ARRIVAL_GRACE_SECONDS of closing, so a player joining long

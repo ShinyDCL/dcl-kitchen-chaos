@@ -1,36 +1,25 @@
 // Owns the visuals for each preparation counter, reconciled against the
-// server-synced PreparationCounterState (shared/schemas.ts) rather than
-// held as local truth — see the authoritative-server skill. Doesn't decide
-// what's allowed — see interactionRules.ts for that. Every action function
-// here assumes the caller already checked it's allowed.
+// server-synced PreparationCounterState rather than held as local truth —
+// see the authoritative-server skill. Doesn't decide what's allowed — see
+// interactionRules.ts. Every action function assumes the caller already
+// checked it's allowed.
 //
-// Each action function does two things: sends a narrow intent to the
-// server (place a plate, pick up the ingredient stack, place this
-// ingredient, ...) and rebuilds this client's own visuals immediately, for
-// zero-latency feedback. The intent is deliberately NOT the counter's
-// whole computed new state — the server applies each intent atomically
-// against its own live state (see server/preparationCounters.ts), which is
-// what lets two players place different ingredients on the same counter at
-// the same time and have both stick, instead of whichever client's
-// computed-full-state push lands last silently discarding the other's.
-// A single reconciliation system, started by
-// startRenderingPreparationCounters, is what makes the counter visible to
-// every OTHER player, and what folds in whatever else changed concurrently
-// (another player's own addition, a lost pickup race) that this client's
-// local prediction couldn't have known about yet.
+// Each action function sends a narrow intent (place a plate, pick up the
+// ingredient stack, ...), not the counter's whole computed new state — the
+// server applies each atomically against its own live state (see
+// server/preparationCounters.ts), which is what lets two players place
+// different ingredients on the same counter at once and have both stick,
+// instead of whichever client's full-state push lands last discarding the
+// other's. The reconciliation system (startRenderingPreparationCounters)
+// is what makes a counter visible to other players, and what folds in
+// concurrent changes this client's own prediction couldn't have known
+// about.
 //
-// It only reacts when the synced state itself has changed since the last
-// frame it was observed (lastSyncedStates) — NOT whenever it merely
-// differs from what's currently rendered. Right after this client's own
-// optimistic render, the synced read is briefly stale (the server hasn't
-// processed the intent yet), which would otherwise look identical to a
-// real mismatch and cause a spurious revert-then-reapply flicker: the
-// still-stale read reverts the optimistic visual, then the real update
-// lands a moment later and reapplies it. Gating on an actual change in the
-// synced value means a merely-stale read is a no-op, and once the real
-// update does arrive it's compared against the (usually already-matching)
-// local prediction inside renderCounter, so nothing visibly rebuilds at
-// all in the common, uncontested case.
+// It only reacts when the synced state has actually changed since last
+// observed (lastSyncedStates) — not whenever it merely differs from what's
+// rendered. Right after this client's own optimistic render, a synced read
+// is briefly stale; gating on an actual change makes that a no-op instead
+// of a spurious revert-then-reapply flicker.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -91,14 +80,11 @@ export interface PreparationCounterSnapshot {
 
 /**
  * Reads the counter's contents for interaction-legality decisions
- * (interactionRules.ts, which drives the focus highlight's color/message) —
- * from renderedStates, this client's current belief, NOT a raw live poll of
- * the synced component. Right after this client's own optimistic action, a
- * raw poll is briefly stale (the server hasn't processed the intent yet);
- * evaluating "is placing/picking up allowed" against that stale snapshot
- * instead of the already-updated prediction is what caused the highlight
- * to flip allowed/disallowed (and its message) for a moment after placing
- * or picking something up, until the real update caught up.
+ * (interactionRules.ts, driving the focus highlight's color/message) from
+ * renderedStates — this client's current belief — rather than a raw live
+ * poll of the synced component, which is briefly stale right after this
+ * client's own optimistic action and would flip the highlight
+ * allowed/disallowed for a moment until the real update caught up.
  */
 export function getPreparationCounterSnapshot(counter: Entity): PreparationCounterSnapshot {
   const { hasPlate, ingredientModels } = getRenderedContents(counter)

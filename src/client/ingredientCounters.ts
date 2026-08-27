@@ -2,8 +2,8 @@
 // available and, once interacted with, attaches the matching slice to the
 // player's hand, discarding whatever was held before (attachItemToPlayerHand
 // always clears the previous held item). A definition with no
-// displayModel/sliceModel (currently just bacon) shows a "not available"
-// message instead.
+// displayModel/sliceModel would show a "not available" message instead —
+// currently unused, since every listed ingredient has real models.
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'

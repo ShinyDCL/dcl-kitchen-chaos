@@ -8,9 +8,9 @@
 // classifyItem() and getCookableItemDefinition() are both derived from
 // this one object, so there's one place to add or edit an ingredient.
 //
-// Bacon isn't listed here yet — no models exist for it. Its ingredient
-// counter slot is handled separately in ingredientCounters.ts (shows
-// "Not available yet" until it's added here with real models).
+// Bacon isn't listed here yet — no models exist for it, and it currently
+// has no counter slot at all (see sceneLayout.ts). classifyItem/
+// getRequiredModelForIngredient just won't resolve it until it's added.
 
 import { MODELS } from './models'
 

@@ -1,13 +1,11 @@
 // Owns every preparation counter's PreparationCounterState. Clients send a
-// narrow intent (place a plate, pick up the ingredient stack, place this
-// ingredient, ...) rather than a computed full snapshot, and each handler
-// applies it atomically against the counter's own current state — see
-// shared/messages.ts's comment for why: two clients computing "current
-// state + my change" from the same stale synced snapshot and pushing the
-// result wholesale is a lost-update race whenever they touch the same
-// counter close together. Message handlers run one at a time, so two
-// concurrent intents for the same counter are simply applied in the order
-// the server receives them, each building on the true latest state.
+// narrow intent (place a plate, pick up the stack, ...) rather than a
+// computed full snapshot, and each handler applies it atomically against
+// the counter's own current state — see shared/messages.ts's comment for
+// why: two clients computing "current state + my change" from the same
+// stale snapshot and pushing the result wholesale is a lost-update race.
+// Message handlers run one at a time, so concurrent intents for the same
+// counter just apply in receipt order, each against the true latest state.
 //
 // Every handler grants/clears the held item itself via grantHeldItem,
 // never trusting the client's own setHeldItem broadcast:
@@ -15,20 +13,17 @@
 //   leaves the second with nothing left to take.
 // - placePlateOnCounter grants the empty hand only on success, replying
 //   actionRejected otherwise so the client restores what it optimistically
-//   took out (see heldItem.ts's takeHeldItemPending) — otherwise a losing
+//   took out (heldItem.ts's takeHeldItemPending) — otherwise a losing
 //   player's plate could be destroyed on a rejected placement.
-// - placeOnCounter verifies the client's claimed models against the
-//   player's real held item (heldItems.ts's getHeldItemModels) before
-//   trusting them, replying actionRejected on a mismatch so the client
-//   restores what it optimistically took out — otherwise a modified
-//   client could claim to be placing items it never actually held.
+// - placeOnCounter verifies the claimed models against the player's real
+//   held item (heldItems.ts's getHeldItemModels) before trusting them,
+//   rejecting a mismatch the same way — otherwise a modified client could
+//   claim to be placing items it never held.
 //
-// Unlike per-player entities, preparation counters are a small fixed set
-// that exists for the scene's whole life, so each uses an EXPLICIT sync id
-// — its counterId, assigned deterministically by client/fixtures.ts's
-// getFixtureSyncId (every client builds the scene in the same order, so
-// the same counter gets the same id everywhere) — rather than the
-// per-player auto-allocate-and-match-by-field pattern.
+// Unlike per-player entities, counters are a small fixed set for the
+// scene's whole life, so each uses an EXPLICIT sync id — its counterId,
+// assigned deterministically by client/fixtures.ts's getFixtureSyncId —
+// rather than the per-player auto-allocate-and-match-by-field pattern.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'

@@ -3,27 +3,24 @@
 // playerRoster.ts's GameState.
 //
 // Target size is 0 with zero active players, else clamp(count, MIN, MAX) —
-// see getTargetQueueSize. Growing only activates inactive slots (never
-// disturbs an active one). advanceSlot is the single hand-off point: a
-// completed delivery or an expired recipe (timerSeconds elapsed, e.g. one
-// left active from a previous server run) either regenerates the slot in
-// place or retires it if over target — so shrinking and difficulty changes
-// only ever apply starting from the next recipe, never mid-recipe. A
-// timeout resets nothing (only a wrong delivery resets the streak).
+// see getTargetQueueSize. Growing only activates inactive slots. advanceSlot
+// is the single hand-off point: a completed delivery or an expired recipe
+// either regenerates the slot in place or retires it if over target, so
+// shrinking/difficulty changes only ever apply from the next recipe, never
+// mid-recipe. A timeout resets nothing — only a wrong delivery resets the
+// streak.
 //
-// evaluateDelivery is called by deliveryCounter.ts, which still owns
-// DeliveryState/the visual timing — a match pays every active player and
-// broadcasts 'recipeDelivered'; a miss just resets the streak.
-// generateRecipeForSlot always broadcasts 'recipeGenerated'; clients time
-// their own highlight locally instead of racing a shared server deadline
-// latency could cut short.
+// evaluateDelivery (called by deliveryCounter.ts, which owns DeliveryState/
+// visual timing) pays every active player and broadcasts 'recipeDelivered'
+// on a match; a miss just resets the streak. Clients time their own success/
+// new-recipe highlight locally from these broadcasts instead of racing a
+// shared server deadline latency could cut short.
 //
 // A match deactivates its slot immediately but defers regenerating it for
-// RECIPE_SUCCESS_CELEBRATION_SECONDS (pendingRegenerations, resolved in
-// growQueueSystem) — otherwise the new recipe's real clock (generatedAt)
-// would already be running while every client's celebration still hides
-// it, so its timer bar would show as already-elapsed the moment it
-// finally appears.
+// RECIPE_SUCCESS_CELEBRATION_SECONDS (pendingRegenerations) — otherwise the
+// new recipe's clock would already be running while every client's
+// celebration still hides it, showing the timer bar as already-elapsed the
+// moment it appears.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'

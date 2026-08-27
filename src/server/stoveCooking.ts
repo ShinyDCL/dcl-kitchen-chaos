@@ -1,22 +1,17 @@
 // Owns every stove's StoveState. Unlike heldItems.ts/preparationCounters.ts,
-// this doesn't just relay whatever the client asserts: collecting a
-// finished stove hands out a scarce item (the cooked result), so
 // collectFromStove re-derives the outcome from the server's own state
-// instead of trusting the client, and rejects a second collect against the
-// same cook — resetting rawModel to '' before granting the item means a
-// second, already-queued collect message for the same cook sees an idle
-// stove and no-ops, which is what stops two players racing a finished
-// stove from both walking away with a copy.
+// rather than trusting the client, since it hands out a scarce cooked
+// item: resetting rawModel to '' before granting it means a second,
+// already-queued collect for the same cook sees an idle stove and no-ops
+// — what stops two players racing a finished stove from both winning.
 //
 // startCookingOnStove grants the empty hand only once the cook actually
-// starts, replying actionRejected otherwise (not idle, or invalid
-// rawModel) so the client restores what it took out — see heldItem.ts's
-// takeHeldItemPending. Otherwise a losing player's ingredient could be
-// destroyed on a rejected cook.
+// starts, replying actionRejected otherwise so the client restores what it
+// took out — see heldItem.ts's takeHeldItemPending.
 //
 // Explicit sync id per stove, same reasoning as preparationCounters.ts:
-// stoves are a small fixed set that exists for the scene's whole life, so
-// no per-connection auto-alloc/match-by-field is needed.
+// stoves are a small fixed set for the scene's whole life, so no
+// per-connection auto-alloc/match-by-field is needed.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'

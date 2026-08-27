@@ -1,39 +1,28 @@
-// Renders every player's held item — including the local player's own
-// hand — reconciled against the server-synced HeldItem component
-// (shared/schemas.ts) rather than held as local truth, the same pattern
-// preparationCounters.ts and stoveCooking.ts use. Uses the parent+child
-// AvatarAttach pattern: an invisible parent tracks the hand anchor for a
-// given avatarId, and one or more visible model entities sit under it.
+// Renders every player's held item, including the local player's own hand,
+// reconciled against the server-synced HeldItem component rather than held
+// as local truth — same pattern as preparationCounters.ts/stoveCooking.ts.
+// Uses the parent+child AvatarAttach pattern: an invisible parent tracks
+// the hand anchor, one or more visible model entities sit under it.
 //
-// Most pickups are a single model (attachItemToPlayerHand). Picking up
-// everything off a plate on a preparation counter is an "assembled" stack
-// of models (attachAssembledItemToPlayerHand) — the first model uses its
-// configured hand offset/rotation/scale (itemHandTransforms.ts) as the
-// stack's base, and subsequent models stack directly above it using
-// itemHeights.ts, the same way preparationCounters.ts stacks items on a
-// counter.
+// Most pickups are a single model; picking everything off a plate is an
+// "assembled" stack (attachAssembledItemToPlayerHand) — the first model's
+// hand transform (itemHandTransforms.ts) anchors the stack, later ones
+// stack above it via itemHeights.ts.
 //
-// Local mutators (attachItemToPlayerHand, takeHeldItem, discardHeldItem,
-// ...) render the local player's hand immediately for zero-latency
-// feedback AND send a setHeldItem message so the server updates the synced
-// component everyone reads. The reconciliation system started by
-// startRenderingHeldItems compares every player's synced state (local
-// player included) against what's currently rendered and corrects any
-// mismatch — this is what makes the item visible to every OTHER player,
-// and what corrects THIS client's own guess if the server ends up
-// disagreeing with it (e.g. stoveCooking.ts's collectFromStove, which
-// deliberately renders nothing optimistically because a race there would
-// mean duplicating a scarce cooked item — see its comment). The server
-// still doesn't validate WHICH model is legal for the general
-// attach/discard path — see server/heldItems.ts — so outside of the stove
-// collect flow this remains a visibility fix, not anti-cheat.
+// Local mutators render the hand immediately for zero-latency feedback AND
+// send setHeldItem so the server updates the synced component. The
+// reconciliation system (startRenderingHeldItems) compares every player's
+// synced state against what's rendered and corrects mismatches — this is
+// what makes the item visible to other players, and what corrects this
+// client's own guess when the server disagrees (e.g. stoveCooking.ts's
+// collectFromStove, which renders nothing optimistically to avoid
+// duplicating a scarce item). setHeldItem itself still isn't validated —
+// see server/heldItems.ts — so outside the stove flow this remains a
+// visibility fix, not anti-cheat.
 //
-// takeHeldItem only returns a model for a single-item hold — it returns
-// null for an assembled stack, since there's no single model to hand back;
-// callers that need to know whether an assembled item is held should check
-// isHoldingAssembledItem(). takeHeldItemModels returns every model
-// regardless of shape. discardHeldItem removes whatever's held (single or
-// assembled) without returning anything.
+// takeHeldItem only returns a model for a single-item hold (null for an
+// assembled stack — check isHoldingAssembledItem() instead).
+// takeHeldItemModels returns every model regardless of shape.
 
 import { AvatarAnchorPointType, AvatarAttach, engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -122,21 +111,17 @@ let pendingRestoreModels: string[] | null = null
 
 /**
  * Like takeHeldItem, but for an action paired with a server-arbitrated
- * fixture intent whose outcome isn't known yet. Clears the local hand
- * prediction immediately (so the player can't reuse the item before the
- * round trip) WITHOUT broadcasting setHeldItem — the paired intent's own
+ * fixture intent whose outcome isn't known yet. Clears the hand prediction
+ * immediately WITHOUT broadcasting setHeldItem — the paired intent's own
  * server handler grants the empty hand on success or sends actionRejected
  * on failure, which restorePendingHeldItem uses to put the item back.
- * Unconditional broadcasting here would let the hand-clear succeed
- * regardless of the fixture action's outcome — how items used to vanish
- * or duplicate in a race.
+ * Broadcasting unconditionally here is how items used to vanish or
+ * duplicate in a race.
  *
- * pendingRestoreModels is a single slot, not scoped to this specific call —
- * it's invalidated (set to null) by applyLocally and by heldItemsSystem
- * reconciling the local player's own synced state, both of which mean the
- * hand has since moved on for an unrelated reason. Without that, a stale
- * rejection arriving after the hand legitimately changed again would
- * restorePendingHeldItem back to this call's now-wrong snapshot.
+ * pendingRestoreModels is a single slot: applyLocally and heldItemsSystem
+ * (reconciling the local player's own synced state) both null it out when
+ * the hand changes for an unrelated reason, so a stale rejection can't
+ * restore it over a hand that's since moved on.
  */
 export function takeHeldItemPending(): string | null {
   const model = peekHeldItemModel()
@@ -177,18 +162,11 @@ export function startRenderingHeldItems(): void {
 const lastSyncedHeldItems = new Map<string, string[]>() // last models actually observed from the synced component, per playerId
 
 /**
- * Renders each player's held item, but only reacts to a player's synced
- * state when it has actually changed since this was last observed — not
- * whenever it merely differs from what's currently rendered. Right after
- * this client's own optimistic applyLocally call, a live read of the local
- * player's synced HeldItem is briefly stale (the server hasn't processed
- * the setHeldItem message yet); comparing against "what's rendered"
- * instead of "what was last observed" would treat that staleness as a
- * real mismatch and revert the just-cleared hand back to holding the item,
- * only to clear it again a moment later once the real update lands — the
- * item visibly "detaches late." Gating on an actual change means a stale
- * read is a no-op, and the real update (once it arrives) matches the
- * already-applied local prediction, so nothing visibly reverts at all.
+ * Renders each player's held item, but only reacts when a player's synced
+ * state has actually changed since last observed — not whenever it merely
+ * differs from what's rendered. Right after this client's own optimistic
+ * applyLocally, a live read is briefly stale; gating on an actual change
+ * makes that a no-op instead of a spurious revert-then-reapply flicker.
  */
 function heldItemsSystem(): void {
   const localId = localPlayerId()

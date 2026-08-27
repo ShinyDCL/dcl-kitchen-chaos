@@ -1,11 +1,13 @@
 // Owns every player's HeldItem state. Clients never write this component
-// directly (see shared/schemas.ts's validateBeforeChange) — they send a
-// setHeldItem message with their new hand contents, and this is the only
-// place that turns that into the synced state everyone renders from. The
-// server doesn't validate WHICH model is legal to hold yet — that needs
-// fixture state (counters/stove) to be server-owned too, which isn't built
-// yet — so for now this only guarantees the state itself is trustworthy,
-// not that every pickup was a legal game action.
+// directly (see shared/schemas.ts's validateBeforeChange) — setHeldItem is
+// the only path in, and it's trusted outright: whatever `models` a client
+// sends becomes their held item, with no check that they're real,
+// obtainable models. placeOnCounter/deliverHeldItem verify against
+// getHeldItemModels below instead of trusting a client's claim directly —
+// but since that claim is checked against THIS record, a client that
+// forges its own HeldItem via setHeldItem first would still pass. Closing
+// that needs setHeldItem itself to validate against fixture state, not
+// done yet.
 //
 // One HeldItem entity per player, matched by the playerId field rather
 // than by network id — see the authoritative-server skill's per-player

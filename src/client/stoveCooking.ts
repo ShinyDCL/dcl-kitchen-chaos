@@ -1,38 +1,22 @@
-// Stove cooking: interacting with a stove while holding a cookable item
-// starts a timed cook. A raw model appears on the stove, a progress bar
-// above it fills in as time passes, and a smoke particle emitter runs for
-// the duration. When done, the model swaps to its cooked version, the
-// checkmark appears, and smoke stops. A second interact while done
-// collects the cooked item and resets the stove.
+// Stove cooking: holding a cookable and interacting starts a timed cook —
+// raw model appears, a progress bar fills, smoke runs. When done, the
+// model swaps to cooked, a checkmark appears, and smoke stops. A second
+// interact while done collects the item and resets the stove.
 //
-// Reconciled against the server-synced StoveState (shared/schemas.ts)
-// rather than held as local truth — see the authoritative-server skill.
-// startCookingOnStove sends the intent to the server AND renders the raw
-// item + progress bar locally right away, for zero-latency feedback, since
-// there's nothing scarce at stake if a race means the optimistic guess
-// gets corrected a moment later. collectFromStove deliberately does NOT
-// render anything optimistically: collecting hands out a scarce cooked
-// item, and the server (server/stoveCooking.ts) is what actually decides
-// who gets it when two players race a finished stove — rendering a guess
-// here would just be a guess that might not match who really won, so this
-// waits for the real outcome to arrive via the reconciliation system
-// below, same as it does for every other player's stove.
+// Reconciled against the server-synced StoveState rather than held as
+// local truth — see the authoritative-server skill. startCookingOnStove
+// renders optimistically (nothing scarce at stake if corrected later).
+// collectFromStove renders nothing optimistically: collecting hands out a
+// scarce cooked item, and server/stoveCooking.ts decides who wins a race
+// for a finished stove, so this waits for the real outcome via
+// reconciliation, same as for every other player's stove.
 //
 // Progress is derived every frame from `Date.now() - startTimestamp`
-// (server clock) rather than a per-tick synced counter, so there's no need
-// to broadcast progress continuously — only the start (and reset) of a
-// cook is ever sent over the network.
+// (server clock), so only the start/reset of a cook is ever sent over the
+// network, never continuous progress.
 //
-// Visibility for the progress bar / checkmark is controlled on just two
-// entities via VisibilityComponent's propagateToChildren — see the note
-// above resetProgressBar/hideProgressBar. The smoke emitter is a single
-// persistent ParticleSystem per stove (created once, like the progress
-// bar), toggled on/off via its `active` field rather than recreated per
-// cook.
-//
-// This is the ONLY system registered for stove cooking — a single
-// engine.addSystem call reconciles every registered stove's visuals against
-// its synced state and advances the progress fill.
+// The smoke emitter is a single persistent ParticleSystem per stove,
+// toggled via `active` rather than recreated per cook.
 
 import {
   Billboard,
@@ -168,26 +152,18 @@ function stoveCookingSystem(): void {
 }
 
 /**
- * Applies a rawModel/startTimestamp transition, but only when the SYNCED
- * value has actually changed since this was last observed — not whenever
- * it merely differs from what's currently rendered. Right after this
- * client's own optimistic startCookingOnStove call, a live read is briefly
- * stale (the server hasn't processed the intent yet); comparing against
- * "what's rendered" instead of "what was last observed" would treat that
- * staleness as a real mismatch and revert the optimistic visual, only to
- * reapply it a moment later once the real update lands — a spurious
- * flicker. Gating on an actual change means a stale read is a no-op, and
- * the real update (once it arrives) is compared against the (usually
- * already-matching) local prediction inside applySyncedState's caller, so
- * nothing visibly rebuilds in the common, uncontested case.
+ * Applies a rawModel/startTimestamp transition, but only when it has
+ * actually changed since last observed — not whenever it merely differs
+ * from what's rendered. Right after this client's own optimistic
+ * startCookingOnStove, a live read is briefly stale; gating on an actual
+ * change makes that a no-op instead of a spurious revert-then-reapply
+ * flicker.
  *
  * If only startTimestamp changes for the same rawModel, that's this
- * client's own optimistic guess being corrected to the server's
- * (always-later) authoritative value. Adopted immediately for
- * tickProgress's "done" check, but without tearing down/rebuilding the
- * item entity or reseeding the bar — same cook, nothing to rebuild, and
- * doing so caused a visible pop/rewind (most noticeable on mobile's
- * higher latency).
+ * client's optimistic guess being corrected to the server's authoritative
+ * value — adopted without tearing down/rebuilding the item entity or bar,
+ * since rebuilding caused a visible pop/rewind (most noticeable on
+ * mobile's higher latency).
  */
 function reconcileTransition(stove: Entity): void {
   const synced = getSyncedState(stove)
