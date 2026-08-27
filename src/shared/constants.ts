@@ -114,3 +114,11 @@ export const RECIPE_SUCCESS_CELEBRATION_SECONDS = 2
 
 // How long a freshly generated recipe flashes its "New!" highlight.
 export const RECIPE_NEW_FLASH_SECONDS = 1
+
+// --- Server heartbeat ---
+
+// Server pulses GameState.serverHeartbeatAt this often; clients treat it as
+// alive only if a pulse was observed within FRESHNESS_MS of their own
+// clock (~3x the interval) — see client/serverReadiness.ts.
+export const SERVER_HEARTBEAT_INTERVAL_MS = 2000
+export const SERVER_HEARTBEAT_FRESHNESS_MS = 6000

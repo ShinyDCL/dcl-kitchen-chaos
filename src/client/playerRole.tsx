@@ -3,6 +3,13 @@
 // in yet: it's meant to be a fully local tutorial flow with no server
 // interaction, and gets its own entry point once built.
 //
+// Until the server is actually alive (see serverReadiness.ts — the CRDT
+// room connecting isn't enough, a cold start can take ~15s), the entry
+// overlay's slot shows serverLoadingUi.tsx's LoadingPrompt instead of
+// RolePrompt, since there's nothing for the player to choose yet. Both
+// share entryOverlayStyle.ts's panel transforms so they render at the
+// same size.
+//
 // The area around the prompt stays click-through so choosing not to answer
 // yet doesn't block movement or interaction.
 
@@ -12,10 +19,11 @@ import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Button, Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
 import { PlayerRoleValue } from '../shared/schemas'
+import { ENTRY_PANEL_TRANSFORM, OVERLAY_WRAPPER_TRANSFORM, PANEL_BACKGROUND } from './entryOverlayStyle'
 import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from './playerRoleState'
+import { isServerAlive } from './serverReadiness'
+import { LoadingPrompt } from './serverLoadingUi'
 
-const PANEL_BACKGROUND = Color4.create(0.1, 0.1, 0.1, 0.95)
-const PANEL_BORDER_RADIUS = 16
 const BUTTON_BORDER_RADIUS = 8
 
 const SWITCHER_BACKGROUND = Color4.create(0, 0, 0, 0.6)
@@ -76,29 +84,13 @@ function chooseRole(role: PlayerRoleValue): void {
 
 function EntryOverlayRenderer() {
   if (!showEntryOverlay) return null
+  return isServerAlive() ? RolePrompt() : LoadingPrompt()
+}
 
+function RolePrompt() {
   return (
-    <UiEntity
-      uiTransform={{
-        width: '100%',
-        height: '100%',
-        positionType: 'absolute',
-        justifyContent: 'center',
-        alignItems: 'center'
-      }}
-    >
-      <UiEntity
-        uiTransform={{
-          width: 640,
-          height: 'auto',
-          flexDirection: 'column',
-          alignItems: 'center',
-          padding: { top: 44, bottom: 44, left: 32, right: 32 },
-          borderRadius: PANEL_BORDER_RADIUS,
-          pointerFilter: 'block'
-        }}
-        uiBackground={{ color: PANEL_BACKGROUND }}
-      >
+    <UiEntity uiTransform={OVERLAY_WRAPPER_TRANSFORM}>
+      <UiEntity uiTransform={ENTRY_PANEL_TRANSFORM} uiBackground={{ color: PANEL_BACKGROUND }}>
         <Label
           value="Join the kitchen?"
           fontSize={32}

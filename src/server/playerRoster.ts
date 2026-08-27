@@ -13,6 +13,7 @@ import { engine, Entity, EntityUtils, PlayerIdentityData, RESERVED_STATIC_ENTITI
 import { syncEntity } from '@dcl/sdk/network'
 import { getPlayer } from '@dcl/sdk/src/players'
 
+import { SERVER_HEARTBEAT_INTERVAL_MS } from '../shared/constants'
 import { room } from '../shared/messages'
 import { GAME_STATE_SYNC_ID, GameState, PlayerRole, PlayerRoleValue } from '../shared/schemas'
 
@@ -32,6 +33,7 @@ export function initPlayerRoster(): void {
   })
 
   engine.addSystem(recomputeActivePlayerCount)
+  engine.addSystem(pulseServerHeartbeat)
 }
 
 /** Whether the given player is currently allowed to act on fixtures — i.e. their PlayerRole is 'play'. */
@@ -81,6 +83,18 @@ function recomputeActivePlayerCount(): void {
   }
 }
 
+let lastHeartbeatAt = 0
+
+/** Pulses GameState.serverHeartbeatAt every SERVER_HEARTBEAT_INTERVAL_MS so clients can detect this server is actually alive — see client/serverReadiness.ts. */
+function pulseServerHeartbeat(): void {
+  const now = Date.now()
+  if (now - lastHeartbeatAt < SERVER_HEARTBEAT_INTERVAL_MS) return
+  lastHeartbeatAt = now
+
+  const mutable = getGameStateMutable()
+  if (mutable) mutable.serverHeartbeatAt = now
+}
+
 function getOrCreatePlayerEntity(playerId: string): Entity {
   const cached = playerEntities.get(playerId)
   if (cached !== undefined && PlayerRole.getOrNull(cached) !== null) return cached
@@ -119,7 +133,9 @@ function getOrCreateGameStateEntity(): Entity {
   if (gameStateEntity !== null && GameState.getOrNull(gameStateEntity) !== null) return gameStateEntity
 
   const entity = engine.addEntity()
-  GameState.create(entity, { activePlayerCount: 0, streak: 0 })
+  // Publish the first heartbeat immediately so a client connecting right
+  // after a cold start doesn't have to wait a full interval to see one.
+  GameState.create(entity, { activePlayerCount: 0, streak: 0, serverHeartbeatAt: Date.now() })
   syncEntity(entity, [GameState.componentId], GAME_STATE_SYNC_ID)
   gameStateEntity = entity
   return entity

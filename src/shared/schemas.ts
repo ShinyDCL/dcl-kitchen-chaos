@@ -119,11 +119,16 @@ lockToServer(PlayerRole)
  * Singleton. `activePlayerCount` is currently-connected 'play'-role
  * players, recomputed each tick so a disconnect is reflected for free.
  * `streak` counts consecutive successful deliveries scene-wide, reset to 0
- * on a miss — see recipeQueue.ts.
+ * on a miss — see recipeQueue.ts. `serverHeartbeatAt` (server clock, ms)
+ * is pulsed periodically by the server so clients can tell it's actually
+ * alive, not just that the CRDT room is connected — see
+ * client/serverReadiness.ts and the authoritative-server skill's Server
+ * Lifecycle section.
  */
 export const GameState = engine.defineComponent('game::GameState', {
   activePlayerCount: Schemas.Int,
-  streak: Schemas.Int
+  streak: Schemas.Int,
+  serverHeartbeatAt: Schemas.Int64
 })
 
 lockToServer(GameState)
