@@ -37,9 +37,10 @@ export const Messages = {
   // server processed last silently discarded the other's addition.
   placePlateOnCounter: Schemas.Map({ counterId: Schemas.Int }),
   pickUpPlateFromCounter: Schemas.Map({ counterId: Schemas.Int }),
-  pickUpAssembledFromCounter: Schemas.Map({ counterId: Schemas.Int }),
-  placeIngredientOnCounter: Schemas.Map({ counterId: Schemas.Int, model: Schemas.String }),
-  placeAssembledOnCounter: Schemas.Map({ counterId: Schemas.Int, models: Schemas.Array(Schemas.String) }),
+  pickUpFromCounter: Schemas.Map({ counterId: Schemas.Int }),
+  // A single ingredient is just a one-element models array — same as a
+  // picked-up assembled stack, no separate message needed for the two.
+  placeOnCounter: Schemas.Map({ counterId: Schemas.Int, models: Schemas.Array(Schemas.String) }),
 
   // Start cooking a raw cookable at this stove. rawModel identifies which
   // CookableIngredientDefinition (shared/ingredients.ts) — the server looks

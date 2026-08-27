@@ -137,26 +137,18 @@ export function pickUpPlateFromCounter(counter: Entity): void {
   renderCounter(counter, { hasPlate: false, ingredientModels })
 }
 
-/** Picks up just the ingredient stack as an assembled item — the plate stays on the counter. */
-export function pickUpAssembledFromCounter(counter: Entity): void {
+/** Picks up just the ingredient stack (as an assembled item) — the plate stays on the counter. */
+export function pickUpFromCounter(counter: Entity): void {
   const { hasPlate, ingredientModels } = getRenderedContents(counter)
-  void room.send('pickUpAssembledFromCounter', { counterId: getFixtureSyncId(counter) })
+  void room.send('pickUpFromCounter', { counterId: getFixtureSyncId(counter) })
   renderCounter(counter, { hasPlate, ingredientModels: [] })
 }
 
-export function placeIngredientOnCounter(counter: Entity): void {
-  const placedModel = takeHeldItemPending()
-  if (!placedModel) return
-  void room.send('placeIngredientOnCounter', { counterId: getFixtureSyncId(counter), model: placedModel })
-  const { hasPlate, ingredientModels } = getRenderedContents(counter)
-  renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, placedModel] })
-}
-
-/** Places every item from a held assembled stack onto the counter's existing stack, on top of whatever's already there. */
-export function placeAssembledOnCounter(counter: Entity): void {
+/** Places whatever's held — a single ingredient or an assembled stack — onto the counter's existing stack, on top of whatever's already there. */
+export function placeOnCounter(counter: Entity): void {
   const models = takeHeldItemModelsPending()
   if (models.length === 0) return
-  void room.send('placeAssembledOnCounter', { counterId: getFixtureSyncId(counter), models })
+  void room.send('placeOnCounter', { counterId: getFixtureSyncId(counter), models })
   const { hasPlate, ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
 }

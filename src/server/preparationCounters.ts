@@ -17,9 +17,9 @@
 //   actionRejected otherwise so the client restores what it optimistically
 //   took out (see heldItem.ts's takeHeldItemPending) — otherwise a losing
 //   player's plate could be destroyed on a rejected placement.
-// - placeIngredientOnCounter/placeAssembledOnCounter can't be rejected
-//   today, but still grant here rather than via client broadcast, so a
-//   future legality check doesn't reopen the same hole.
+// - placeOnCounter can't be rejected today, but still grants here rather
+//   than via client broadcast, so a future legality check doesn't reopen
+//   the same hole.
 //
 // Unlike per-player entities, preparation counters are a small fixed set
 // that exists for the scene's whole life, so each uses an EXPLICIT sync id
@@ -61,7 +61,7 @@ export function initPreparationCounters(): void {
     grantHeldItem(context.from.toLowerCase(), [MODELS.plate])
   })
 
-  room.onMessage('pickUpAssembledFromCounter', (data, context) => {
+  room.onMessage('pickUpFromCounter', (data, context) => {
     if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state || state.ingredientModels.length === 0) return // nothing to pick up — ignore
@@ -70,15 +70,7 @@ export function initPreparationCounters(): void {
     grantHeldItem(context.from.toLowerCase(), models)
   })
 
-  room.onMessage('placeIngredientOnCounter', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    const state = getMutableState(data.counterId)
-    if (!state) return
-    state.ingredientModels = [...state.ingredientModels, data.model]
-    grantHeldItem(context.from.toLowerCase(), [])
-  })
-
-  room.onMessage('placeAssembledOnCounter', (data, context) => {
+  room.onMessage('placeOnCounter', (data, context) => {
     if (!context || !isPlayerAllowedToAct(context.from)) return
     const state = getMutableState(data.counterId)
     if (!state) return

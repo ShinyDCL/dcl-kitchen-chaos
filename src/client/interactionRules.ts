@@ -20,10 +20,9 @@ import { classifyItem, getCookableItemDefinition } from '../shared/ingredients'
 import { MODELS } from '../shared/models'
 import {
   getPreparationCounterSnapshot,
-  pickUpAssembledFromCounter,
+  pickUpFromCounter,
   pickUpPlateFromCounter,
-  placeAssembledOnCounter,
-  placeIngredientOnCounter,
+  placeOnCounter,
   placePlateOnCounter
 } from './preparationCounters'
 import { collectFromStove, getStoveStatus, startCookingOnStove } from './stoveCooking'
@@ -65,13 +64,13 @@ export function evaluatePreparationCounterInteraction(counter: Entity): Interact
 
   if (!hasHeldItem()) {
     if (!hasPlate) return { allowed: false, message: 'Place a plate first' }
-    if (ingredientCount > 0) return { allowed: true, perform: () => pickUpAssembledFromCounter(counter) }
+    if (ingredientCount > 0) return { allowed: true, perform: () => pickUpFromCounter(counter) }
     return { allowed: true, perform: () => pickUpPlateFromCounter(counter) }
   }
 
   if (isHoldingAssembledItem()) {
     return hasPlate
-      ? { allowed: true, perform: () => placeAssembledOnCounter(counter) }
+      ? { allowed: true, perform: () => placeOnCounter(counter) }
       : { allowed: false, message: 'Place a plate first' }
   }
 
@@ -93,7 +92,7 @@ export function evaluatePreparationCounterInteraction(counter: Entity): Interact
 
   // nonCookable or cookedCookable — both placeable directly on a plate
   if (!hasPlate) return { allowed: false, message: 'Place a plate first' }
-  return { allowed: true, perform: () => placeIngredientOnCounter(counter) }
+  return { allowed: true, perform: () => placeOnCounter(counter) }
 }
 
 // --- Stove ---

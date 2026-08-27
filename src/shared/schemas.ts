@@ -8,6 +8,30 @@ import { engine, Schemas } from '@dcl/sdk/ecs'
 import { isServer } from '@dcl/sdk/network'
 import { AUTH_SERVER_PEER_ID } from '@dcl/sdk/network/message-bus-sync'
 
+// Minimal structural type — every synced component below satisfies this,
+// so this doesn't need to import the SDK's own component definition type.
+type ServerOnlyComponent = {
+  validateBeforeChange: (cb: (value: { senderAddress: string }) => boolean) => void
+}
+
+/** Every component here is server-owned: only the auth server may write it. Call once per component, right after defining it. */
+function lockToServer(component: ServerOnlyComponent): void {
+  if (isServer()) {
+    component.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
+  }
+}
+
+// Reserved explicit sync ids for the scene's non-fixture singletons/fixed
+// sets (GameState, the recipe queue slots) — contiguous from 100000, well
+// clear of client/fixtures.ts's separate 0-based, dynamically-sized
+// fixture id space, so neither can ever collide no matter how large the
+// scene's fixture count grows. Every other component below either derives
+// its id from a fixture (PreparationCounterState, StoveState,
+// DeliveryState) or needs no explicit id at all (per-player components,
+// matched by playerId instead).
+export const GAME_STATE_SYNC_ID = 100000
+export const RECIPE_SLOT_SYNC_ID_BASE = 100001 // + slotIndex, one id per MAX_QUEUE_SIZE slot
+
 /**
  * One entity per player who has held something this session. `models` is
  * the full stack currently in that player's hand, bottom to top — empty
@@ -20,9 +44,7 @@ export const HeldItem = engine.defineComponent('game::HeldItem', {
   models: Schemas.Array(Schemas.String)
 })
 
-if (isServer()) {
-  HeldItem.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(HeldItem)
 
 /**
  * One entity per preparation counter — plate presence and the ingredient
@@ -38,9 +60,7 @@ export const PreparationCounterState = engine.defineComponent('game::Preparation
   ingredientModels: Schemas.Array(Schemas.String)
 })
 
-if (isServer()) {
-  PreparationCounterState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(PreparationCounterState)
 
 /**
  * One entity per stove. `rawModel` is '' while idle, otherwise the
@@ -58,9 +78,7 @@ export const StoveState = engine.defineComponent('game::StoveState', {
   startTimestamp: Schemas.Int64
 })
 
-if (isServer()) {
-  StoveState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(StoveState)
 
 /**
  * Singleton — the scene only ever creates one delivery counter (see
@@ -77,9 +95,7 @@ export const DeliveryState = engine.defineComponent('game::DeliveryState', {
   success: Schemas.Boolean
 })
 
-if (isServer()) {
-  DeliveryState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(DeliveryState)
 
 export enum PlayerRoleValue {
   Play = 'play',
@@ -98,14 +114,7 @@ export const PlayerRole = engine.defineComponent('game::PlayerRole', {
   role: Schemas.EnumString(PlayerRoleValue, PlayerRoleValue.Spectate)
 })
 
-if (isServer()) {
-  PlayerRole.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
-
-// Reserved sync id for GameState, the one non-fixture singleton — kept well
-// clear of client/fixtures.ts's contiguous-from-0 fixture id space so it
-// can never collide no matter how many fixtures the scene grows to.
-export const GAME_STATE_SYNC_ID = 100000
+lockToServer(PlayerRole)
 
 /**
  * Singleton. `activePlayerCount` is currently-connected 'play'-role
@@ -118,9 +127,7 @@ export const GameState = engine.defineComponent('game::GameState', {
   streak: Schemas.Int
 })
 
-if (isServer()) {
-  GameState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(GameState)
 
 /** One entity per player's coin balance, matched by `playerId` like HeldItem/PlayerRole. Session-only — no Storage persistence yet. */
 export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
@@ -128,13 +135,7 @@ export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
   coins: Schemas.Int
 })
 
-if (isServer()) {
-  PlayerCoins.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
-
-// Reserved sync ids for the MAX_QUEUE_SIZE recipe queue slots. Slot i uses
-// RECIPE_SLOT_SYNC_ID_BASE + i.
-export const RECIPE_SLOT_SYNC_ID_BASE = 100001
+lockToServer(PlayerCoins)
 
 /**
  * One entity per recipe queue slot (a fixed set — MAX_QUEUE_SIZE — same
@@ -152,6 +153,4 @@ export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
   generatedAt: Schemas.Int64
 })
 
-if (isServer()) {
-  RecipeSlotState.validateBeforeChange((value) => value.senderAddress === AUTH_SERVER_PEER_ID)
-}
+lockToServer(RecipeSlotState)
