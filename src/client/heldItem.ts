@@ -76,6 +76,7 @@ function attachModelsToPlayerHand(models: string[]): void {
 
 /** Sends the local player's new hand contents to the server and renders it immediately, ahead of the round trip. */
 function applyLocally(models: string[]): void {
+  pendingRestoreModels = null // this hand change fully commits, superseding any still-outstanding pending restore — see takeHeldItemPending's comment
   void room.send('setHeldItem', { models })
   renderHeldItem(localPlayerId(), models)
 }
@@ -129,6 +130,13 @@ let pendingRestoreModels: string[] | null = null
  * Unconditional broadcasting here would let the hand-clear succeed
  * regardless of the fixture action's outcome — how items used to vanish
  * or duplicate in a race.
+ *
+ * pendingRestoreModels is a single slot, not scoped to this specific call —
+ * it's invalidated (set to null) by applyLocally and by heldItemsSystem
+ * reconciling the local player's own synced state, both of which mean the
+ * hand has since moved on for an unrelated reason. Without that, a stale
+ * rejection arriving after the hand legitimately changed again would
+ * restorePendingHeldItem back to this call's now-wrong snapshot.
  */
 export function takeHeldItemPending(): string | null {
   const model = peekHeldItemModel()
@@ -194,6 +202,9 @@ function heldItemsSystem(): void {
     const lastSynced = lastSyncedHeldItems.get(playerId) ?? []
     if (sameModels(models, lastSynced)) continue // nothing new from the server since last frame
     lastSyncedHeldItems.set(playerId, models)
+
+    // An authoritative update to our own hand supersedes any still-outstanding pending restore — see takeHeldItemPending's comment.
+    if (playerId === localId) pendingRestoreModels = null
 
     renderHeldItem(playerId, models)
   }
