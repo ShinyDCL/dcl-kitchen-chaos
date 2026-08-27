@@ -39,6 +39,17 @@ export function grantHeldItem(playerId: string, models: string[]): void {
   mutable.models = models
 }
 
+/** The player's actual server-held models — used to verify a client's claimed models before consuming them as a real item (placeOnCounter, deliverHeldItem), rather than trusting the claim outright. */
+export function getHeldItemModels(playerId: string): string[] {
+  const entity = playerEntities.get(playerId.toLowerCase())
+  const models = entity !== undefined ? HeldItem.getOrNull(entity)?.models : undefined
+  return models ? [...models] : []
+}
+
+export function sameModels(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((model, index) => model === b[index])
+}
+
 function getOrCreatePlayerEntity(playerId: string): Entity {
   const cached = playerEntities.get(playerId)
   if (cached !== undefined && HeldItem.getOrNull(cached) !== null) return cached

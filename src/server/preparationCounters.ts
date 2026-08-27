@@ -17,9 +17,11 @@
 //   actionRejected otherwise so the client restores what it optimistically
 //   took out (see heldItem.ts's takeHeldItemPending) — otherwise a losing
 //   player's plate could be destroyed on a rejected placement.
-// - placeOnCounter can't be rejected today, but still grants here rather
-//   than via client broadcast, so a future legality check doesn't reopen
-//   the same hole.
+// - placeOnCounter verifies the client's claimed models against the
+//   player's real held item (heldItems.ts's getHeldItemModels) before
+//   trusting them, replying actionRejected on a mismatch so the client
+//   restores what it optimistically took out — otherwise a modified
+//   client could claim to be placing items it never actually held.
 //
 // Unlike per-player entities, preparation counters are a small fixed set
 // that exists for the scene's whole life, so each uses an EXPLICIT sync id
@@ -34,7 +36,7 @@ import { syncEntity } from '@dcl/sdk/network'
 import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
 import { PreparationCounterState } from '../shared/schemas'
-import { grantHeldItem } from './heldItems'
+import { getHeldItemModels, grantHeldItem, sameModels } from './heldItems'
 import { isPlayerAllowedToAct } from './playerRoster'
 
 const counterEntities = new Map<number, Entity>()
@@ -72,10 +74,16 @@ export function initPreparationCounters(): void {
 
   room.onMessage('placeOnCounter', (data, context) => {
     if (!context || !isPlayerAllowedToAct(context.from)) return
+    const playerId = context.from.toLowerCase()
+    const heldModels = getHeldItemModels(playerId)
+    if (!sameModels(heldModels, data.models)) {
+      void room.send('actionRejected', {}, { to: [context.from] })
+      return
+    }
     const state = getMutableState(data.counterId)
     if (!state) return
-    state.ingredientModels = [...state.ingredientModels, ...data.models]
-    grantHeldItem(context.from.toLowerCase(), [])
+    state.ingredientModels = [...state.ingredientModels, ...heldModels]
+    grantHeldItem(playerId, [])
   })
 }
 

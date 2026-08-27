@@ -22,9 +22,11 @@
 // animation frame from that one shared instant, and a client that joins
 // mid-animation picks it up at the right point instead of restarting it.
 // deliverHeldItem still renders the item locally right away, ahead of the
-// round trip, for zero-latency feedback — unlike the stove's
-// collectFromStove, nothing scarce is at stake here, so predicting
-// optimistically is safe.
+// round trip, for zero-latency feedback. The hand-clear itself goes
+// through takeHeldItemModelsPending rather than broadcasting — the server
+// now verifies the claimed models against the player's real held item
+// before accepting the delivery (see server/deliveryCounter.ts) and
+// rejects (restoring the hand) rather than trusting the claim outright.
 
 import { engine, Entity, GltfContainer, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -44,7 +46,7 @@ import { room } from '../shared/messages'
 import { MODELS } from '../shared/models'
 import { DeliveryState } from '../shared/schemas'
 import { getFixtureSyncId } from './fixtures'
-import { takeHeldItemModels } from './heldItem'
+import { takeHeldItemModelsPending } from './heldItem'
 import { getItemHeight } from './itemHeights'
 import { getWorldPosition } from './worldPosition'
 
@@ -66,7 +68,7 @@ export function registerDeliveryCounter(fixtureEntity: Entity): void {
 export function deliverHeldItem(): void {
   if (deliveryCounterEntity === null) return
 
-  const models = takeHeldItemModels()
+  const models = takeHeldItemModelsPending()
   if (models.length === 0) return
 
   const startTimestamp = Date.now()
