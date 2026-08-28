@@ -42,15 +42,15 @@ interface RenderedCounter extends CounterContents {
   ingredientEntities: Entity[]
 }
 
-const registeredCounters: Entity[] = []
 const renderedStates = new Map<Entity, RenderedCounter>()
 const lastSyncedStates = new Map<Entity, CounterContents>()
+const countersById = new Map<number, Entity>() // avoids an O(counters × synced entities) scan every frame
 
 /** Registers a preparation counter fixture so its state gets rendered and reconciled. Call once per counter during scene setup. */
 export function registerPreparationCounter(counter: Entity): void {
-  registeredCounters.push(counter)
   renderedStates.set(counter, emptyRenderedCounter())
   lastSyncedStates.set(counter, emptyContents())
+  countersById.set(getFixtureSyncId(counter), counter)
 }
 
 /** Reconciles every registered counter's synced state against what's currently rendered. Call once during client setup. */
@@ -63,8 +63,11 @@ export function startRenderingPreparationCounters(): void {
 let reconcileSystemRegistered = false
 
 function reconcileCountersSystem(): void {
-  for (const counter of registeredCounters) {
-    const synced = getSyncedContents(counter)
+  for (const [, data] of engine.getEntitiesWith(PreparationCounterState)) {
+    const counter = countersById.get(data.counterId)
+    if (!counter) continue // synced state for a counter this client hasn't registered
+
+    const synced: CounterContents = { hasPlate: data.hasPlate, ingredientModels: [...data.ingredientModels] }
     const lastSynced = lastSyncedStates.get(counter) ?? emptyContents()
     if (sameContents(synced, lastSynced)) continue // nothing new from the server since last frame
 
@@ -94,14 +97,6 @@ export function getPreparationCounterSnapshot(counter: Entity): PreparationCount
 function getRenderedContents(counter: Entity): CounterContents {
   const rendered = renderedStates.get(counter)
   return rendered ? { hasPlate: rendered.hasPlate, ingredientModels: [...rendered.ingredientModels] } : emptyContents()
-}
-
-function getSyncedContents(counter: Entity): CounterContents {
-  const counterId = getFixtureSyncId(counter)
-  for (const [, data] of engine.getEntitiesWith(PreparationCounterState)) {
-    if (data.counterId === counterId) return { hasPlate: data.hasPlate, ingredientModels: [...data.ingredientModels] }
-  }
-  return { hasPlate: false, ingredientModels: [] }
 }
 
 export function placePlateOnCounter(counter: Entity): void {

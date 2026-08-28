@@ -89,6 +89,7 @@ const stoveVisuals = new Map<Entity, StoveVisuals>()
 const renderedCooks = new Map<Entity, RenderedCook>()
 const lastSyncedStates = new Map<Entity, { rawModel: string; startTimestamp: number }>()
 const registeredStoves: Entity[] = []
+const stovesById = new Map<number, Entity>() // avoids an O(stoves × synced entities) scan every frame
 
 export type StoveStatus = 'idle' | 'cooking' | 'done'
 
@@ -97,6 +98,7 @@ export function registerStove(stove: Entity): void {
   registeredStoves.push(stove)
   renderedCooks.set(stove, emptyRenderedCook())
   lastSyncedStates.set(stove, { rawModel: '', startTimestamp: 0 })
+  stovesById.set(getFixtureSyncId(stove), stove)
   getOrCreateVisuals(stove) // build the persistent progress bar / smoke emitter up front, hidden/inactive
 }
 
@@ -127,12 +129,14 @@ export function collectFromStove(stove: Entity): void {
   void room.send('collectFromStove', { stoveId: getFixtureSyncId(stove) })
 }
 
-function getSyncedState(stove: Entity): { rawModel: string; startTimestamp: number } {
-  const stoveId = getFixtureSyncId(stove)
+/** One pass over every synced StoveState, keyed by the local stove entity — built fresh each frame instead of re-scanned per stove. */
+function getSyncedStates(): Map<Entity, { rawModel: string; startTimestamp: number }> {
+  const states = new Map<Entity, { rawModel: string; startTimestamp: number }>()
   for (const [, data] of engine.getEntitiesWith(StoveState)) {
-    if (data.stoveId === stoveId) return { rawModel: data.rawModel, startTimestamp: Number(data.startTimestamp) }
+    const stove = stovesById.get(data.stoveId)
+    if (stove) states.set(stove, { rawModel: data.rawModel, startTimestamp: Number(data.startTimestamp) })
   }
-  return { rawModel: '', startTimestamp: 0 }
+  return states
 }
 
 function elapsedSeconds(startTimestamp: number): number {
@@ -151,8 +155,9 @@ export function startRenderingStoves(): void {
 }
 
 function stoveCookingSystem(): void {
+  const synced = getSyncedStates()
   for (const stove of registeredStoves) {
-    reconcileTransition(stove)
+    reconcileTransition(stove, synced.get(stove) ?? { rawModel: '', startTimestamp: 0 })
     tickProgress(stove)
   }
 }
@@ -171,8 +176,7 @@ function stoveCookingSystem(): void {
  * since rebuilding caused a visible pop/rewind (most noticeable on
  * mobile's higher latency).
  */
-function reconcileTransition(stove: Entity): void {
-  const synced = getSyncedState(stove)
+function reconcileTransition(stove: Entity, synced: { rawModel: string; startTimestamp: number }): void {
   const lastSynced = lastSyncedStates.get(stove) ?? { rawModel: '', startTimestamp: 0 }
   if (synced.rawModel === lastSynced.rawModel && synced.startTimestamp === lastSynced.startTimestamp) return
   lastSyncedStates.set(stove, synced)
