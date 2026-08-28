@@ -8,7 +8,11 @@
 import { engine, Entity, Material, MeshRenderer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { HIGHLIGHT_DEPTH, HIGHLIGHT_THICKNESS, HIGHLIGHT_WIDTH } from '../shared/constants'
+import { FIXTURE_DEPTH, FIXTURE_WIDTH } from '../shared/constants'
+
+const HIGHLIGHT_WIDTH = FIXTURE_WIDTH
+const HIGHLIGHT_DEPTH = FIXTURE_DEPTH
+const HIGHLIGHT_THICKNESS = 0.02
 
 const ALLOWED_COLOR = Color4.create(0.28, 1, 0.22, 1)
 const DISALLOWED_COLOR = Color4.create(0.5, 0.5, 0.5, 1)

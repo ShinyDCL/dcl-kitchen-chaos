@@ -9,18 +9,7 @@
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import {
-  BACK_WALL_DISTANCE,
-  FACE_NEGATIVE_X,
-  FACE_NEGATIVE_Z,
-  FACE_POSITIVE_X,
-  FACE_POSITIVE_Z,
-  FIXTURE_DEPTH,
-  FIXTURE_HEIGHT,
-  FIXTURE_WIDTH,
-  FRONT_ROW_DISTANCE,
-  SIDE_WALL_DISTANCE
-} from '../../shared/constants'
+import { FIXTURE_DEPTH, FIXTURE_HEIGHT, FIXTURE_WIDTH } from '../../shared/constants'
 import { MODELS } from '../../shared/models'
 import {
   evaluateDeliveryCounterInteraction,
@@ -39,6 +28,18 @@ import {
 } from './ingredientCounters'
 import { registerPreparationCounter } from './preparationCounters'
 import { registerStove } from './stoveCooking'
+
+// Local-space distances from the scene root to each wall/row — tuned to
+// match Scene.glb, can't be derived from the model file.
+const SIDE_WALL_DISTANCE = 6 // meters, along X
+const FRONT_ROW_DISTANCE = 6 // meters, along Z
+const BACK_WALL_DISTANCE = 6 // meters, along Z
+
+// Y-axis rotation (degrees) for a fixture whose unrotated model faces +Z.
+const FACE_POSITIVE_Z = 0
+const FACE_POSITIVE_X = 90
+const FACE_NEGATIVE_Z = 180
+const FACE_NEGATIVE_X = 270
 
 function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)

@@ -27,13 +27,16 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { ORDER_NEW_FLASH_SECONDS, ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
+import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../../shared/recipes'
 import { OrderSlotState } from '../../shared/schemas'
 import { isLocalPlayerPlaying } from '../playerRoleState'
 
 export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
+
+// How long a freshly generated order flashes its "New!" highlight.
+const ORDER_NEW_FLASH_SECONDS = 1
 
 const SUCCESS_GREEN = Color4.create(0.2, 0.85, 0.3, 1) // shared base hue for every "success" signal on this HUD
 const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1) // shared base hue for every "timed out/overdue" signal on this HUD

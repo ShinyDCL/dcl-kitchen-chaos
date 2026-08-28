@@ -33,28 +33,7 @@ import {
 } from '@dcl/sdk/ecs'
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import {
-  PROGRESS_BAR_BACKGROUND_COLOR,
-  PROGRESS_BAR_BACKGROUND_RECESS,
-  PROGRESS_BAR_FILL_COLOR,
-  PROGRESS_BAR_FILL_OVERSCALE,
-  PROGRESS_BAR_HEIGHT,
-  PROGRESS_BAR_THICKNESS,
-  PROGRESS_BAR_WIDTH,
-  PROGRESS_BAR_Y_OFFSET,
-  SMOKE_COLOR,
-  SMOKE_GRAVITY,
-  SMOKE_INITIAL_SIZE,
-  SMOKE_INITIAL_VELOCITY,
-  SMOKE_LIFETIME,
-  SMOKE_MAX_PARTICLES,
-  SMOKE_OFFSET,
-  SMOKE_RATE,
-  SMOKE_SIZE_OVER_TIME,
-  SMOKE_SPAWN_RADIUS,
-  SMOKE_TEXTURE,
-  STOVE_ITEM_OFFSET
-} from '../../shared/constants'
+import { FIXTURE_HEIGHT, SMOKE_TEXTURE } from '../../shared/constants'
 import { CookableIngredientDefinition, getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
@@ -62,6 +41,31 @@ import { StoveState } from '../../shared/schemas'
 import { takeHeldItemPending } from '../heldItem'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
+
+const STOVE_ITEM_OFFSET = Vector3.create(0.25, FIXTURE_HEIGHT + 0.05, 0.25) // sits on the pan, not the stove base
+
+const PROGRESS_BAR_WIDTH = 0.6
+const PROGRESS_BAR_HEIGHT = 0.1
+const PROGRESS_BAR_THICKNESS = 0.02
+const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6
+const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
+const PROGRESS_BAR_FILL_COLOR = Color4.create(0.165, 0.596, 0.133, 1) // #2a9822
+const PROGRESS_BAR_FILL_OVERSCALE = 1.01 // fill slightly bigger than background so no sliver/z-fight shows at the seam
+const PROGRESS_BAR_BACKGROUND_RECESS = 0.001 // background set back in Z once so the two boxes don't z-fight
+
+// Smoke particles above a stove while cooking. Tuned for ~11 steady-state
+// per stove. Emission point sits inside the stove model so particles drift
+// out from under the pan instead of spawning as one thin visible column.
+const SMOKE_OFFSET = Vector3.create(STOVE_ITEM_OFFSET.x, STOVE_ITEM_OFFSET.y - 0.1, STOVE_ITEM_OFFSET.z)
+const SMOKE_SPAWN_RADIUS = 0.12
+const SMOKE_RATE = 6 // particles per second
+const SMOKE_MAX_PARTICLES = 18
+const SMOKE_LIFETIME = 1.8 // seconds
+const SMOKE_INITIAL_SIZE = { start: 0.3125, end: 0.5 }
+const SMOKE_SIZE_OVER_TIME = { start: 0.75, end: 2.75 }
+const SMOKE_GRAVITY = -0.05 // negative = drifts upward
+const SMOKE_INITIAL_VELOCITY = { start: 0.03, end: 0.08 }
+const SMOKE_COLOR = Color4.create(0.85, 0.85, 0.85, 0.85) // birth color; fades to fully transparent over lifetime
 
 interface ProgressBar {
   root: Entity // background + fill, no own VisibilityComponent — controlled via root's propagateToChildren

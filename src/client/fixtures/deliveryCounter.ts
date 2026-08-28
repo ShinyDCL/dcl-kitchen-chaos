@@ -28,16 +28,7 @@
 import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import {
-  DELIVERY_CHECKMARK_HOLD_SECONDS,
-  DELIVERY_CHECKMARK_MODEL_SCALE,
-  DELIVERY_CHECKMARK_SCALE_SECONDS,
-  DELIVERY_CHECKMARK_Y_OFFSET,
-  DELIVERY_ITEM_SHRINK_DURATION,
-  DELIVERY_ITEM_SIT_DURATION,
-  DELIVERY_LATE_ARRIVAL_GRACE_SECONDS,
-  FIXTURE_HEIGHT
-} from '../../shared/constants'
+import { FIXTURE_HEIGHT } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { MODELS, sameModels } from '../../shared/models'
 import { DeliveryState } from '../../shared/schemas'
@@ -45,6 +36,17 @@ import { takeHeldItemModelsPending } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
+
+const DELIVERY_ITEM_SIT_DURATION = 1 // seconds before shrinking starts
+const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds
+const DELIVERY_CHECKMARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale-down, each
+const DELIVERY_CHECKMARK_HOLD_SECONDS = 0.6 // seconds at full scale
+const DELIVERY_CHECKMARK_MODEL_SCALE = 1.5
+const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6
+
+// Grace window for a delivery observed just after its 1.4s sit+shrink
+// window closed (latency) — replays from now instead of not showing at all.
+const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 
 let deliveryCounterEntity: Entity | null = null
 let checkmarkWorldPosition: Vector3 | null = null

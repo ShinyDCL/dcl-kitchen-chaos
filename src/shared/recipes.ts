@@ -3,7 +3,9 @@
 // slot's recipeId back to one to render it. Ingredient keys match
 // shared/ingredients.ts's INGREDIENTS.
 
-import { MAX_DIFFICULTY_TIER, STREAK_DIFFICULTY_STEP } from './constants'
+// Difficulty tier = 1 + floor(streak / STREAK_DIFFICULTY_STEP), capped at MAX_DIFFICULTY_TIER.
+const STREAK_DIFFICULTY_STEP = 3
+const MAX_DIFFICULTY_TIER = 3
 
 export interface Recipe {
   id: string

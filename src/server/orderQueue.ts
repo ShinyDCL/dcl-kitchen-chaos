@@ -32,7 +32,7 @@
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { BASE_ORDER_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, ORDER_RESULT_DISPLAY_SECONDS } from '../shared/constants'
+import { ORDER_RESULT_DISPLAY_SECONDS } from '../shared/constants'
 import { getRequiredModelForIngredient } from '../shared/ingredients'
 import { room } from '../shared/messages'
 import { sameModels } from '../shared/models'
@@ -43,6 +43,12 @@ import { getActivePlayerIds, getGameStateMutable, getPlayerDisplayName } from '.
 
 type SlotState = ReturnType<typeof OrderSlotState.getMutable>
 type GameStateMutable = NonNullable<ReturnType<typeof getGameStateMutable>>
+
+// Queue size clamps to this range by active player count — see getTargetQueueSize.
+const MIN_QUEUE_SIZE = 1
+const MAX_QUEUE_SIZE = 5
+
+const BASE_ORDER_PAYOUT = 10 // per delivery, scaled by recipe difficulty
 
 const slotEntities = new Map<number, Entity>()
 const pendingRegenerations = new Map<number, number>() // slotIndex -> server timestamp when it's eligible to regenerate

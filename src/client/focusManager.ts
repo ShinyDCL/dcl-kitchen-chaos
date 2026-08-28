@@ -16,12 +16,14 @@
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { FACING_THRESHOLD, INTERACTION_RANGE } from '../shared/constants'
 import { showMessage } from './fixtureMessage'
 import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
 import { InteractionResult } from './interactionRules'
 import { isLocalPlayerPlaying } from './playerRoleState'
 import { getWorldPosition, getWorldRotation } from './worldPosition'
+
+const INTERACTION_RANGE = 2.5 // meters
+const FACING_THRESHOLD = 0.1 // dot product; ~0.1 ≈ wide ±84° cone
 
 interface FocusableFixture {
   id: number
