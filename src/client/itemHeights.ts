@@ -18,7 +18,6 @@ export const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.pattyRaw]: 0.07,
   [MODELS.pattyCooked]: 0.07,
   [MODELS.eggRaw]: 0.03,
-  [MODELS.eggCooked]: 0.03,
   [MODELS.plate]: 0.02
 }
 

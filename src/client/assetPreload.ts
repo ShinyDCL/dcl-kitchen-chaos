@@ -22,7 +22,6 @@ export function preloadAssets(): void {
       MODELS.pattyCooked,
       MODELS.egg,
       MODELS.eggRaw,
-      MODELS.eggCooked,
       MODELS.plate,
       MODELS.checkmark,
       MODELS.crossmark,

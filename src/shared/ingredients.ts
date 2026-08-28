@@ -48,7 +48,7 @@ export const INGREDIENTS: Record<string, IngredientDefinition> = {
     cookable: true,
     heldModel: MODELS.egg,
     stoveModel: MODELS.eggRaw,
-    cookedModel: MODELS.eggCooked,
+    cookedModel: MODELS.eggRaw, // no dedicated cooked-egg model; reuses eggRaw's
     cookDurationSeconds: 5
   }
 }
