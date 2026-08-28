@@ -1,16 +1,16 @@
-// Recipe queue HUD — cards along the top-left, newest slot first. Reads
-// straight from the synced RecipeSlotState entities every frame; no local
+// Order queue HUD — cards along the top-left, newest slot first. Reads
+// straight from the synced OrderSlotState entities every frame; no local
 // prediction to protect, so no reconcile step like heldItem.ts's. Only
 // visible to players in the 'play' role.
 //
-// The server broadcasts 'recipeDelivered'/'recipeExpired'/'recipeGenerated'
-// once each, and each client times its result/new-recipe highlight locally
+// The server broadcasts 'orderDelivered'/'orderExpired'/'orderGenerated'
+// once each, and each client times its result/new-order highlight locally
 // from receipt — not a shared server deadline latency could cut short. A
 // result card (success or timed out) and its slot's live card are
-// independent entries (getActiveRecipes) — if a client sees the live
+// independent entries (getActiveOrders) — if a client sees the live
 // update before its own result display ends (latency skew), both just
 // render at once. pendingNewFlashSlots guards the case where
-// 'recipeGenerated' beats the RecipeSlotState sync itself.
+// 'orderGenerated' beats the OrderSlotState sync itself.
 //
 // Card background eases between normal/new/success via getCardBackground's
 // per-card lerp state — cheap, since this UI rebuilds fully every frame.
@@ -27,10 +27,10 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { RECIPE_NEW_FLASH_SECONDS, RECIPE_RESULT_DISPLAY_SECONDS } from '../shared/constants'
+import { ORDER_NEW_FLASH_SECONDS, ORDER_RESULT_DISPLAY_SECONDS } from '../shared/constants'
 import { room } from '../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
-import { RecipeSlotState } from '../shared/schemas'
+import { OrderSlotState } from '../shared/schemas'
 import { isLocalPlayerPlaying } from './playerRoleState'
 
 const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
@@ -64,7 +64,7 @@ const STATUS_BADGE_MARGIN_TOP = 2
 const STATUS_BADGE_TEXT_COLOR = Color4.White()
 
 // Order badge — a session-wide ticket number (climbs for the whole
-// session, see server/recipeQueue.ts's orderNumber), overlaid on the
+// session, see server/orderQueue.ts's orderNumber), overlaid on the
 // card's top-left corner rather than its own row, since card height
 // already varies by recipe (see the file header). A fixed dark color
 // rather than the card's own background keeps it readable against all
@@ -88,7 +88,7 @@ const TIMER_ZONE_GREEN_PERCENT = 75
 const TIMER_ZONE_RED_PERCENT = 25
 const TIMER_MASK_COLOR = Color4.create(0, 0, 0, 0.92)
 
-interface RecipeCardLayout {
+interface OrderCardLayout {
   cardWidth: number
   cardPadding: number
   cardGap: number
@@ -99,7 +99,7 @@ interface RecipeCardLayout {
   leftOffset: number
 }
 
-const DESKTOP_LAYOUT: RecipeCardLayout = {
+const DESKTOP_LAYOUT: OrderCardLayout = {
   cardWidth: 96,
   cardPadding: 10,
   cardGap: 12,
@@ -111,7 +111,7 @@ const DESKTOP_LAYOUT: RecipeCardLayout = {
 }
 
 // Smaller, tighter-packed cards tuned from on-device testing.
-const MOBILE_LAYOUT: RecipeCardLayout = {
+const MOBILE_LAYOUT: OrderCardLayout = {
   cardWidth: 76,
   cardPadding: 6,
   cardGap: 8,
@@ -122,13 +122,13 @@ const MOBILE_LAYOUT: RecipeCardLayout = {
   leftOffset: 24
 }
 
-let currentLayout: RecipeCardLayout = DESKTOP_LAYOUT
+let currentLayout: OrderCardLayout = DESKTOP_LAYOUT
 
-export function setupRecipesUi(): void {
-  ReactEcsRenderer.setUiRenderer(RecipesUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'interactable' })
+export function setupOrdersUi(): void {
+  ReactEcsRenderer.setUiRenderer(OrdersUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'interactable' })
   startPlatformDetection()
 
-  room.onMessage('recipeDelivered', (data) => {
+  room.onMessage('orderDelivered', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
     cardOverrides.set(data.slotIndex, {
@@ -137,11 +137,11 @@ export function setupRecipesUi(): void {
       deliveredByName: data.deliveredByName,
       generatedAt: Number(data.generatedAt),
       orderNumber: data.orderNumber,
-      endsAt: Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000
+      endsAt: Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000
     })
   })
 
-  room.onMessage('recipeExpired', (data) => {
+  room.onMessage('orderExpired', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
     cardOverrides.set(data.slotIndex, {
@@ -150,11 +150,11 @@ export function setupRecipesUi(): void {
       deliveredByName: '',
       generatedAt: Number(data.generatedAt),
       orderNumber: data.orderNumber,
-      endsAt: Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000
+      endsAt: Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000
     })
   })
 
-  room.onMessage('recipeGenerated', (data) => {
+  room.onMessage('orderGenerated', (data) => {
     pendingNewFlashSlots.add(data.slotIndex)
   })
 }
@@ -172,7 +172,7 @@ interface CardOverride {
   kind: 'success' | 'timedOut'
   recipe: Recipe
   deliveredByName: string // '' for a timeout — nobody delivered it
-  generatedAt: number // the recipe's own generatedAt, not the result's start time — keeps its row position instead of jumping to the front
+  generatedAt: number // the order's own generatedAt, not the result's start time — keeps its row position instead of jumping to the front
   orderNumber: number
   endsAt: number
 }
@@ -180,20 +180,20 @@ interface CardOverride {
 // Keyed by slotIndex — client-local timing, see the file header comment.
 const cardOverrides = new Map<number, CardOverride>()
 
-// Keyed by slotIndex — a slot that got 'recipeGenerated' but hasn't been
-// rendered yet (still covered by its own success celebration). The flash
+// Keyed by slotIndex — a slot that got 'orderGenerated' but hasn't been
+// rendered yet (still covered by its own result display). The flash
 // timer only starts once actually rendered, so a refill right after this
 // client's own delivery still gets its full flash instead of elapsing
-// unseen underneath the longer celebration.
+// unseen underneath the longer result display.
 const pendingNewFlashSlots = new Set<number>()
 
 // Keyed by slotIndex, value is when the "New!" flash ends locally, once started.
-const newRecipeFlashUntil = new Map<number, number>()
+const newOrderFlashUntil = new Map<number, number>()
 
 type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
-interface ActiveRecipe {
-  cardKey: string // unique per rendered card — a celebrating slot and its already-regenerated live slot can render simultaneously, so slotIndex alone isn't unique
+interface ActiveOrder {
+  cardKey: string // unique per rendered card — a result card and its already-regenerated live slot can render simultaneously, so slotIndex alone isn't unique
   recipe: Recipe
   generatedAt: number
   orderNumber: number
@@ -204,13 +204,13 @@ interface ActiveRecipe {
 /**
  * Newest first by generatedAt. A result override and its slot's live state
  * are independent entries, not mutually exclusive — if the server's
- * regenerated recipe becomes visible before this client's own result
+ * regenerated order becomes visible before this client's own result
  * display ends (latency skew), both simply show at once instead of one
  * hiding the other.
  */
-function getActiveRecipes(): ActiveRecipe[] {
+function getActiveOrders(): ActiveOrder[] {
   const now = Date.now()
-  const active: ActiveRecipe[] = []
+  const active: ActiveOrder[] = []
 
   for (const [slotIndex, override] of cardOverrides) {
     if (now >= override.endsAt) {
@@ -227,19 +227,19 @@ function getActiveRecipes(): ActiveRecipe[] {
     })
   }
 
-  for (const [, data] of engine.getEntitiesWith(RecipeSlotState)) {
+  for (const [, data] of engine.getEntitiesWith(OrderSlotState)) {
     if (!data.active) continue
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
 
     let isNew: boolean
     if (pendingNewFlashSlots.delete(data.slotIndex)) {
-      newRecipeFlashUntil.set(data.slotIndex, now + RECIPE_NEW_FLASH_SECONDS * 1000)
+      newOrderFlashUntil.set(data.slotIndex, now + ORDER_NEW_FLASH_SECONDS * 1000)
       isNew = true
     } else {
-      const flashUntil = newRecipeFlashUntil.get(data.slotIndex)
+      const flashUntil = newOrderFlashUntil.get(data.slotIndex)
       isNew = flashUntil !== undefined && now < flashUntil
-      if (flashUntil !== undefined && !isNew) newRecipeFlashUntil.delete(data.slotIndex)
+      if (flashUntil !== undefined && !isNew) newOrderFlashUntil.delete(data.slotIndex)
     }
 
     active.push({
@@ -293,11 +293,11 @@ function lerpTransitionColor(transition: CardColorTransition, now: number): Colo
   return Color4.lerp(transition.fromColor, transition.toColor, t)
 }
 
-function RecipesUI() {
+function OrdersUI() {
   if (!isLocalPlayerPlaying()) return null // spectators (and anyone who hasn't chosen Play yet) don't see the queue at all
 
   const layout = currentLayout
-  const recipes = getActiveRecipes()
+  const orders = getActiveOrders()
 
   return (
     <UiEntity uiTransform={{ width: '100%', height: '100%' }}>
@@ -314,8 +314,8 @@ function RecipesUI() {
           alignItems: 'flex-start'
         }}
       >
-        {recipes.map(({ cardKey, recipe, generatedAt, orderNumber, visualState, deliveredByName }) => (
-          <RecipeCard
+        {orders.map(({ cardKey, recipe, generatedAt, orderNumber, visualState, deliveredByName }) => (
+          <OrderCard
             cardKey={cardKey}
             orderNumber={orderNumber}
             recipe={recipe}
@@ -330,7 +330,7 @@ function RecipesUI() {
   )
 }
 
-function RecipeCard({
+function OrderCard({
   cardKey,
   orderNumber,
   recipe,
@@ -345,7 +345,7 @@ function RecipeCard({
   generatedAt: number
   visualState: CardVisualState
   deliveredByName: string
-  layout: RecipeCardLayout
+  layout: OrderCardLayout
 }) {
   const background = getCardBackground(cardKey, visualState)
 
@@ -462,7 +462,7 @@ function StatusBadge({ text }: { text: string }) {
  * computed from the ingredient count so the card shrink-wraps exactly —
  * different recipes intentionally get different card heights.
  */
-function IngredientStack({ ingredients, layout }: { ingredients: string[]; layout: RecipeCardLayout }) {
+function IngredientStack({ ingredients, layout }: { ingredients: string[]; layout: OrderCardLayout }) {
   const iconStep = layout.iconHeight - layout.iconOverlap
   const stackHeight = layout.iconHeight + (ingredients.length - 1) * iconStep
 

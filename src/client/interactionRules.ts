@@ -131,7 +131,7 @@ export function evaluateTrashBinInteraction(): InteractionResult {
 
 // --- Delivery counter ---
 // Allowed whenever holding anything; the checkmark/crossmark flourish is
-// decided server-side against the active recipe queue (see recipeQueue.ts).
+// decided server-side against the active order queue (see orderQueue.ts).
 
 export function evaluateDeliveryCounterInteraction(): InteractionResult {
   if (!hasHeldItem()) return { allowed: false, message: 'Nothing to deliver' }

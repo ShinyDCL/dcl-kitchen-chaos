@@ -64,30 +64,30 @@ export const Messages = {
   deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int }),
 
   // Server -> all: broadcast on a matched delivery. Each client times its
-  // own success celebration locally from receipt, not a shared deadline
-  // latency could cut short — see recipeQueue.ts/recipesUi.tsx.
-  recipeDelivered: Schemas.Map({
+  // own success display locally from receipt, not a shared deadline
+  // latency could cut short — see orderQueue.ts/ordersUi.tsx.
+  orderDelivered: Schemas.Map({
     slotIndex: Schemas.Int,
     recipeId: Schemas.String,
     deliveredByName: Schemas.String,
-    generatedAt: Schemas.Int64, // the delivered recipe's own generatedAt, so its card keeps its row position instead of jumping to the front
-    orderNumber: Schemas.Int // the delivered recipe's own ticket number, so its badge doesn't change during the celebration
+    generatedAt: Schemas.Int64, // the order's own generatedAt, so its card keeps its row position instead of jumping to the front
+    orderNumber: Schemas.Int // the order's own ticket number, so its badge doesn't change during the result display
   }),
 
   // Server -> all: broadcast when a slot's timer runs out before anyone
-  // delivers it. Same shape/purpose as recipeDelivered minus
-  // deliveredByName (nobody delivered it) — see recipesUi.tsx's 'timedOut'
+  // delivers it. Same shape/purpose as orderDelivered minus
+  // deliveredByName (nobody delivered it) — see ordersUi.tsx's 'timedOut'
   // visual state.
-  recipeExpired: Schemas.Map({
+  orderExpired: Schemas.Map({
     slotIndex: Schemas.Int,
     recipeId: Schemas.String,
     generatedAt: Schemas.Int64,
     orderNumber: Schemas.Int
   }),
 
-  // Server -> all: broadcast whenever a slot gets a fresh recipe. Same
-  // local-timing reasoning as recipeDelivered, for a brief "New!" flash.
-  recipeGenerated: Schemas.Map({ slotIndex: Schemas.Int, recipeId: Schemas.String })
+  // Server -> all: broadcast whenever a slot gets a fresh order. Same
+  // local-timing reasoning as orderDelivered, for a brief "New!" flash.
+  orderGenerated: Schemas.Map({ slotIndex: Schemas.Int, recipeId: Schemas.String })
 }
 
 export const room = registerMessages(Messages)

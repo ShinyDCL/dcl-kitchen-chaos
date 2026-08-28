@@ -1,5 +1,5 @@
-// Recipe definitions for the recipe queue — recipeQueue.ts picks from
-// these by difficulty tier to fill queue slots; recipesUi.tsx resolves a
+// Recipe definitions for the order queue — orderQueue.ts picks from
+// these by difficulty tier to fill queue slots; ordersUi.tsx resolves a
 // slot's recipeId back to one to render it. Ingredient keys match
 // shared/ingredients.ts's INGREDIENTS.
 
@@ -72,7 +72,7 @@ export const SAMPLE_RECIPES: Recipe[] = [
 
 const RECIPES_BY_ID = new Map(SAMPLE_RECIPES.map((recipe) => [recipe.id, recipe]))
 
-/** Looks up a recipe by id — resolves a synced RecipeSlotState's recipeId for rendering. */
+/** Looks up a recipe by id — resolves a synced OrderSlotState's recipeId for rendering. */
 export function getRecipeById(id: string): Recipe | undefined {
   return RECIPES_BY_ID.get(id)
 }

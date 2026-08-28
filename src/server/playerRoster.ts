@@ -55,12 +55,12 @@ export function getActivePlayerIds(): string[] {
   return activeIds
 }
 
-/** GameState's mutable data, for other modules that own a field on it (recipeQueue.ts's streak). */
+/** GameState's mutable data, for other modules that own a field on it (orderQueue.ts's streak). */
 export function getGameStateMutable() {
   return GameState.getMutableOrNull(getOrCreateGameStateEntity())
 }
 
-/** Display name for a player address, used in the recipe HUD's "delivered by" message. */
+/** Display name for a player address, used in the order HUD's "delivered by" message. */
 export function getPlayerDisplayName(playerId: string): string {
   const name = getPlayer({ userId: playerId })?.name
   return name && name.length > 0 ? name : 'A player'

@@ -14,7 +14,7 @@ export function initPlayerCoins(): void {
   reconcilePlayerEntities()
 }
 
-/** Adds `amount` coins to each given player's balance — called by recipeQueue.ts on a successful delivery. */
+/** Adds `amount` coins to each given player's balance — called by orderQueue.ts on a successful delivery. */
 export function grantCoins(playerIds: string[], amount: number): void {
   for (const playerId of playerIds) {
     const entity = getOrCreatePlayerEntity(playerId.toLowerCase())

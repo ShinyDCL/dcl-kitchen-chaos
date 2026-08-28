@@ -92,24 +92,24 @@ export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the del
 // treated as late (not historical) and replays from when observed.
 export const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 
-// --- Recipe queue ---
+// --- Order queue ---
 
-// Active recipe count clamps to this range based on active player count — see recipeQueue.ts.
+// Active order count clamps to this range based on active player count — see orderQueue.ts.
 export const MIN_QUEUE_SIZE = 1
 export const MAX_QUEUE_SIZE = 5
 
-// Coins paid to every active player per delivery, scaled by the recipe's difficulty tier.
-export const BASE_RECIPE_PAYOUT = 10
+// Coins paid to every active player per delivery, scaled by the order's recipe's difficulty tier.
+export const BASE_ORDER_PAYOUT = 10
 
 // Difficulty tier = 1 + floor(streak / STREAK_DIFFICULTY_STEP), capped at MAX_DIFFICULTY_TIER.
 export const STREAK_DIFFICULTY_STEP = 3
 export const MAX_DIFFICULTY_TIER = 3
 
-// How long a completed slot shows its result (delivered or timed out) before the next recipe replaces it.
-export const RECIPE_RESULT_DISPLAY_SECONDS = 2
+// How long a completed slot shows its result (delivered or timed out) before the next order replaces it.
+export const ORDER_RESULT_DISPLAY_SECONDS = 2
 
-// How long a freshly generated recipe flashes its "New!" highlight.
-export const RECIPE_NEW_FLASH_SECONDS = 1
+// How long a freshly generated order flashes its "New!" highlight.
+export const ORDER_NEW_FLASH_SECONDS = 1
 
 // --- Server heartbeat ---
 

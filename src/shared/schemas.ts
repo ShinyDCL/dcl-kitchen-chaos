@@ -22,7 +22,7 @@ function lockToServer(component: ServerOnlyComponent): void {
 }
 
 // Reserved explicit sync ids for the scene's non-fixture singletons/fixed
-// sets (GameState, the recipe queue slots) — contiguous from 100000, well
+// sets (GameState, the order queue slots) — contiguous from 100000, well
 // clear of client/fixtures.ts's separate 0-based, dynamically-sized
 // fixture id space, so neither can ever collide no matter how large the
 // scene's fixture count grows. Every other component below either derives
@@ -30,7 +30,7 @@ function lockToServer(component: ServerOnlyComponent): void {
 // DeliveryState) or needs no explicit id at all (per-player components,
 // matched by playerId instead).
 export const GAME_STATE_SYNC_ID = 100000
-export const RECIPE_SLOT_SYNC_ID_BASE = 100001 // + slotIndex, one id per MAX_QUEUE_SIZE slot
+export const ORDER_SLOT_SYNC_ID_BASE = 100001 // + slotIndex, one id per MAX_QUEUE_SIZE slot
 
 /**
  * One entity per player who has held something this session. `models` is
@@ -85,7 +85,7 @@ lockToServer(StoveState)
  * top), empty meaning nothing to show right now. `startTimestamp` (server
  * clock, ms) is when that delivery landed; every client derives the item
  * sit/shrink animation and the checkmark/crossmark flourish from
- * `Date.now() - startTimestamp`. `success` (see recipeQueue.ts) picks
+ * `Date.now() - startTimestamp`. `success` (see orderQueue.ts) picks
  * checkmark vs crossmark.
  */
 export const DeliveryState = engine.defineComponent('game::DeliveryState', {
@@ -119,7 +119,7 @@ lockToServer(PlayerRole)
  * Singleton. `activePlayerCount` is currently-connected 'play'-role
  * players, recomputed each tick so a disconnect is reflected for free.
  * `streak` counts consecutive successful deliveries scene-wide, reset to 0
- * on a miss — see recipeQueue.ts. `serverHeartbeatAt` (server clock, ms)
+ * on a miss — see orderQueue.ts. `serverHeartbeatAt` (server clock, ms)
  * is pulsed periodically by the server so clients can tell it's actually
  * alive, not just that the CRDT room is connected — see
  * client/serverReadiness.ts and the authoritative-server skill's Server
@@ -142,18 +142,19 @@ export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
 lockToServer(PlayerCoins)
 
 /**
- * One entity per recipe queue slot (a fixed set — MAX_QUEUE_SIZE — same
+ * One entity per order queue slot (a fixed set — MAX_QUEUE_SIZE — same
  * explicit-id pattern as PreparationCounterState). `active` is toggled by
- * recipeQueue.ts; `recipeId` looks up shared/recipes.ts (inactive slots
- * leave it '' and clients skip rendering); `generatedAt` (server clock,
- * ms) drives the HUD's countdown. A delivery advances the slot
- * immediately — the HUD's success celebration is timed client-side off
- * the recipeDelivered broadcast, not a field on this component.
- * `orderNumber` is a session-wide ticket counter, assigned the next value
- * whenever a slot gets a fresh recipe — it climbs for the whole session,
- * unlike slotIndex which just names the fixed HUD position.
+ * orderQueue.ts; `recipeId` looks up shared/recipes.ts for which dish this
+ * order is for (inactive slots leave it '' and clients skip rendering);
+ * `generatedAt` (server clock, ms) drives the HUD's countdown. A delivery
+ * advances the slot immediately — the HUD's result display is timed
+ * client-side off the orderDelivered/orderExpired broadcast, not a field
+ * on this component. `orderNumber` is a session-wide ticket counter,
+ * assigned the next value whenever a slot gets a fresh order — it climbs
+ * for the whole session, unlike slotIndex which just names the fixed HUD
+ * position.
  */
-export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
+export const OrderSlotState = engine.defineComponent('game::OrderSlotState', {
   slotIndex: Schemas.Int,
   active: Schemas.Boolean,
   recipeId: Schemas.String,
@@ -161,4 +162,4 @@ export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
   orderNumber: Schemas.Int
 })
 
-lockToServer(RecipeSlotState)
+lockToServer(OrderSlotState)

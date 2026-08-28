@@ -1,8 +1,8 @@
 // Delivery counter: interacting while holding something places it on the
 // counter, where it sits for DELIVERY_ITEM_SIT_DURATION, then shrinks away
 // over DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales
-// up — a checkmark if the delivery matched an active recipe (server-
-// decided, see recipeQueue.ts), or a crossmark otherwise. renderedSuccess
+// up — a checkmark if the delivery matched an active order (server-
+// decided, see orderQueue.ts), or a crossmark otherwise. renderedSuccess
 // defaults optimistically to true since the real verdict is server-only;
 // the ~1s sit delay is normally enough for it to land first, and
 // reconciliation corrects it if not.
