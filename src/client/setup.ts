@@ -3,8 +3,8 @@
 // against server-synced state (see heldItem.ts's startRenderingHeldItems,
 // preparationCounters.ts's startRenderingPreparationCounters,
 // stoveCooking.ts's startRenderingStoves, and deliveryCounter.ts's
-// startRenderingDeliveryCounter), then the order queue HUD and the
-// Play/Spectate role UI.
+// startRenderingDeliveryCounter), then the order queue HUD, the
+// Play/Spectate role UI, and mobile-specific input/camera setup.
 
 import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -16,6 +16,8 @@ import { startRenderingPreparationCounters } from './fixtures/preparationCounter
 import { createSceneLayout } from './fixtures/sceneLayout'
 import { startRenderingStoves } from './fixtures/stoveCooking'
 import { startRenderingHeldItems } from './heldItem'
+import { startMobileCamera } from './mobileCamera'
+import { setupMobileControls } from './mobileControls'
 import { setupOrdersUi } from './ui/ordersUi'
 import { setupPlayerRoleUi } from './ui/playerRole'
 
@@ -34,4 +36,6 @@ export function initClient(): void {
   startRenderingDeliveryCounter()
   setupOrdersUi()
   setupPlayerRoleUi()
+  setupMobileControls()
+  startMobileCamera()
 }
