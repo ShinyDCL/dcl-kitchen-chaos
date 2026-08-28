@@ -11,13 +11,13 @@ export const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.cucumberSlice]: 0.06,
   [MODELS.onionSlice]: 0.06,
   [MODELS.tomatoSlice]: 0.06,
-  [MODELS.saladLeaf]: 0.04,
-  [MODELS.cheeseSlice]: 0.04,
+  [MODELS.saladLeaf]: 0.06,
+  [MODELS.cheeseSlice]: 0.06,
   [MODELS.bunBottom]: 0.06,
   [MODELS.bunTop]: 0.12,
   [MODELS.pattyRaw]: 0.07,
   [MODELS.pattyCooked]: 0.07,
-  [MODELS.eggRaw]: 0.03,
+  [MODELS.eggRaw]: 0.05,
   [MODELS.plate]: 0.02
 }
 
