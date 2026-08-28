@@ -10,6 +10,7 @@ import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
+import { preloadAssets } from './assetPreload'
 import { startRenderingDeliveryCounter } from './deliveryCounter'
 import { startRenderingHeldItems } from './heldItem'
 import { setupOrdersUi } from './ordersUi'
@@ -26,6 +27,7 @@ export function initClient(): void {
   GltfContainer.create(scene, { src: 'assets/scene/models/Scene.glb' })
 
   createSceneLayout(scene)
+  preloadAssets()
   startRenderingHeldItems()
   startRenderingPreparationCounters()
   startRenderingStoves()

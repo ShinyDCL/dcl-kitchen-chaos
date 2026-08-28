@@ -33,7 +33,7 @@ import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
 import { OrderSlotState } from '../shared/schemas'
 import { isLocalPlayerPlaying } from './playerRoleState'
 
-const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
+export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
 const SUCCESS_GREEN = Color4.create(0.2, 0.85, 0.3, 1) // shared base hue for every "success" signal on this HUD
 const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1) // shared base hue for every "timed out/overdue" signal on this HUD
