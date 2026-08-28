@@ -89,9 +89,9 @@ export function pickRandomRecipeByDifficulty(difficulty: number): Recipe {
   return source[Math.floor(Math.random() * source.length)]
 }
 
-// IngredientAtlas.png: 512x512, 4x8 grid of 128x64 cells. Only column 0
+// IngredientAtlas.png: 256x512, 2x8 grid of 128x64 cells. Only column 0
 // and column 1's bottom row (bunTop) are populated — rest is reserved.
-const ATLAS_COLUMNS = 4
+const ATLAS_COLUMNS = 2
 const ATLAS_ROWS = 8
 
 // [column, row-from-top], per IngredientAtlas.png's actual layout.

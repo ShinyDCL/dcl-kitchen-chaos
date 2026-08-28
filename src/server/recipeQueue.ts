@@ -16,16 +16,23 @@
 // new-recipe highlight locally from these broadcasts instead of racing a
 // shared server deadline latency could cut short.
 //
-// A match deactivates its slot immediately but defers regenerating it for
-// RECIPE_SUCCESS_CELEBRATION_SECONDS (pendingRegenerations) — otherwise the
-// new recipe's clock would already be running while every client's
-// celebration still hides it, showing the timer bar as already-elapsed the
-// moment it appears.
+// A match (evaluateDelivery) or an unmatched timeout (expireSlot) both
+// deactivate their slot immediately but defer regenerating it for
+// RECIPE_RESULT_DISPLAY_SECONDS (pendingRegenerations) — otherwise the new
+// recipe's clock would already be running while every client's result
+// display still hides it, showing the timer bar as already-elapsed the
+// moment it appears. A timeout resets nothing else — only a wrong
+// delivery resets the streak.
+//
+// generateRecipeForSlot also hands out the next session-wide orderNumber
+// (a restaurant-style ticket number, distinct from slotIndex) — see
+// reconcileSlotEntities for why it's recovered from existing state rather
+// than always restarting at 1.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { BASE_RECIPE_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, RECIPE_SUCCESS_CELEBRATION_SECONDS } from '../shared/constants'
+import { BASE_RECIPE_PAYOUT, MAX_QUEUE_SIZE, MIN_QUEUE_SIZE, RECIPE_RESULT_DISPLAY_SECONDS } from '../shared/constants'
 import { getRequiredModelForIngredient } from '../shared/ingredients'
 import { room } from '../shared/messages'
 import { sameModels } from '../shared/models'
@@ -39,6 +46,7 @@ type GameStateMutable = NonNullable<ReturnType<typeof getGameStateMutable>>
 
 const slotEntities = new Map<number, Entity>()
 const pendingRegenerations = new Map<number, number>() // slotIndex -> server timestamp when it's eligible to regenerate
+let nextOrderNumber = 1 // session-wide ticket counter — see RecipeSlotState.orderNumber
 
 export function initRecipeQueue(): void {
   reconcileSlotEntities()
@@ -66,12 +74,13 @@ export function evaluateDelivery(models: string[], delivererId: string): boolean
     slotIndex: matched.state.slotIndex,
     recipeId: matched.state.recipeId,
     deliveredByName: getPlayerDisplayName(delivererId),
-    generatedAt: matched.state.generatedAt
+    generatedAt: matched.state.generatedAt,
+    orderNumber: matched.state.orderNumber
   })
 
   matched.state.active = false
   matched.state.recipeId = ''
-  pendingRegenerations.set(matched.state.slotIndex, Date.now() + RECIPE_SUCCESS_CELEBRATION_SECONDS * 1000)
+  pendingRegenerations.set(matched.state.slotIndex, Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000)
 
   return true
 }
@@ -101,7 +110,7 @@ function growQueueSystem(): void {
       continue
     }
 
-    if (isSlotExpired(state)) advanceSlot(state, gameState)
+    if (isSlotExpired(state)) expireSlot(state)
   }
 }
 
@@ -110,6 +119,25 @@ function isSlotExpired(state: SlotState): boolean {
   if (!recipe) return false
   const elapsedSeconds = (Date.now() - Number(state.generatedAt)) / 1000
   return elapsedSeconds >= recipe.timerSeconds
+}
+
+/**
+ * A recipe's timer ran out before anyone delivered it. Mirrors
+ * evaluateDelivery's match path — deactivate immediately, defer
+ * regenerating for RECIPE_RESULT_DISPLAY_SECONDS — but touches nothing
+ * else (no streak/coins; a timeout only resets the slot itself).
+ */
+function expireSlot(state: SlotState): void {
+  void room.send('recipeExpired', {
+    slotIndex: state.slotIndex,
+    recipeId: state.recipeId,
+    generatedAt: state.generatedAt,
+    orderNumber: state.orderNumber
+  })
+
+  state.active = false
+  state.recipeId = ''
+  pendingRegenerations.set(state.slotIndex, Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000)
 }
 
 /**
@@ -142,6 +170,7 @@ function generateRecipeForSlot(state: SlotState, streak: number): void {
   state.active = true
   state.recipeId = recipe.id
   state.generatedAt = Date.now()
+  state.orderNumber = nextOrderNumber++
 
   void room.send('recipeGenerated', { slotIndex: state.slotIndex, recipeId: recipe.id })
 }
@@ -175,18 +204,24 @@ function getOrCreateSlotEntity(slotIndex: number): Entity {
   if (cached !== undefined && RecipeSlotState.getOrNull(cached) !== null) return cached
 
   const entity = engine.addEntity()
-  RecipeSlotState.create(entity, { slotIndex, active: false, recipeId: '', generatedAt: 0 })
+  RecipeSlotState.create(entity, { slotIndex, active: false, recipeId: '', generatedAt: 0, orderNumber: 0 })
   syncEntity(entity, [RecipeSlotState.componentId], RECIPE_SLOT_SYNC_ID_BASE + slotIndex)
   slotEntities.set(slotIndex, entity)
   return entity
 }
 
-/** Re-adopts slot entities that may already exist in the CRDT snapshot from a previous server run. */
+/**
+ * Re-adopts slot entities that may already exist in the CRDT snapshot from
+ * a previous server run, and recovers nextOrderNumber from the highest
+ * orderNumber already handed out — otherwise a restart would reset the
+ * ticket counter to 1 and hand out duplicate numbers for new recipes.
+ */
 function reconcileSlotEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(RecipeSlotState)) {
     const [entityNumber] = EntityUtils.fromEntityId(entity)
     if (entityNumber < RESERVED_STATIC_ENTITIES) continue
     slotEntities.set(data.slotIndex, entity)
+    if (data.orderNumber >= nextOrderNumber) nextOrderNumber = data.orderNumber + 1
   }
 }
 

@@ -105,8 +105,8 @@ export const BASE_RECIPE_PAYOUT = 10
 export const STREAK_DIFFICULTY_STEP = 3
 export const MAX_DIFFICULTY_TIER = 3
 
-// How long a completed slot shows its delivered recipe before the next replaces it.
-export const RECIPE_SUCCESS_CELEBRATION_SECONDS = 2
+// How long a completed slot shows its result (delivered or timed out) before the next recipe replaces it.
+export const RECIPE_RESULT_DISPLAY_SECONDS = 2
 
 // How long a freshly generated recipe flashes its "New!" highlight.
 export const RECIPE_NEW_FLASH_SECONDS = 1

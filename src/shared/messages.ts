@@ -70,7 +70,19 @@ export const Messages = {
     slotIndex: Schemas.Int,
     recipeId: Schemas.String,
     deliveredByName: Schemas.String,
-    generatedAt: Schemas.Int64 // the delivered recipe's own generatedAt, so its card keeps its row position instead of jumping to the front
+    generatedAt: Schemas.Int64, // the delivered recipe's own generatedAt, so its card keeps its row position instead of jumping to the front
+    orderNumber: Schemas.Int // the delivered recipe's own ticket number, so its badge doesn't change during the celebration
+  }),
+
+  // Server -> all: broadcast when a slot's timer runs out before anyone
+  // delivers it. Same shape/purpose as recipeDelivered minus
+  // deliveredByName (nobody delivered it) — see recipesUi.tsx's 'timedOut'
+  // visual state.
+  recipeExpired: Schemas.Map({
+    slotIndex: Schemas.Int,
+    recipeId: Schemas.String,
+    generatedAt: Schemas.Int64,
+    orderNumber: Schemas.Int
   }),
 
   // Server -> all: broadcast whenever a slot gets a fresh recipe. Same

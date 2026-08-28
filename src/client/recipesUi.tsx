@@ -3,13 +3,14 @@
 // prediction to protect, so no reconcile step like heldItem.ts's. Only
 // visible to players in the 'play' role.
 //
-// The server broadcasts 'recipeDelivered'/'recipeGenerated' once each, and
-// each client times its success/new-recipe highlight locally from receipt
-// — not a shared server deadline latency could cut short. A celebrating
-// card and its slot's live card are independent entries (getActiveRecipes)
-// — if a client sees the live update before its own celebration ends
-// (latency skew), both just render at once. pendingNewFlashSlots guards
-// the case where 'recipeGenerated' beats the RecipeSlotState sync itself.
+// The server broadcasts 'recipeDelivered'/'recipeExpired'/'recipeGenerated'
+// once each, and each client times its result/new-recipe highlight locally
+// from receipt — not a shared server deadline latency could cut short. A
+// result card (success or timed out) and its slot's live card are
+// independent entries (getActiveRecipes) — if a client sees the live
+// update before its own result display ends (latency skew), both just
+// render at once. pendingNewFlashSlots guards the case where
+// 'recipeGenerated' beats the RecipeSlotState sync itself.
 //
 // Card background eases between normal/new/success via getCardBackground's
 // per-card lerp state — cheap, since this UI rebuilds fully every frame.
@@ -26,7 +27,7 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { RECIPE_NEW_FLASH_SECONDS, RECIPE_SUCCESS_CELEBRATION_SECONDS } from '../shared/constants'
+import { RECIPE_NEW_FLASH_SECONDS, RECIPE_RESULT_DISPLAY_SECONDS } from '../shared/constants'
 import { room } from '../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
 import { RecipeSlotState } from '../shared/schemas'
@@ -35,10 +36,12 @@ import { isLocalPlayerPlaying } from './playerRoleState'
 const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
 const SUCCESS_GREEN = Color4.create(0.2, 0.85, 0.3, 1) // shared base hue for every "success" signal on this HUD
+const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1) // shared base hue for every "timed out/overdue" signal on this HUD
 
 const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
 const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8)
 const CARD_SUCCESS_BACKGROUND = Color4.create(SUCCESS_GREEN.r, SUCCESS_GREEN.g, SUCCESS_GREEN.b, 0.9)
+const CARD_TIMED_OUT_BACKGROUND = Color4.create(DANGER_RED.r, DANGER_RED.g, DANGER_RED.b, 0.9)
 const CARD_NEW_BACKGROUND = Color4.create(0.15, 0.4, 0.85, 0.9) // blue — distinct from success green and the timer bar's red
 const CARD_COLOR_TRANSITION_SECONDS = 0.3
 const TIMER_BAR_HEIGHT = 8
@@ -52,11 +55,30 @@ const SUCCESS_SUBTEXT_HEIGHT = 14
 const SUCCESS_LINE_GAP = 2
 const SUCCESS_MESSAGE_MARGIN_TOP = 2
 const SUCCESS_TEXT_COLOR = Color4.White()
+const DELIVERED_BY_NAME_MAX_LENGTH = 10 // truncated (no ellipsis) so a long display name can't overflow the card
 
-const NEW_BADGE_FONT_SIZE = 14
-const NEW_BADGE_HEIGHT = 18
-const NEW_BADGE_MARGIN_TOP = 2
-const NEW_BADGE_TEXT_COLOR = Color4.White()
+// Shared by every simple one-line footer badge (New!, Timed Out!) — see StatusBadge.
+const STATUS_BADGE_FONT_SIZE = 14
+const STATUS_BADGE_HEIGHT = 18
+const STATUS_BADGE_MARGIN_TOP = 2
+const STATUS_BADGE_TEXT_COLOR = Color4.White()
+
+// Order badge — a session-wide ticket number (climbs for the whole
+// session, see server/recipeQueue.ts's orderNumber), overlaid on the
+// card's top-left corner rather than its own row, since card height
+// already varies by recipe (see the file header). A fixed dark color
+// rather than the card's own background keeps it readable against all
+// three card states. Width is fixed rather than 'auto' — an auto-sized
+// parent around a text child doesn't reliably size itself in this
+// renderer (see playerRole.tsx's switcher for the same gotcha) — sized
+// generously enough for a 3-digit number without measuring text.
+const ORDER_BADGE_WIDTH = 36
+const ORDER_BADGE_HEIGHT = 20
+const ORDER_BADGE_MARGIN = 2
+const ORDER_BADGE_FONT_SIZE = 12
+const ORDER_BADGE_BORDER_RADIUS = 10
+const ORDER_BADGE_BACKGROUND = Color4.create(0, 0, 0, 0.85)
+const ORDER_BADGE_TEXT_COLOR = Color4.White()
 
 // Two fixed zones (green/red) instead of a single growing fill — a dark
 // mask anchored to the right shrinks as progress increases, revealing
@@ -64,7 +86,6 @@ const NEW_BADGE_TEXT_COLOR = Color4.White()
 // Mask is nearly opaque so the edge stays sharp on a small bar.
 const TIMER_ZONE_GREEN_PERCENT = 75
 const TIMER_ZONE_RED_PERCENT = 25
-const TIMER_ZONE_RED_COLOR = Color4.create(0.9, 0.2, 0.2, 1)
 const TIMER_MASK_COLOR = Color4.create(0, 0, 0, 0.92)
 
 interface RecipeCardLayout {
@@ -84,7 +105,7 @@ const DESKTOP_LAYOUT: RecipeCardLayout = {
   cardGap: 12,
   iconWidth: 64,
   iconHeight: 32, // half of the atlas's native 128x64 per ingredient cell
-  iconOverlap: 14,
+  iconOverlap: 16,
   topOffset: 24,
   leftOffset: 24
 }
@@ -96,7 +117,7 @@ const MOBILE_LAYOUT: RecipeCardLayout = {
   cardGap: 8,
   iconWidth: 56,
   iconHeight: 28,
-  iconOverlap: 12,
+  iconOverlap: 15,
   topOffset: 0,
   leftOffset: 24
 }
@@ -110,11 +131,26 @@ export function setupRecipesUi(): void {
   room.onMessage('recipeDelivered', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    successOverrides.set(data.slotIndex, {
+    cardOverrides.set(data.slotIndex, {
+      kind: 'success',
       recipe,
       deliveredByName: data.deliveredByName,
       generatedAt: Number(data.generatedAt),
-      endsAt: Date.now() + RECIPE_SUCCESS_CELEBRATION_SECONDS * 1000
+      orderNumber: data.orderNumber,
+      endsAt: Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000
+    })
+  })
+
+  room.onMessage('recipeExpired', (data) => {
+    const recipe = getRecipeById(data.recipeId)
+    if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
+    cardOverrides.set(data.slotIndex, {
+      kind: 'timedOut',
+      recipe,
+      deliveredByName: '',
+      generatedAt: Number(data.generatedAt),
+      orderNumber: data.orderNumber,
+      endsAt: Date.now() + RECIPE_RESULT_DISPLAY_SECONDS * 1000
     })
   })
 
@@ -132,15 +168,17 @@ function startPlatformDetection(): void {
   })
 }
 
-interface SuccessOverride {
+interface CardOverride {
+  kind: 'success' | 'timedOut'
   recipe: Recipe
-  deliveredByName: string
-  generatedAt: number // the delivered recipe's own generatedAt, not celebration start — keeps its row position instead of jumping to the front
+  deliveredByName: string // '' for a timeout — nobody delivered it
+  generatedAt: number // the recipe's own generatedAt, not the result's start time — keeps its row position instead of jumping to the front
+  orderNumber: number
   endsAt: number
 }
 
 // Keyed by slotIndex — client-local timing, see the file header comment.
-const successOverrides = new Map<number, SuccessOverride>()
+const cardOverrides = new Map<number, CardOverride>()
 
 // Keyed by slotIndex — a slot that got 'recipeGenerated' but hasn't been
 // rendered yet (still covered by its own success celebration). The flash
@@ -152,37 +190,39 @@ const pendingNewFlashSlots = new Set<number>()
 // Keyed by slotIndex, value is when the "New!" flash ends locally, once started.
 const newRecipeFlashUntil = new Map<number, number>()
 
-type CardVisualState = 'normal' | 'new' | 'success'
+type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
 interface ActiveRecipe {
   cardKey: string // unique per rendered card — a celebrating slot and its already-regenerated live slot can render simultaneously, so slotIndex alone isn't unique
   recipe: Recipe
   generatedAt: number
+  orderNumber: number
   visualState: CardVisualState
   deliveredByName: string
 }
 
 /**
- * Newest first by generatedAt. A celebrating override and its slot's live
- * state are independent entries, not mutually exclusive — if the server's
- * regenerated recipe becomes visible before this client's own celebration
- * ends (latency skew), both simply show at once instead of one hiding
- * the other.
+ * Newest first by generatedAt. A result override and its slot's live state
+ * are independent entries, not mutually exclusive — if the server's
+ * regenerated recipe becomes visible before this client's own result
+ * display ends (latency skew), both simply show at once instead of one
+ * hiding the other.
  */
 function getActiveRecipes(): ActiveRecipe[] {
   const now = Date.now()
   const active: ActiveRecipe[] = []
 
-  for (const [slotIndex, override] of successOverrides) {
+  for (const [slotIndex, override] of cardOverrides) {
     if (now >= override.endsAt) {
-      successOverrides.delete(slotIndex)
+      cardOverrides.delete(slotIndex)
       continue
     }
     active.push({
-      cardKey: `success-${slotIndex}`,
+      cardKey: `${override.kind}-${slotIndex}`,
       recipe: override.recipe,
       generatedAt: override.generatedAt,
-      visualState: 'success',
+      orderNumber: override.orderNumber,
+      visualState: override.kind,
       deliveredByName: override.deliveredByName
     })
   }
@@ -206,6 +246,7 @@ function getActiveRecipes(): ActiveRecipe[] {
       cardKey: `live-${data.slotIndex}`,
       recipe,
       generatedAt: Number(data.generatedAt),
+      orderNumber: data.orderNumber,
       visualState: isNew ? 'new' : 'normal',
       deliveredByName: ''
     })
@@ -225,6 +266,7 @@ const cardColorTransitions = new Map<string, CardColorTransition>()
 
 function visualStateColor(state: CardVisualState): Color4 {
   if (state === 'success') return CARD_SUCCESS_BACKGROUND
+  if (state === 'timedOut') return CARD_TIMED_OUT_BACKGROUND
   if (state === 'new') return CARD_NEW_BACKGROUND
   return CARD_BACKGROUND
 }
@@ -272,9 +314,10 @@ function RecipesUI() {
           alignItems: 'flex-start'
         }}
       >
-        {recipes.map(({ cardKey, recipe, generatedAt, visualState, deliveredByName }) => (
+        {recipes.map(({ cardKey, recipe, generatedAt, orderNumber, visualState, deliveredByName }) => (
           <RecipeCard
             cardKey={cardKey}
+            orderNumber={orderNumber}
             recipe={recipe}
             generatedAt={generatedAt}
             visualState={visualState}
@@ -289,6 +332,7 @@ function RecipesUI() {
 
 function RecipeCard({
   cardKey,
+  orderNumber,
   recipe,
   generatedAt,
   visualState,
@@ -296,6 +340,7 @@ function RecipeCard({
   layout
 }: {
   cardKey: string
+  orderNumber: number
   recipe: Recipe
   generatedAt: number
   visualState: CardVisualState
@@ -320,11 +365,42 @@ function RecipeCard({
       <IngredientStack ingredients={recipe.ingredients} layout={layout} />
       {visualState === 'success' ? (
         <SuccessMessage deliveredByName={deliveredByName} />
+      ) : visualState === 'timedOut' ? (
+        <StatusBadge text="Timed Out!" />
       ) : visualState === 'new' ? (
-        <NewBadge />
+        <StatusBadge text="New!" />
       ) : (
         <TimerBar timerSeconds={recipe.timerSeconds} generatedAt={generatedAt} />
       )}
+      {/* Rendered last (and given a zIndex) so it paints over the ingredient stack rather than under it. */}
+      <OrderBadge orderNumber={orderNumber} />
+    </UiEntity>
+  )
+}
+
+/** A pill, not a circle — a circle only has room for 1-2 digits before text starts clipping at the rounded edges; a pill can grow wider as the session-wide ticket number climbs. */
+function OrderBadge({ orderNumber }: { orderNumber: number }) {
+  return (
+    <UiEntity
+      uiTransform={{
+        positionType: 'absolute',
+        position: { top: ORDER_BADGE_MARGIN, left: ORDER_BADGE_MARGIN },
+        zIndex: 10,
+        width: ORDER_BADGE_WIDTH,
+        height: ORDER_BADGE_HEIGHT,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: ORDER_BADGE_BORDER_RADIUS
+      }}
+      uiBackground={{ color: ORDER_BADGE_BACKGROUND }}
+    >
+      <Label
+        value={`#${orderNumber}`}
+        fontSize={ORDER_BADGE_FONT_SIZE}
+        color={ORDER_BADGE_TEXT_COLOR}
+        textAlign="middle-center"
+        uiTransform={{ width: '100%', height: '100%' }}
+      />
     </UiEntity>
   )
 }
@@ -348,7 +424,7 @@ function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
         uiTransform={{ width: '100%', height: SUCCESS_TITLE_HEIGHT }}
       />
       <Label
-        value={`by ${deliveredByName}`}
+        value={`by ${deliveredByName.slice(0, DELIVERED_BY_NAME_MAX_LENGTH)}`}
         fontSize={SUCCESS_SUBTEXT_FONT_SIZE}
         color={SUCCESS_TEXT_COLOR}
         textAlign="middle-center"
@@ -358,15 +434,23 @@ function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
   )
 }
 
-function NewBadge() {
+/** A simple one-line footer badge — used for both the "New!" flash and the "Timed Out!" result. */
+function StatusBadge({ text }: { text: string }) {
   return (
-    <UiEntity uiTransform={{ width: '100%', height: NEW_BADGE_HEIGHT, alignItems: 'center', margin: { top: NEW_BADGE_MARGIN_TOP } }}>
+    <UiEntity
+      uiTransform={{
+        width: '100%',
+        height: STATUS_BADGE_HEIGHT,
+        alignItems: 'center',
+        margin: { top: STATUS_BADGE_MARGIN_TOP }
+      }}
+    >
       <Label
-        value="New!"
-        fontSize={NEW_BADGE_FONT_SIZE}
-        color={NEW_BADGE_TEXT_COLOR}
+        value={text}
+        fontSize={STATUS_BADGE_FONT_SIZE}
+        color={STATUS_BADGE_TEXT_COLOR}
         textAlign="middle-center"
-        uiTransform={{ width: '100%', height: NEW_BADGE_HEIGHT }}
+        uiTransform={{ width: '100%', height: STATUS_BADGE_HEIGHT }}
       />
     </UiEntity>
   )
@@ -427,7 +511,7 @@ function TimerBar({ timerSeconds, generatedAt }: { timerSeconds: number; generat
       />
       <UiEntity
         uiTransform={{ width: `${TIMER_ZONE_RED_PERCENT}%`, height: '100%' }}
-        uiBackground={{ color: TIMER_ZONE_RED_COLOR }}
+        uiBackground={{ color: DANGER_RED }}
       />
       <UiEntity
         uiTransform={{

@@ -149,12 +149,16 @@ lockToServer(PlayerCoins)
  * ms) drives the HUD's countdown. A delivery advances the slot
  * immediately — the HUD's success celebration is timed client-side off
  * the recipeDelivered broadcast, not a field on this component.
+ * `orderNumber` is a session-wide ticket counter, assigned the next value
+ * whenever a slot gets a fresh recipe — it climbs for the whole session,
+ * unlike slotIndex which just names the fixed HUD position.
  */
 export const RecipeSlotState = engine.defineComponent('game::RecipeSlotState', {
   slotIndex: Schemas.Int,
   active: Schemas.Boolean,
   recipeId: Schemas.String,
-  generatedAt: Schemas.Int64
+  generatedAt: Schemas.Int64,
+  orderNumber: Schemas.Int
 })
 
 lockToServer(RecipeSlotState)
