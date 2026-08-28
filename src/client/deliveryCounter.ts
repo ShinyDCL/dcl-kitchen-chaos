@@ -126,6 +126,16 @@ function deliveryRenderSystem(): void {
  * actual change makes that a no-op instead of a spurious revert-then-
  * reapply flicker.
  *
+ * If the models match what's already rendered, this is our own optimistic
+ * guess being corrected to the server's authoritative timestamp/verdict,
+ * not a new delivery — startTimestamp/success are adopted (and
+ * builtStartTimestamp kept in step) without going through
+ * tickDeliveryAnimation's isNewDelivery rebuild, since destroying and
+ * recreating the item entities for an unchanged item is what caused a
+ * visible flicker right after every delivery. The sit/shrink animation
+ * still restarts correctly from the corrected timestamp either way, since
+ * it's derived purely from elapsed time, not from when the entities were built.
+ *
  * If a delivery's 1.4s window already closed by the time it's first
  * observed (latency ate the whole window), it's re-anchored to start now
  * instead of never showing — but only within
@@ -148,6 +158,13 @@ function reconcileDelivery(): void {
     synced.startTimestamp === renderedStartTimestamp &&
     synced.success === renderedSuccess
   if (renderedMatches) return
+
+  if (sameModels(synced.models, renderedModels)) {
+    renderedStartTimestamp = synced.startTimestamp
+    renderedSuccess = synced.success
+    builtStartTimestamp = synced.startTimestamp
+    return
+  }
 
   renderedModels = synced.models
   renderedStartTimestamp = arrivedLateButRecently(synced) ? Date.now() : synced.startTimestamp
