@@ -16,11 +16,11 @@
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { getCookableItemDefinition } from '../shared/ingredients'
-import { room } from '../shared/messages'
-import { StoveState } from '../shared/schemas'
-import { grantHeldItem } from './heldItems'
-import { isPlayerAllowedToAct } from './playerRoster'
+import { getCookableItemDefinition } from '../../shared/ingredients'
+import { room } from '../../shared/messages'
+import { StoveState } from '../../shared/schemas'
+import { grantHeldItem } from '../heldItems'
+import { isPlayerAllowedToAct } from '../playerRoster'
 
 const stoveEntities = new Map<number, Entity>()
 

@@ -11,13 +11,13 @@ import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
 import { preloadAssets } from './assetPreload'
-import { startRenderingDeliveryCounter } from './deliveryCounter'
+import { startRenderingDeliveryCounter } from './fixtures/deliveryCounter'
+import { startRenderingPreparationCounters } from './fixtures/preparationCounters'
+import { createSceneLayout } from './fixtures/sceneLayout'
+import { startRenderingStoves } from './fixtures/stoveCooking'
 import { startRenderingHeldItems } from './heldItem'
-import { setupOrdersUi } from './ordersUi'
-import { setupPlayerRoleUi } from './playerRole'
-import { startRenderingPreparationCounters } from './preparationCounters'
-import { createSceneLayout } from './sceneLayout'
-import { startRenderingStoves } from './stoveCooking'
+import { setupOrdersUi } from './ui/ordersUi'
+import { setupPlayerRoleUi } from './ui/playerRole'
 
 export function initClient(): void {
   const scene = engine.addEntity()

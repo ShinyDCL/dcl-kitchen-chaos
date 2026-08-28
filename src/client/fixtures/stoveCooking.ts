@@ -7,7 +7,7 @@
 // local truth — see the authoritative-server skill. startCookingOnStove
 // renders optimistically (nothing scarce at stake if corrected later).
 // collectFromStove renders nothing optimistically: collecting hands out a
-// scarce cooked item, and server/stoveCooking.ts decides who wins a race
+// scarce cooked item, and server/fixtures/stoveCooking.ts decides who wins a race
 // for a finished stove, so this waits for the real outcome via
 // reconciliation, same as for every other player's stove.
 //
@@ -54,14 +54,14 @@ import {
   SMOKE_SPAWN_RADIUS,
   SMOKE_TEXTURE,
   STOVE_ITEM_OFFSET
-} from '../shared/constants'
-import { CookableIngredientDefinition, getCookableItemDefinition } from '../shared/ingredients'
-import { room } from '../shared/messages'
-import { MODELS } from '../shared/models'
-import { StoveState } from '../shared/schemas'
+} from '../../shared/constants'
+import { CookableIngredientDefinition, getCookableItemDefinition } from '../../shared/ingredients'
+import { room } from '../../shared/messages'
+import { MODELS } from '../../shared/models'
+import { StoveState } from '../../shared/schemas'
+import { takeHeldItemPending } from '../heldItem'
+import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
-import { takeHeldItemPending } from './heldItem'
-import { getWorldPosition } from './worldPosition'
 
 interface ProgressBar {
   root: Entity // background + fill, no own VisibilityComponent — controlled via root's propagateToChildren

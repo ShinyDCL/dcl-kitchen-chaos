@@ -27,11 +27,11 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { ORDER_NEW_FLASH_SECONDS, ORDER_RESULT_DISPLAY_SECONDS } from '../shared/constants'
-import { room } from '../shared/messages'
-import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../shared/recipes'
-import { OrderSlotState } from '../shared/schemas'
-import { isLocalPlayerPlaying } from './playerRoleState'
+import { ORDER_NEW_FLASH_SECONDS, ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
+import { room } from '../../shared/messages'
+import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../../shared/recipes'
+import { OrderSlotState } from '../../shared/schemas'
+import { isLocalPlayerPlaying } from '../playerRoleState'
 
 export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 

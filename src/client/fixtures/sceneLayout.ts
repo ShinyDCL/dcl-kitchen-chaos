@@ -20,8 +20,15 @@ import {
   FIXTURE_WIDTH,
   FRONT_ROW_DISTANCE,
   SIDE_WALL_DISTANCE
-} from '../shared/constants'
-import { MODELS } from '../shared/models'
+} from '../../shared/constants'
+import { MODELS } from '../../shared/models'
+import {
+  evaluateDeliveryCounterInteraction,
+  evaluatePlateCounterInteraction,
+  evaluatePreparationCounterInteraction,
+  evaluateStoveInteraction,
+  evaluateTrashBinInteraction
+} from '../interactionRules'
 import { registerDeliveryCounter } from './deliveryCounter'
 import { createFixture } from './fixtures'
 import {
@@ -30,13 +37,6 @@ import {
   LEFT_SIDE_INGREDIENTS,
   RIGHT_SIDE_INGREDIENTS
 } from './ingredientCounters'
-import {
-  evaluateDeliveryCounterInteraction,
-  evaluatePlateCounterInteraction,
-  evaluatePreparationCounterInteraction,
-  evaluateStoveInteraction,
-  evaluateTrashBinInteraction
-} from './interactionRules'
 import { registerPreparationCounter } from './preparationCounters'
 import { registerStove } from './stoveCooking'
 

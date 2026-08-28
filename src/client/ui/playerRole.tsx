@@ -18,10 +18,10 @@ import { Color4 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Button, Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { PlayerRoleValue } from '../shared/schemas'
+import { PlayerRoleValue } from '../../shared/schemas'
+import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from '../playerRoleState'
+import { isServerAlive } from '../serverReadiness'
 import { ENTRY_PANEL_TRANSFORM, OVERLAY_WRAPPER_TRANSFORM, PANEL_BACKGROUND } from './entryOverlayStyle'
-import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from './playerRoleState'
-import { isServerAlive } from './serverReadiness'
 import { LoadingPrompt } from './serverLoadingUi'
 
 const BUTTON_BORDER_RADIUS = 8

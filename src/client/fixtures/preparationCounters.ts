@@ -7,7 +7,7 @@
 // Each action function sends a narrow intent (place a plate, pick up the
 // ingredient stack, ...), not the counter's whole computed new state — the
 // server applies each atomically against its own live state (see
-// server/preparationCounters.ts), which is what lets two players place
+// server/fixtures/preparationCounters.ts), which is what lets two players place
 // different ingredients on the same counter at once and have both stick,
 // instead of whichever client's full-state push lands last discarding the
 // other's. The reconciliation system (startRenderingPreparationCounters)
@@ -24,13 +24,13 @@
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
-import { FIXTURE_HEIGHT } from '../shared/constants'
-import { room } from '../shared/messages'
-import { MODELS } from '../shared/models'
-import { PreparationCounterState } from '../shared/schemas'
+import { FIXTURE_HEIGHT } from '../../shared/constants'
+import { room } from '../../shared/messages'
+import { MODELS } from '../../shared/models'
+import { PreparationCounterState } from '../../shared/schemas'
+import { takeHeldItemModelsPending, takeHeldItemPending } from '../heldItem'
+import { getItemHeight } from '../itemHeights'
 import { getFixtureSyncId } from './fixtures'
-import { takeHeldItemModelsPending, takeHeldItemPending } from './heldItem'
-import { getItemHeight } from './itemHeights'
 
 interface CounterContents {
   hasPlate: boolean

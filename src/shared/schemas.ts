@@ -23,7 +23,7 @@ function lockToServer(component: ServerOnlyComponent): void {
 
 // Reserved explicit sync ids for the scene's non-fixture singletons/fixed
 // sets (GameState, the order queue slots) — contiguous from 100000, well
-// clear of client/fixtures.ts's separate 0-based, dynamically-sized
+// clear of client/fixtures/fixtures.ts's separate 0-based, dynamically-sized
 // fixture id space, so neither can ever collide no matter how large the
 // scene's fixture count grows. Every other component below either derives
 // its id from a fixture (PreparationCounterState, StoveState,
@@ -48,7 +48,7 @@ lockToServer(HeldItem)
 
 /**
  * One entity per preparation counter — plate presence and the ingredient
- * stack on top of it. `counterId` (client/fixtures.ts's getFixtureSyncId)
+ * stack on top of it. `counterId` (client/fixtures/fixtures.ts's getFixtureSyncId)
  * doubles as this entity's explicit syncEntity id: counters are a small
  * fixed set for the scene's whole life, unlike per-player entities, so
  * there's no need for HeldItem's auto-allocate-and-match-by-field pattern.
@@ -81,7 +81,7 @@ lockToServer(StoveState)
 
 /**
  * Singleton — the scene only ever creates one delivery counter (see
- * client/sceneLayout.ts). `models` is what was last delivered (bottom to
+ * client/fixtures/sceneLayout.ts). `models` is what was last delivered (bottom to
  * top), empty meaning nothing to show right now. `startTimestamp` (server
  * clock, ms) is when that delivery landed; every client derives the item
  * sit/shrink animation and the checkmark/crossmark flourish from

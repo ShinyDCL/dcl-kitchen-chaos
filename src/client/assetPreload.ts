@@ -6,7 +6,7 @@ import { AssetLoad, engine } from '@dcl/sdk/ecs'
 
 import { SMOKE_TEXTURE } from '../shared/constants'
 import { MODELS } from '../shared/models'
-import { ATLAS_TEXTURE_SRC } from './ordersUi'
+import { ATLAS_TEXTURE_SRC } from './ui/ordersUi'
 
 export function preloadAssets(): void {
   AssetLoad.create(engine.RootEntity, {

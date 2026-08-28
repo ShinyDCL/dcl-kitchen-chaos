@@ -22,7 +22,7 @@
 // item locally right away for zero-latency feedback. The hand-clear goes
 // through takeHeldItemModelsPending rather than broadcasting, since the
 // server now verifies the claimed models against the player's real held
-// item before accepting (see server/deliveryCounter.ts) and rejects
+// item before accepting (see server/fixtures/deliveryCounter.ts) and rejects
 // (restoring the hand) rather than trusting the claim outright.
 
 import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
@@ -37,14 +37,14 @@ import {
   DELIVERY_ITEM_SIT_DURATION,
   DELIVERY_LATE_ARRIVAL_GRACE_SECONDS,
   FIXTURE_HEIGHT
-} from '../shared/constants'
-import { room } from '../shared/messages'
-import { MODELS, sameModels } from '../shared/models'
-import { DeliveryState } from '../shared/schemas'
+} from '../../shared/constants'
+import { room } from '../../shared/messages'
+import { MODELS, sameModels } from '../../shared/models'
+import { DeliveryState } from '../../shared/schemas'
+import { takeHeldItemModelsPending } from '../heldItem'
+import { getItemHeight } from '../itemHeights'
+import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
-import { takeHeldItemModelsPending } from './heldItem'
-import { getItemHeight } from './itemHeights'
-import { getWorldPosition } from './worldPosition'
 
 let deliveryCounterEntity: Entity | null = null
 let checkmarkWorldPosition: Vector3 | null = null

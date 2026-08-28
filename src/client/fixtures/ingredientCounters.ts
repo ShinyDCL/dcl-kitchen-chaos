@@ -8,10 +8,10 @@
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { FIXTURE_HEIGHT } from '../shared/constants'
-import { MODELS } from '../shared/models'
+import { FIXTURE_HEIGHT } from '../../shared/constants'
+import { MODELS } from '../../shared/models'
+import { evaluateIngredientCounterInteraction } from '../interactionRules'
 import { createFixture } from './fixtures'
-import { evaluateIngredientCounterInteraction } from './interactionRules'
 
 export interface IngredientDefinition {
   displayModel?: string

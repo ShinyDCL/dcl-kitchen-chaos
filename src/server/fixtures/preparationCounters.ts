@@ -22,17 +22,17 @@
 //
 // Unlike per-player entities, counters are a small fixed set for the
 // scene's whole life, so each uses an EXPLICIT sync id — its counterId,
-// assigned deterministically by client/fixtures.ts's getFixtureSyncId —
+// assigned deterministically by client/fixtures/fixtures.ts's getFixtureSyncId —
 // rather than the per-player auto-allocate-and-match-by-field pattern.
 
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { room } from '../shared/messages'
-import { MODELS, sameModels } from '../shared/models'
-import { PreparationCounterState } from '../shared/schemas'
-import { getHeldItemModels, grantHeldItem } from './heldItems'
-import { isPlayerAllowedToAct } from './playerRoster'
+import { room } from '../../shared/messages'
+import { MODELS, sameModels } from '../../shared/models'
+import { PreparationCounterState } from '../../shared/schemas'
+import { getHeldItemModels, grantHeldItem } from '../heldItems'
+import { isPlayerAllowedToAct } from '../playerRoster'
 
 const counterEntities = new Map<number, Entity>()
 

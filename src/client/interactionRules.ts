@@ -8,7 +8,17 @@
 
 import { Entity } from '@dcl/sdk/ecs'
 
-import { deliverHeldItem } from './deliveryCounter'
+import { classifyItem, getCookableItemDefinition } from '../shared/ingredients'
+import { MODELS } from '../shared/models'
+import { deliverHeldItem } from './fixtures/deliveryCounter'
+import {
+  getPreparationCounterSnapshot,
+  pickUpFromCounter,
+  pickUpPlateFromCounter,
+  placeOnCounter,
+  placePlateOnCounter
+} from './fixtures/preparationCounters'
+import { collectFromStove, getStoveStatus, startCookingOnStove } from './fixtures/stoveCooking'
 import {
   attachItemToPlayerHand,
   discardHeldItem,
@@ -16,16 +26,6 @@ import {
   isHoldingAssembledItem,
   peekHeldItemModel
 } from './heldItem'
-import { classifyItem, getCookableItemDefinition } from '../shared/ingredients'
-import { MODELS } from '../shared/models'
-import {
-  getPreparationCounterSnapshot,
-  pickUpFromCounter,
-  pickUpPlateFromCounter,
-  placeOnCounter,
-  placePlateOnCounter
-} from './preparationCounters'
-import { collectFromStove, getStoveStatus, startCookingOnStove } from './stoveCooking'
 
 export interface InteractionResult {
   allowed: boolean

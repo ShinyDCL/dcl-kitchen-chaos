@@ -11,8 +11,8 @@
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { registerFocusableFixture } from './focusManager'
-import { InteractionResult } from './interactionRules'
+import { registerFocusableFixture } from '../focusManager'
+import { InteractionResult } from '../interactionRules'
 
 export interface FixtureOptions {
   model: string
