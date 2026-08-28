@@ -83,7 +83,9 @@ export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
 // animating — no particles, cheap on mobile.
 export const DELIVERY_ITEM_SIT_DURATION = 1 // seconds the delivered item sits unchanged before shrinking
 export const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds — item shrinks away over this long, once sitting ends
-export const DELIVERY_CHECKMARK_DURATION = 0.8 // seconds — checkmark spin+scale animation length
+export const DELIVERY_CHECKMARK_SCALE_SECONDS = 0.3 // seconds — result mark's scale-up and scale-down, each
+export const DELIVERY_CHECKMARK_HOLD_SECONDS = 0.6 // seconds the result mark stays fully scaled up before shrinking away
+export const DELIVERY_CHECKMARK_MODEL_SCALE = 1.5 // result mark's model is rendered at this multiple of its base size
 export const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6 // above the delivery pad
 
 // The 1.4s sit+shrink window can be fully eaten by network/CRDT latency

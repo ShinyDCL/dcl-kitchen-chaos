@@ -303,7 +303,7 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
 
   const checkmarkAnchor = engine.addEntity()
   Transform.create(checkmarkAnchor, {
-    position: Vector3.create(0, 0, -PROGRESS_BAR_THICKNESS),
+    position: Vector3.create(0, 0.1, -0.06),
     parent: root
   })
   // Own VisibilityComponent so this can be toggled independently of root

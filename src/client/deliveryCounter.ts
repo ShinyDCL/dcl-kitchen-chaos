@@ -1,11 +1,12 @@
 // Delivery counter: interacting while holding something places it on the
 // counter, where it sits for DELIVERY_ITEM_SIT_DURATION, then shrinks away
-// over DELIVERY_ITEM_SHRINK_DURATION while a result mark spins and scales
-// up — a checkmark if the delivery matched an active order (server-
-// decided, see orderQueue.ts), or a crossmark otherwise. renderedSuccess
-// defaults optimistically to true since the real verdict is server-only;
-// the ~1s sit delay is normally enough for it to land first, and
-// reconciliation corrects it if not.
+// over DELIVERY_ITEM_SHRINK_DURATION while a result mark scales up, holds,
+// then scales back down — a checkmark if the delivery matched an active
+// order (server-decided, see orderQueue.ts), or a crossmark otherwise.
+// Both marks are billboarded so whichever one is showing faces the player
+// — see createResultMark. renderedSuccess defaults optimistically to true
+// since the real verdict is server-only; the ~1s sit delay is normally
+// enough for it to land first, and reconciliation corrects it if not.
 //
 // Reconciled against the server-synced DeliveryState rather than held as
 // local truth — see the authoritative-server skill. Only one delivery
@@ -28,7 +29,9 @@ import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, Vis
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import {
-  DELIVERY_CHECKMARK_DURATION,
+  DELIVERY_CHECKMARK_HOLD_SECONDS,
+  DELIVERY_CHECKMARK_MODEL_SCALE,
+  DELIVERY_CHECKMARK_SCALE_SECONDS,
   DELIVERY_CHECKMARK_Y_OFFSET,
   DELIVERY_ITEM_SHRINK_DURATION,
   DELIVERY_ITEM_SIT_DURATION,
@@ -219,7 +222,7 @@ function updateItemScale(startTimestamp: number): void {
   Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 
-/** The result mark's whole spin+scale animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
+/** The result mark's whole scale-up/hold/scale-down animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
 function updateResultMark(active: boolean, startTimestamp: number, success: boolean): void {
   if (checkmarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
@@ -232,48 +235,62 @@ function updateResultMark(active: boolean, startTimestamp: number, success: bool
     return
   }
 
-  // Scale up then back down across the duration — a simple triangle curve
-  // peaking at the midpoint. Starts once the item finishes sitting.
-  const t = (elapsedSince(startTimestamp) - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_CHECKMARK_DURATION
+  // Scales up, holds fully scaled for DELIVERY_CHECKMARK_HOLD_SECONDS, then
+  // scales back down — starts once the item finishes sitting.
+  const elapsed = elapsedSince(startTimestamp) - DELIVERY_ITEM_SIT_DURATION
+  const totalDuration = DELIVERY_CHECKMARK_SCALE_SECONDS * 2 + DELIVERY_CHECKMARK_HOLD_SECONDS
   VisibilityComponent.getMutable(hidden).visible = false
-  if (t < 0 || t > 1) {
+  if (elapsed < 0 || elapsed > totalDuration) {
     VisibilityComponent.getMutable(shown).visible = false
     return
   }
 
   VisibilityComponent.getMutable(shown).visible = true
-  const scale = t < 0.5 ? t / 0.5 : (1 - t) / 0.5
+  const scale = resultMarkScale(elapsed) * DELIVERY_CHECKMARK_MODEL_SCALE
   Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
 }
 
+/** 0→1 over the scale-up, held at 1 through the hold, then 1→0 over the scale-down. */
+function resultMarkScale(elapsed: number): number {
+  if (elapsed < DELIVERY_CHECKMARK_SCALE_SECONDS) return elapsed / DELIVERY_CHECKMARK_SCALE_SECONDS
+
+  const holdEnd = DELIVERY_CHECKMARK_SCALE_SECONDS + DELIVERY_CHECKMARK_HOLD_SECONDS
+  if (elapsed < holdEnd) return 1
+
+  return 1 - (elapsed - holdEnd) / DELIVERY_CHECKMARK_SCALE_SECONDS
+}
+
 function getOrCreateCheckmark(): Entity {
-  if (checkmarkEntity !== null) return checkmarkEntity
-
-  const checkmark = engine.addEntity()
-  Transform.create(checkmark, {
-    position: checkmarkWorldPosition ?? Vector3.Zero(),
-    scale: Vector3.Zero(),
-    rotation: Quaternion.fromEulerDegrees(0, 90, 0)
-  })
-  GltfContainer.create(checkmark, { src: MODELS.checkmark })
-  VisibilityComponent.create(checkmark, { visible: false })
-
-  checkmarkEntity = checkmark
-  return checkmark
+  if (checkmarkEntity === null) checkmarkEntity = createResultMark(MODELS.checkmark)
+  return checkmarkEntity
 }
 
 function getOrCreateCrossmark(): Entity {
-  if (crossmarkEntity !== null) return crossmarkEntity
+  if (crossmarkEntity === null) crossmarkEntity = createResultMark(MODELS.crossmark)
+  return crossmarkEntity
+}
 
-  const crossmark = engine.addEntity()
-  Transform.create(crossmark, {
+/**
+ * Both result marks (checkmark, crossmark) are built the same way — only
+ * the model differs. The anchor is billboarded so whichever one is showing
+ * always faces the player; the model is a child with a static 180°
+ * rotation to correct for facing away, since a static rotation on the same
+ * entity Billboard controls would just get overwritten by it every frame —
+ * see the advanced-rendering skill. Scale/visibility are driven on the
+ * anchor (propagateToChildren covers the model).
+ */
+function createResultMark(model: string): Entity {
+  const anchor = engine.addEntity()
+  Transform.create(anchor, {
     position: checkmarkWorldPosition ?? Vector3.Zero(),
     scale: Vector3.Zero()
   })
-  GltfContainer.create(crossmark, { src: MODELS.crossmark })
-  VisibilityComponent.create(crossmark, { visible: false })
-  Billboard.create(crossmark, { billboardMode: BillboardMode.BM_Y })
+  VisibilityComponent.create(anchor, { visible: false, propagateToChildren: true })
+  Billboard.create(anchor, { billboardMode: BillboardMode.BM_Y })
 
-  crossmarkEntity = crossmark
-  return crossmark
+  const mark = engine.addEntity()
+  Transform.create(mark, { parent: anchor, rotation: Quaternion.fromEulerDegrees(0, 180, 0) })
+  GltfContainer.create(mark, { src: model })
+
+  return anchor
 }
