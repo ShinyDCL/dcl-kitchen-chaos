@@ -34,20 +34,25 @@ export interface InteractionResult {
 }
 
 // --- Ingredient counters ---
-// Always allowed to interact with, except a slot with no model yet.
+// Allowed except a slot with no model yet, or while holding an assembled
+// item — otherwise grabbing a fresh ingredient silently discards whatever
+// was already built.
 
 export function evaluateIngredientCounterInteraction(sliceModel: string | undefined): InteractionResult {
   if (!sliceModel) return { allowed: false, message: 'Not available yet' }
+  if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
   return { allowed: true, perform: () => attachItemToPlayerHand(sliceModel) }
 }
 
 // --- Plate counters ---
-// Always allowed. If already holding a plate, interacting is a no-op.
+// Allowed. If already holding a plate, interacting is a no-op. Blocked
+// while holding an assembled item, same reasoning as ingredient counters.
 
 export function evaluatePlateCounterInteraction(): InteractionResult {
   if (hasHeldItem() && peekHeldItemModel() === MODELS.plate) {
     return { allowed: true, perform: () => {} }
   }
+  if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
   return { allowed: true, perform: () => attachItemToPlayerHand(MODELS.plate) }
 }
 
