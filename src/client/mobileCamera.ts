@@ -16,7 +16,7 @@ import { isLocalPlayerPlaying } from './playerRoleState'
 
 const CAMERA_HEIGHT_OFFSET = 6 // meters above the player
 const CAMERA_BACK_OFFSET = -4 // meters behind the player along -Z, so the fixed downward tilt looks across the kitchen toward the front wall (+Z)
-const CAMERA_TILT_DEGREES = 60 // fixed pitch, positive tilts down (negative would point up at the sky) — the point is a locked angle, never re-aimed at the player
+export const CAMERA_TILT_DEGREES = 60 // fixed pitch, positive tilts down (negative would point up at the sky) — the point is a locked angle, never re-aimed at the player; exported for cameraFacing.ts
 
 const CAMERA_OFFSET = Vector3.create(0, CAMERA_HEIGHT_OFFSET, CAMERA_BACK_OFFSET)
 const CAMERA_ROTATION = Quaternion.fromEulerDegrees(CAMERA_TILT_DEGREES, 0, 0)

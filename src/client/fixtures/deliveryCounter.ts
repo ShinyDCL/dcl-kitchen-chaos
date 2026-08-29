@@ -16,15 +16,18 @@
 // verifies the claimed models against the real held item and can reject
 // (restoring the hand) instead of trusting the claim outright.
 
-import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
+import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
+import { getPlatform, isMobile } from '@dcl/sdk/platform'
 
 import { FIXTURE_HEIGHT } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { MODELS, sameModels } from '../../shared/models'
 import { DeliveryState } from '../../shared/schemas'
+import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemModelsPending } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
+import { isLocalPlayerPlaying } from '../playerRoleState'
 import { playAcceptSound, playRejectSound } from '../sound'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
@@ -34,6 +37,7 @@ const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds
 const DELIVERY_RESULT_MARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale-down, each
 const DELIVERY_RESULT_MARK_HOLD_SECONDS = 0.6 // seconds at full scale
 const DELIVERY_RESULT_MARK_MODEL_SCALE = 1.5
+const MOBILE_RESULT_MARK_SCALE = 1.4 // bigger on mobile — see fixtureMessage.ts's MOBILE_SCALE
 const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
 
 // Grace window for a delivery observed just after its 1.4s window closed
@@ -118,7 +122,19 @@ let systemRegistered = false
 export function startRenderingDeliveryCounter(): void {
   if (systemRegistered) return
   engine.addSystem(deliveryRenderSystem)
+  engine.addSystem(prebuildResultMarksOnceReady)
   systemRegistered = true
+}
+
+// Builds the marks here rather than on first need, since isMobile() reads
+// false until getPlatform() resolves — building on the first render tick
+// (which happens almost immediately) would always bake in the desktop
+// scale/facing.
+function prebuildResultMarksOnceReady(): void {
+  if (getPlatform() === null) return
+  engine.removeSystem(prebuildResultMarksOnceReady)
+  getOrCreateCheckmark()
+  getOrCreateCrossmark()
 }
 
 function deliveryRenderSystem(): void {
@@ -242,9 +258,11 @@ let soundPlayedForStartTimestamp: number | null = null // avoids replaying the r
 function revealDeliveryResult(active: boolean, startTimestamp: number, success: boolean | null): void {
   if (resultMarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
-  if (!active || success === null) {
-    VisibilityComponent.getMutable(getOrCreateCheckmark()).visible = false
-    VisibilityComponent.getMutable(getOrCreateCrossmark()).visible = false
+  // Hidden for spectators. Marks may not be built yet (see
+  // prebuildResultMarksOnceReady) — nothing to hide in that case.
+  if (!active || success === null || !isLocalPlayerPlaying()) {
+    if (checkmarkEntity !== null) VisibilityComponent.getMutable(checkmarkEntity).visible = false
+    if (crossmarkEntity !== null) VisibilityComponent.getMutable(crossmarkEntity).visible = false
     return
   }
 
@@ -265,7 +283,8 @@ function revealDeliveryResult(active: boolean, startTimestamp: number, success: 
   }
 
   VisibilityComponent.getMutable(shown).visible = true
-  const scale = resultMarkScale(elapsed) * DELIVERY_RESULT_MARK_MODEL_SCALE
+  const modelScale = DELIVERY_RESULT_MARK_MODEL_SCALE * (isMobile() ? MOBILE_RESULT_MARK_SCALE : 1)
+  const scale = resultMarkScale(elapsed) * modelScale
   Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
 }
 
@@ -289,21 +308,11 @@ function getOrCreateCrossmark(): Entity {
   return crossmarkEntity
 }
 
-/**
- * Anchor is billboarded to face the player; the model is a child with a
- * static 180° rotation, since a static rotation on the same entity
- * Billboard controls would get overwritten every frame — see
- * advanced-rendering. Scale/visibility are driven on the anchor
- * (propagateToChildren covers the model).
- */
+/** Anchor faces the camera; model is a child rotated 180° to face the right way. */
 function createResultMark(model: string): Entity {
   const anchor = engine.addEntity()
-  Transform.create(anchor, {
-    position: resultMarkWorldPosition ?? Vector3.Zero(),
-    scale: Vector3.Zero()
-  })
+  createCameraFacingTransform(anchor, { position: resultMarkWorldPosition ?? Vector3.Zero(), scale: Vector3.Zero() })
   VisibilityComponent.create(anchor, { visible: false, propagateToChildren: true })
-  Billboard.create(anchor, { billboardMode: BillboardMode.BM_Y })
 
   const mark = engine.addEntity()
   Transform.create(mark, { parent: anchor, rotation: Quaternion.fromEulerDegrees(0, 180, 0) })

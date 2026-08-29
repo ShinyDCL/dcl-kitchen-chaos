@@ -3,19 +3,15 @@
 // 3D text) positioned above that fixture, shown for MESSAGE_DURATION_SECONDS
 // or until replaced by a new message. Mirrors the stove's progress bar: one
 // persistent world-space entity, billboarded via BM_Y.
+//
+// Scaled up on mobile — world-space text reads smaller from mobileCamera.ts's
+// more distant camera. Camera-facing itself is handled by cameraFacing.ts.
 
-import {
-  Billboard,
-  BillboardMode,
-  engine,
-  Entity,
-  Material,
-  MeshRenderer,
-  TextShape,
-  Transform,
-  VisibilityComponent
-} from '@dcl/sdk/ecs'
+import { engine, Entity, Material, MeshRenderer, TextShape, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Color4, Vector3 } from '@dcl/sdk/math'
+import { isMobile } from '@dcl/sdk/platform'
+
+import { createCameraFacingTransform } from './cameraFacing'
 
 const MESSAGE_DURATION_SECONDS = 2
 const MESSAGE_Y_OFFSET = 0.5 // above the fixture's highlight/world position
@@ -25,6 +21,7 @@ const BACKGROUND_WIDTH = 1.1 // fixed width — tune alongside FONT_SIZE if mess
 const BACKGROUND_HEIGHT = 0.24
 const BACKGROUND_THICKNESS = 0.02
 const FONT_SIZE = 1
+const MOBILE_SCALE = 2 // bigger on mobile — see header
 
 let root: Entity | null = null
 let textEntity: Entity | null = null
@@ -50,14 +47,15 @@ export function showMessage(text: string, worldPosition: Vector3): void {
 function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
   if (root !== null && textEntity !== null) return { root, textEntity }
 
+  const scale = isMobile() ? MOBILE_SCALE : 1
+
   root = engine.addEntity()
-  Transform.create(root, { position: Vector3.Zero() })
-  Billboard.create(root, { billboardMode: BillboardMode.BM_Y })
+  createCameraFacingTransform(root, { position: Vector3.Zero() })
   VisibilityComponent.create(root, { visible: false, propagateToChildren: true })
 
   const background = engine.addEntity()
   Transform.create(background, {
-    scale: Vector3.create(BACKGROUND_WIDTH, BACKGROUND_HEIGHT, BACKGROUND_THICKNESS),
+    scale: Vector3.create(BACKGROUND_WIDTH * scale, BACKGROUND_HEIGHT * scale, BACKGROUND_THICKNESS),
     parent: root
   })
   MeshRenderer.setBox(background)
@@ -74,7 +72,7 @@ function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
   })
   TextShape.create(textEntity, {
     text: '',
-    fontSize: FONT_SIZE,
+    fontSize: FONT_SIZE * scale,
     textColor: TEXT_COLOR
   })
 

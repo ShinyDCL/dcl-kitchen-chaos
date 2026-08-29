@@ -25,8 +25,6 @@
 // per stove, toggled via `active` rather than recreated per cook.
 
 import {
-  Billboard,
-  BillboardMode,
   engine,
   Entity,
   GltfContainer,
@@ -38,13 +36,16 @@ import {
   VisibilityComponent
 } from '@dcl/sdk/ecs'
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { getPlatform, isMobile } from '@dcl/sdk/platform'
 
 import { BURN_GRACE_SECONDS, FIRE_TEXTURE, FIXTURE_HEIGHT, SMOKE_TEXTURE } from '../../shared/constants'
 import { CookableIngredientDefinition, getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
+import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemPending } from '../heldItem'
+import { isLocalPlayerPlaying } from '../playerRoleState'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
 
@@ -60,6 +61,7 @@ const PROGRESS_BAR_DRAIN_START_COLOR = Color4.create(0.9, 0.75, 0.06, 1) // drai
 const PROGRESS_BAR_BURNT_COLOR = Color4.create(0.85, 0.18, 0.12, 1) // drained-bar color once fully burnt
 const PROGRESS_BAR_FILL_OVERSCALE = 1.01 // fill slightly bigger than background so no sliver/z-fight shows at the seam
 const PROGRESS_BAR_BACKGROUND_RECESS = 0.001 // background set back in Z once so the two boxes don't z-fight
+const MOBILE_PROGRESS_BAR_SCALE = 1.4 // bigger on mobile — also scales the checkmark, a child of this root
 
 // Smoke particles above a stove while cooking. Tuned for ~11 steady-state
 // per stove. Emission point sits inside the stove model so particles drift
@@ -125,7 +127,6 @@ export function registerStove(stove: Entity): void {
   renderedCooks.set(stove, emptyRenderedCook())
   lastSyncedStates.set(stove, { rawModel: '', startTimestamp: 0 })
   stovesById.set(getFixtureSyncId(stove), stove)
-  getOrCreateVisuals(stove) // build the persistent progress bar / smoke emitter up front, hidden/inactive
 }
 
 /**
@@ -180,7 +181,17 @@ let systemRegistered = false
 export function startRenderingStoves(): void {
   if (systemRegistered) return
   engine.addSystem(stoveCookingSystem)
+  engine.addSystem(prebuildVisualsOnceReady)
   systemRegistered = true
+}
+
+// Builds progress bars here rather than in registerStove, since isMobile()
+// reads false until getPlatform() resolves — building immediately at scene
+// setup would always bake in the desktop scale/facing.
+function prebuildVisualsOnceReady(): void {
+  if (getPlatform() === null) return
+  engine.removeSystem(prebuildVisualsOnceReady)
+  for (const stove of registeredStoves) getOrCreateVisuals(stove)
 }
 
 function stoveCookingSystem(): void {
@@ -229,7 +240,13 @@ function computePhase(elapsedSecondsValue: number, definition: CookableIngredien
   return 'burnt'
 }
 
-/** Continuous per-frame progress, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
+/**
+ * Continuous per-frame progress, derived purely from what's currently
+ * rendered — never from a fresh (possibly stale) synced read.
+ *
+ * Also recomputes bar/checkmark visibility every frame (not just on phase
+ * transitions), so switching Spectate -> Play restores it correctly.
+ */
 function tickProgress(stove: Entity): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
   if (rendered.rawModel === '') return // idle, nothing to advance
@@ -237,27 +254,34 @@ function tickProgress(stove: Entity): void {
   const definition = getCookableItemDefinition(rendered.rawModel)
   if (!definition) return // shouldn't happen — unknown rawModel
 
+  const visuals = getOrCreateVisuals(stove)
   const elapsed = elapsedSeconds(rendered.startTimestamp)
+  let phase = rendered.phase
 
-  if (rendered.phase === 'cooking') {
-    updateFill(getOrCreateVisuals(stove).progressBar, Math.min(elapsed / definition.cookDurationSeconds, 1))
+  if (phase === 'cooking') {
+    updateFill(visuals.progressBar, Math.min(elapsed / definition.cookDurationSeconds, 1))
     if (elapsed >= definition.cookDurationSeconds) {
       applyDoneVisual(stove, definition)
-      renderedCooks.set(stove, { ...rendered, phase: 'done' })
+      phase = 'done'
+      renderedCooks.set(stove, { ...rendered, phase })
     }
-    return
-  }
-
-  if (rendered.phase === 'done') {
+  } else if (phase === 'done') {
     const burnProgress = Math.min((elapsed - definition.cookDurationSeconds) / BURN_GRACE_SECONDS, 1)
-    const progressBar = getOrCreateVisuals(stove).progressBar
-    updateFill(progressBar, 1 - burnProgress) // drains back down instead of staying full
-    updateFillColor(progressBar, Color4.lerp(PROGRESS_BAR_DRAIN_START_COLOR, PROGRESS_BAR_BURNT_COLOR, burnProgress))
+    updateFill(visuals.progressBar, 1 - burnProgress) // drains back down instead of staying full
+    updateFillColor(
+      visuals.progressBar,
+      Color4.lerp(PROGRESS_BAR_DRAIN_START_COLOR, PROGRESS_BAR_BURNT_COLOR, burnProgress)
+    )
     if (burnProgress >= 1) {
       applyBurntVisual(stove)
-      renderedCooks.set(stove, { ...rendered, phase: 'burnt' })
+      phase = 'burnt'
+      renderedCooks.set(stove, { ...rendered, phase })
     }
   }
+
+  const showBar = isLocalPlayerPlaying() && phase !== 'burnt'
+  VisibilityComponent.getMutable(visuals.progressBar.root).visible = showBar
+  VisibilityComponent.getMutable(visuals.progressBar.checkmarkAnchor).visible = showBar && phase === 'done'
 }
 
 /** Applies a rawModel/startTimestamp change (idle->cooking or any->idle) to this stove's visuals. */
@@ -297,18 +321,17 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   if (phase === 'burnt') applyBurntVisual(stove)
 }
 
+/** Visibility is owned by tickProgress, called right after this. */
 function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition): void {
   const visuals = getOrCreateVisuals(stove)
   if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: definition.cookedModel })
-  VisibilityComponent.getMutable(visuals.progressBar.checkmarkAnchor).visible = true
   ParticleSystem.getMutable(visuals.smokeEmitter).active = false
 }
 
-/** Neglected too long — burnt model, checkmark and bar hidden (hideProgressBar covers both), fire replaces smoke. */
+/** Neglected too long — burnt model, fire replaces smoke. Visibility owned by tickProgress. */
 function applyBurntVisual(stove: Entity): void {
   const visuals = getOrCreateVisuals(stove)
   if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: MODELS.burntCookable })
-  hideProgressBar(visuals.progressBar)
   ParticleSystem.getMutable(visuals.fireEmitter).active = true
 }
 
@@ -338,12 +361,10 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
     stoveWorldPosition.z
   )
 
-  // No parent — lives in world space directly. Billboard (Y-axis only)
-  // keeps everything parented to it upright and always facing the player,
-  // handled by the engine rather than manual per-frame rotation math.
+  // No parent — createCameraFacingTransform handles facing the camera.
   const root = engine.addEntity()
-  Transform.create(root, { position: worldPosition })
-  Billboard.create(root, { billboardMode: BillboardMode.BM_Y })
+  const scale = isMobile() ? MOBILE_PROGRESS_BAR_SCALE : 1
+  createCameraFacingTransform(root, { position: worldPosition, scale: Vector3.create(scale, scale, scale) })
   VisibilityComponent.create(root, { visible: false, propagateToChildren: true })
 
   const background = engine.addEntity()
@@ -440,9 +461,8 @@ function getOrCreateFireEmitter(stove: Entity): Entity {
   return emitter
 }
 
+/** Seeds fill/color for a fresh cook — visibility is owned by tickProgress. */
 function resetProgressBar(progressBar: ProgressBar, progress: number): void {
-  VisibilityComponent.getMutable(progressBar.root).visible = true
-  VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = false
   updateFill(progressBar, progress)
   updateFillColor(progressBar, PROGRESS_BAR_FILL_COLOR) // reset in case a previous cook left it mid-drain toward red
 }
