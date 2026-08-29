@@ -1,22 +1,28 @@
 // Stove cooking: holding a cookable and interacting starts a timed cook —
 // raw model appears, a progress bar fills, smoke runs. When done, the
-// model swaps to cooked, a checkmark appears, and smoke stops. A second
-// interact while done collects the item and resets the stove.
+// model swaps to cooked, a checkmark appears, and smoke stops. Left too
+// long, the bar drains back down while shifting toward red; once it empties
+// (BURN_GRACE_SECONDS after done) the model swaps to the burnt cookable,
+// the checkmark hides, and fire particles start. Collecting works the same
+// way in either state — server/fixtures/stoveCooking.ts decides which
+// model that actually grants — and resets the stove, stopping the fire.
 //
 // Reconciled against the server-synced StoveState rather than held as
 // local truth — see the authoritative-server skill. startCookingOnStove
 // renders optimistically (nothing scarce at stake if corrected later).
 // collectFromStove renders nothing optimistically: collecting hands out a
-// scarce cooked item, and server/fixtures/stoveCooking.ts decides who wins a race
+// scarce item, and server/fixtures/stoveCooking.ts decides who wins a race
 // for a finished stove, so this waits for the real outcome via
 // reconciliation, same as for every other player's stove.
 //
 // Progress is derived every frame from `Date.now() - startTimestamp`
 // (server clock), so only the start/reset of a cook is ever sent over the
-// network, never continuous progress.
+// network, never continuous progress. The done/burnt phase is likewise
+// recomputed from elapsed time, not stored, so a late observer (or a
+// reconciliation correction) can jump straight to the right one.
 //
-// The smoke emitter is a single persistent ParticleSystem per stove,
-// toggled via `active` rather than recreated per cook.
+// The smoke and fire emitters are each a single persistent ParticleSystem
+// per stove, toggled via `active` rather than recreated per cook.
 
 import {
   Billboard,
@@ -33,7 +39,7 @@ import {
 } from '@dcl/sdk/ecs'
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { FIXTURE_HEIGHT, SMOKE_TEXTURE } from '../../shared/constants'
+import { BURN_GRACE_SECONDS, FIRE_TEXTURE, FIXTURE_HEIGHT, SMOKE_TEXTURE } from '../../shared/constants'
 import { CookableIngredientDefinition, getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
@@ -50,6 +56,8 @@ const PROGRESS_BAR_THICKNESS = 0.02
 const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6
 const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
 const PROGRESS_BAR_FILL_COLOR = Color4.create(0.165, 0.596, 0.133, 1) // #2a9822
+const PROGRESS_BAR_DRAIN_START_COLOR = Color4.create(0.9, 0.75, 0.06, 1) // drain starts yellow, not green — a green bar moving backward reads as confusing, not urgent
+const PROGRESS_BAR_BURNT_COLOR = Color4.create(0.85, 0.18, 0.12, 1) // drained-bar color once fully burnt
 const PROGRESS_BAR_FILL_OVERSCALE = 1.01 // fill slightly bigger than background so no sliver/z-fight shows at the seam
 const PROGRESS_BAR_BACKGROUND_RECESS = 0.001 // background set back in Z once so the two boxes don't z-fight
 
@@ -67,6 +75,21 @@ const SMOKE_GRAVITY = -0.05 // negative = drifts upward
 const SMOKE_INITIAL_VELOCITY = { start: 0.03, end: 0.08 }
 const SMOKE_COLOR = Color4.create(0.85, 0.85, 0.85, 0.85) // birth color; fades to fully transparent over lifetime
 
+// Fire particles once a finished cook has burnt. Same spawn point/spread as
+// smoke, but a bit more velocity/upward pull so flames reach a little
+// higher than the smoke plume did while cooking.
+const FIRE_SPAWN_RADIUS = 0.09
+const FIRE_RATE = 10 // particles per second
+const FIRE_MAX_PARTICLES = 25
+const FIRE_LIFETIME = 1.8 // seconds
+const FIRE_INITIAL_SIZE = { start: 0.85, end: 1.2 }
+const FIRE_SIZE_OVER_TIME = { start: 1, end: 0.3 }
+const FIRE_GRAVITY = -0.18 // negative = drifts upward, stronger pull than smoke's so flames reach higher
+const FIRE_INITIAL_VELOCITY = { start: 0.14, end: 0.28 }
+const FIRE_INITIAL_COLOR = { start: Color4.create(1, 0.9, 0.7, 1), end: Color4.create(1, 0.7, 0.3, 1) }
+const FIRE_COLOR_OVER_TIME = { start: Color4.create(1, 0.8, 0.5, 1), end: Color4.create(0.4, 0.1, 0, 0) }
+const FIRE_SPRITE_SHEET = { tilesX: 4, tilesY: 3, framesPerSecond: 12 }
+
 interface ProgressBar {
   root: Entity // background + fill, no own VisibilityComponent — controlled via root's propagateToChildren
   fill: Entity
@@ -76,13 +99,16 @@ interface ProgressBar {
 interface StoveVisuals {
   progressBar: ProgressBar
   smokeEmitter: Entity
-  itemEntity: Entity | null // the raw/cooked model currently sitting on the stove, or null while idle
+  fireEmitter: Entity
+  itemEntity: Entity | null // the raw/cooked/burnt model currently sitting on the stove, or null while idle
 }
+
+type CookPhase = 'cooking' | 'done' | 'burnt'
 
 interface RenderedCook {
   rawModel: string // '' means idle — mirrors the synced field this is reconciled against
   startTimestamp: number
-  done: boolean // local-only: whether the done transition (cooked model swap, checkmark, smoke off) has been applied
+  phase: CookPhase // local-only: how far the done/burnt transition has progressed
 }
 
 const stoveVisuals = new Map<Entity, StoveVisuals>()
@@ -115,7 +141,10 @@ export function registerStove(stove: Entity): void {
 export function getStoveStatus(stove: Entity): StoveStatus {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
   if (rendered.rawModel === '') return 'idle'
-  return rendered.done ? 'done' : 'cooking'
+  // 'done' and 'burnt' are the same as far as interactionRules.ts is
+  // concerned — collecting is allowed either way, just for a different
+  // model — so both map to the public 'done' status.
+  return rendered.phase === 'cooking' ? 'cooking' : 'done'
 }
 
 export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
@@ -193,6 +222,13 @@ function reconcileTransition(stove: Entity, synced: { rawModel: string; startTim
   applySyncedState(stove, synced)
 }
 
+/** Which phase a cook is in, purely from elapsed time — the same rule tickProgress steps through incrementally and applySyncedState jumps to directly for a late observer. */
+function computePhase(elapsedSecondsValue: number, definition: CookableIngredientDefinition): CookPhase {
+  if (elapsedSecondsValue < definition.cookDurationSeconds) return 'cooking'
+  if (elapsedSecondsValue < definition.cookDurationSeconds + BURN_GRACE_SECONDS) return 'done'
+  return 'burnt'
+}
+
 /** Continuous per-frame progress, derived purely from what's currently rendered — never from a fresh (possibly stale) synced read. */
 function tickProgress(stove: Entity): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
@@ -201,12 +237,26 @@ function tickProgress(stove: Entity): void {
   const definition = getCookableItemDefinition(rendered.rawModel)
   if (!definition) return // shouldn't happen — unknown rawModel
 
-  const progress = Math.min(elapsedSeconds(rendered.startTimestamp) / definition.cookDurationSeconds, 1)
-  updateFill(getOrCreateVisuals(stove).progressBar, progress)
+  const elapsed = elapsedSeconds(rendered.startTimestamp)
 
-  if (progress >= 1 && !rendered.done) {
-    applyDoneVisual(stove, definition)
-    renderedCooks.set(stove, { ...rendered, done: true })
+  if (rendered.phase === 'cooking') {
+    updateFill(getOrCreateVisuals(stove).progressBar, Math.min(elapsed / definition.cookDurationSeconds, 1))
+    if (elapsed >= definition.cookDurationSeconds) {
+      applyDoneVisual(stove, definition)
+      renderedCooks.set(stove, { ...rendered, phase: 'done' })
+    }
+    return
+  }
+
+  if (rendered.phase === 'done') {
+    const burnProgress = Math.min((elapsed - definition.cookDurationSeconds) / BURN_GRACE_SECONDS, 1)
+    const progressBar = getOrCreateVisuals(stove).progressBar
+    updateFill(progressBar, 1 - burnProgress) // drains back down instead of staying full
+    updateFillColor(progressBar, Color4.lerp(PROGRESS_BAR_DRAIN_START_COLOR, PROGRESS_BAR_BURNT_COLOR, burnProgress))
+    if (burnProgress >= 1) {
+      applyBurntVisual(stove)
+      renderedCooks.set(stove, { ...rendered, phase: 'burnt' })
+    }
   }
 }
 
@@ -222,6 +272,7 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   if (synced.rawModel === '') {
     hideProgressBar(visuals.progressBar)
     ParticleSystem.getMutable(visuals.smokeEmitter).active = false
+    ParticleSystem.getMutable(visuals.fireEmitter).active = false
     renderedCooks.set(stove, emptyRenderedCook())
     return
   }
@@ -236,13 +287,14 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   // Seed the true elapsed progress right away instead of always starting
   // at 0 and correcting next tick — otherwise a late observer sees a
   // 0% flash before jumping to the real value.
-  const progress = definition ? Math.min(elapsedSeconds(synced.startTimestamp) / definition.cookDurationSeconds, 1) : 0
-  resetProgressBar(visuals.progressBar, progress)
+  const elapsed = elapsedSeconds(synced.startTimestamp)
+  resetProgressBar(visuals.progressBar, definition ? Math.min(elapsed / definition.cookDurationSeconds, 1) : 0)
   ParticleSystem.getMutable(visuals.smokeEmitter).active = true
 
-  const alreadyDone = progress >= 1
-  renderedCooks.set(stove, { rawModel: synced.rawModel, startTimestamp: synced.startTimestamp, done: alreadyDone })
-  if (alreadyDone && definition) applyDoneVisual(stove, definition)
+  const phase: CookPhase = definition ? computePhase(elapsed, definition) : 'cooking'
+  renderedCooks.set(stove, { rawModel: synced.rawModel, startTimestamp: synced.startTimestamp, phase })
+  if (phase === 'done' && definition) applyDoneVisual(stove, definition)
+  if (phase === 'burnt') applyBurntVisual(stove)
 }
 
 function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition): void {
@@ -252,8 +304,16 @@ function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition
   ParticleSystem.getMutable(visuals.smokeEmitter).active = false
 }
 
+/** Neglected too long — burnt model, checkmark and bar hidden (hideProgressBar covers both), fire replaces smoke. */
+function applyBurntVisual(stove: Entity): void {
+  const visuals = getOrCreateVisuals(stove)
+  if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: MODELS.burntCookable })
+  hideProgressBar(visuals.progressBar)
+  ParticleSystem.getMutable(visuals.fireEmitter).active = true
+}
+
 function emptyRenderedCook(): RenderedCook {
-  return { rawModel: '', startTimestamp: 0, done: false }
+  return { rawModel: '', startTimestamp: 0, phase: 'cooking' }
 }
 
 function getOrCreateVisuals(stove: Entity): StoveVisuals {
@@ -263,6 +323,7 @@ function getOrCreateVisuals(stove: Entity): StoveVisuals {
   const visuals: StoveVisuals = {
     progressBar: getOrCreateProgressBar(stove),
     smokeEmitter: getOrCreateSmokeEmitter(stove),
+    fireEmitter: getOrCreateFireEmitter(stove),
     itemEntity: null
   }
   stoveVisuals.set(stove, visuals)
@@ -311,7 +372,7 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
 
   const checkmarkAnchor = engine.addEntity()
   Transform.create(checkmarkAnchor, {
-    position: Vector3.create(0, 0.1, -0.06),
+    position: Vector3.create(0, 0.2, -0.06),
     parent: root
   })
   // Own VisibilityComponent so this can be toggled independently of root
@@ -352,10 +413,38 @@ function getOrCreateSmokeEmitter(stove: Entity): Entity {
   return emitter
 }
 
+/** Persistent per-stove fire emitter for a neglected, burnt cook — same spawn anchor as smoke, toggled via `active`. */
+function getOrCreateFireEmitter(stove: Entity): Entity {
+  const emitter = engine.addEntity()
+  Transform.create(emitter, { position: SMOKE_OFFSET, parent: stove })
+  ParticleSystem.create(emitter, {
+    active: false,
+    loop: true,
+    prewarm: false,
+    faceTravelDirection: false,
+    rate: FIRE_RATE,
+    maxParticles: FIRE_MAX_PARTICLES,
+    lifetime: FIRE_LIFETIME,
+    shape: ParticleSystem.Shape.Sphere({ radius: FIRE_SPAWN_RADIUS }),
+    gravity: FIRE_GRAVITY,
+    initialVelocitySpeed: FIRE_INITIAL_VELOCITY,
+    initialSize: FIRE_INITIAL_SIZE,
+    sizeOverTime: FIRE_SIZE_OVER_TIME,
+    initialColor: FIRE_INITIAL_COLOR,
+    colorOverTime: FIRE_COLOR_OVER_TIME,
+    texture: { src: FIRE_TEXTURE },
+    blendMode: PBParticleSystem_BlendMode.PSB_ADD,
+    spriteSheet: FIRE_SPRITE_SHEET
+  })
+
+  return emitter
+}
+
 function resetProgressBar(progressBar: ProgressBar, progress: number): void {
   VisibilityComponent.getMutable(progressBar.root).visible = true
   VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = false
   updateFill(progressBar, progress)
+  updateFillColor(progressBar, PROGRESS_BAR_FILL_COLOR) // reset in case a previous cook left it mid-drain toward red
 }
 
 function hideProgressBar(progressBar: ProgressBar): void {
@@ -372,6 +461,17 @@ function updateFill(progressBar: ProgressBar, progress: number): void {
     PROGRESS_BAR_THICKNESS * PROGRESS_BAR_FILL_OVERSCALE
   )
   transform.position = Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0)
+}
+
+/** Only called during the done->burnt drain, where the color actually changes frame to frame — cooking keeps the material set once at creation. */
+function updateFillColor(progressBar: ProgressBar, color: Color4): void {
+  Material.setPbrMaterial(progressBar.fill, {
+    albedoColor: color,
+    emissiveColor: color,
+    emissiveIntensity: 0.4,
+    metallic: 0,
+    roughness: 0.6
+  })
 }
 
 function fadeToTransparent(color: Color4): Color4 {

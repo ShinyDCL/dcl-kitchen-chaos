@@ -41,6 +41,7 @@ export const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
   [MODELS.pattyCooked]: handTransform(Vector3.create(0.08, 0.28, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
   [MODELS.egg]: handTransform(Vector3.create(0.05, 0.45, 0), Quaternion.fromEulerDegrees(180, 0, 0)),
   [MODELS.eggRaw]: handTransform(Vector3.create(0.05, 0.31, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
+  [MODELS.burntCookable]: handTransform(Vector3.create(0.06, 0.28, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
   [MODELS.plate]: handTransform(
     Vector3.create(0.04, 0.34, 0),
     Quaternion.fromEulerDegrees(0, 0, 90),

@@ -18,6 +18,7 @@ export const MODELS = {
   pattyCooked: 'assets/scene/models/PattyCooked.glb',
   egg: 'assets/scene/models/Egg.glb',
   eggRaw: 'assets/scene/models/EggRaw.glb',
+  burntCookable: 'assets/scene/models/BurntCookable.glb',
   plate: 'assets/scene/models/Plate.glb',
 
   // Display items

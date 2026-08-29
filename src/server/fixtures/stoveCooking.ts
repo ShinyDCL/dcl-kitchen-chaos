@@ -4,6 +4,9 @@
 // item: resetting rawModel to '' before granting it means a second,
 // already-queued collect for the same cook sees an idle stove and no-ops
 // — what stops two players racing a finished stove from both winning.
+// Collecting past BURN_GRACE_SECONDS after done grants the universal
+// burnt model instead of the real cookedModel — same "done" gate, no
+// separate stored flag, since it's derived from elapsed time either way.
 //
 // startCookingOnStove grants the empty hand only once the cook actually
 // starts, replying actionRejected otherwise so the client restores what it
@@ -16,8 +19,10 @@
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
+import { BURN_GRACE_SECONDS } from '../../shared/constants'
 import { getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
+import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
 import { grantHeldItem } from '../heldItems'
 import { isPlayerAllowedToAct } from '../playerRoster'
@@ -61,8 +66,9 @@ export function initStoveCooking(): void {
     const elapsedSeconds = (Date.now() - Number(state.startTimestamp)) / 1000
     if (elapsedSeconds < definition.cookDurationSeconds) return // not done yet — ignore
 
+    const isBurnt = elapsedSeconds >= definition.cookDurationSeconds + BURN_GRACE_SECONDS
     state.rawModel = '' // reset first so a second, already-queued collect sees idle and no-ops
-    grantHeldItem(context.from.toLowerCase(), [definition.cookedModel])
+    grantHeldItem(context.from.toLowerCase(), [isBurnt ? MODELS.burntCookable : definition.cookedModel])
   })
 }
 

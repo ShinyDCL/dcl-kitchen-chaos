@@ -8,6 +8,11 @@
 // classifyItem() and getCookableItemDefinition() are both derived from
 // this one object, so there's one place to add or edit an ingredient.
 //
+// MODELS.burntCookable classifies as 'cookedCookable' too, even though
+// it's not any ingredient's own cookedModel — server/fixtures/stoveCooking.ts
+// grants it instead of the real cookedModel once a finished cook sits too
+// long (see BURN_GRACE_SECONDS).
+//
 // Bacon isn't listed here yet — no models exist for it, and it currently
 // has no counter slot at all (see sceneLayout.ts). classifyItem/
 // getRequiredModelForIngredient just won't resolve it until it's added.
@@ -62,6 +67,7 @@ for (const definition of Object.values(INGREDIENTS)) {
     COOKED_MODELS.add(definition.cookedModel)
   }
 }
+COOKED_MODELS.add(MODELS.burntCookable) // one universal burnt model, not tied to whatever was actually cooking
 
 export function getCookableItemDefinition(heldModel: string): CookableIngredientDefinition | undefined {
   return HELD_MODEL_TO_DEFINITION.get(heldModel)

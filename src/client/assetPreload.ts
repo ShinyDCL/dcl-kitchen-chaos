@@ -4,7 +4,7 @@
 
 import { AssetLoad, engine } from '@dcl/sdk/ecs'
 
-import { SMOKE_TEXTURE } from '../shared/constants'
+import { FIRE_TEXTURE, SMOKE_TEXTURE } from '../shared/constants'
 import { MODELS } from '../shared/models'
 import { ACCEPT_SOUND, INTERACTION_SOUND, REJECT_SOUND } from './sound'
 import { ATLAS_TEXTURE_SRC } from './ui/ordersUi'
@@ -23,10 +23,12 @@ export function preloadAssets(): void {
       MODELS.pattyCooked,
       MODELS.egg,
       MODELS.eggRaw,
+      MODELS.burntCookable,
       MODELS.plate,
       MODELS.checkmark,
       MODELS.crossmark,
       SMOKE_TEXTURE,
+      FIRE_TEXTURE,
       ATLAS_TEXTURE_SRC,
       INTERACTION_SOUND,
       ACCEPT_SOUND,
