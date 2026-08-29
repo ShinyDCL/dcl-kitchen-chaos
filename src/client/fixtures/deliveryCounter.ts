@@ -1,29 +1,20 @@
-// Delivery counter: interacting while holding something places it on the
-// counter, where it sits for DELIVERY_ITEM_SIT_DURATION, then shrinks away
-// over DELIVERY_ITEM_SHRINK_DURATION while a result mark scales up, holds,
-// then scales back down — a checkmark if the delivery matched an active
-// order (server-decided, see orderQueue.ts), or a crossmark otherwise.
-// Both marks are billboarded so whichever one is showing faces the player
-// — see createResultMark. renderedSuccess defaults optimistically to true
-// since the real verdict is server-only; the ~1s sit delay is normally
-// enough for it to land first, and reconciliation corrects it if not.
+// Delivery counter: placing a held item makes it sit, then shrink away,
+// while a result mark scales up/holds/down alongside it — checkmark if it
+// matched an active order (server-decided, see orderQueue.ts), crossmark
+// otherwise. renderedSuccess stays null (neither mark shown) until the
+// server responds, since guessing here used to flash the wrong mark first.
 //
-// Reconciled against the server-synced DeliveryState rather than held as
-// local truth — see the authoritative-server skill. Only one delivery
-// counter exists in the scene, so this keeps simple module-level state
-// rather than a Map keyed by fixture, unlike stoveCooking.ts's per-stove
-// state.
+// Reconciled against the server-synced DeliveryState — see the
+// authoritative-server skill. Single fixture, so module-level state is
+// fine here unlike stoveCooking.ts's per-stove Map.
 //
 // Both animations are pure functions of `Date.now() - startTimestamp`, so
-// only the delivery itself (models + one timestamp) is ever sent over the
-// network — every client derives the same animation frame from that one
-// shared instant, and a client joining mid-animation picks it up at the
-// right point instead of restarting it. deliverHeldItem still renders the
-// item locally right away for zero-latency feedback. The hand-clear goes
-// through takeHeldItemModelsPending rather than broadcasting, since the
-// server now verifies the claimed models against the player's real held
-// item before accepting (see server/fixtures/deliveryCounter.ts) and rejects
-// (restoring the hand) rather than trusting the claim outright.
+// only the delivery (models + one timestamp) ever crosses the network —
+// every client derives the same frame from that shared instant, including
+// one joining mid-animation. The hand-clear goes through
+// takeHeldItemModelsPending rather than broadcasting, since the server
+// verifies the claimed models against the real held item and can reject
+// (restoring the hand) instead of trusting the claim outright.
 
 import { Billboard, BillboardMode, engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -40,20 +31,20 @@ import { getFixtureSyncId } from './fixtures'
 
 const DELIVERY_ITEM_SIT_DURATION = 1 // seconds before shrinking starts
 const DELIVERY_ITEM_SHRINK_DURATION = 0.4 // seconds
-const DELIVERY_CHECKMARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale-down, each
-const DELIVERY_CHECKMARK_HOLD_SECONDS = 0.6 // seconds at full scale
-const DELIVERY_CHECKMARK_MODEL_SCALE = 1.5
-const DELIVERY_CHECKMARK_Y_OFFSET = FIXTURE_HEIGHT + 0.6
+const DELIVERY_RESULT_MARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale-down, each
+const DELIVERY_RESULT_MARK_HOLD_SECONDS = 0.6 // seconds at full scale
+const DELIVERY_RESULT_MARK_MODEL_SCALE = 1.5
+const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
 
-// Grace window for a delivery observed just after its 1.4s sit+shrink
-// window closed (latency) — replays from now instead of not showing at all.
+// Grace window for a delivery observed just after its 1.4s window closed
+// (latency) — replays from now instead of not showing at all.
 const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 
 let deliveryCounterEntity: Entity | null = null
-let checkmarkWorldPosition: Vector3 | null = null
+let resultMarkWorldPosition: Vector3 | null = null
 
-// Separate entity per sound role — sharing one AudioSource would let a
-// later call cut off a clip still playing (see sound.ts).
+// Separate entity per sound role — one AudioSource would let a later call
+// cut off a clip still playing (see sound.ts).
 let acceptSoundEntity: Entity | null = null
 let rejectSoundEntity: Entity | null = null
 
@@ -64,9 +55,9 @@ export function registerDeliveryCounter(fixtureEntity: Entity): void {
   rejectSoundEntity = createSoundAnchor(fixtureEntity)
 
   const worldPosition = getWorldPosition(fixtureEntity)
-  checkmarkWorldPosition = Vector3.create(
+  resultMarkWorldPosition = Vector3.create(
     worldPosition.x,
-    worldPosition.y + DELIVERY_CHECKMARK_Y_OFFSET,
+    worldPosition.y + DELIVERY_RESULT_MARK_Y_OFFSET,
     worldPosition.z
   )
 }
@@ -89,8 +80,8 @@ export function deliverHeldItem(): void {
 
   renderedModels = models
   renderedStartTimestamp = startTimestamp
-  renderedSuccess = true // optimistic guess — see header comment
-  tickDeliveryAnimation() // builds/scales from the values just set, same as the system's per-frame call
+  renderedSuccess = null // unknown until the server responds
+  tickDeliveryAnimation() // apply immediately, same as the system's per-frame call
 }
 
 function getSyncedState(): { models: string[]; startTimestamp: number; success: boolean } {
@@ -112,10 +103,10 @@ interface RenderedItem {
 }
 
 let renderedItem: RenderedItem | null = null
-let builtStartTimestamp = 0 // startTimestamp currently reflected by renderedItem — detects a new delivery arriving while one is still showing
+let builtStartTimestamp = 0 // startTimestamp renderedItem reflects — detects a new delivery landing while one is still showing
 let renderedModels: string[] = []
 let renderedStartTimestamp = 0
-let renderedSuccess = true
+let renderedSuccess: boolean | null = null // null until the server's verdict is known for the current delivery
 let lastSyncedModels: string[] = []
 let lastSyncedStartTimestamp = 0
 let lastSyncedSuccess = true
@@ -136,28 +127,19 @@ function deliveryRenderSystem(): void {
 }
 
 /**
- * Points renderedModels/renderedStartTimestamp at the synced delivery, but
- * only when it has actually changed since last observed — not whenever it
- * merely differs from what's rendered. Right after this client's own
- * optimistic deliverHeldItem, a live read is briefly stale; gating on an
- * actual change makes that a no-op instead of a spurious revert-then-
- * reapply flicker.
+ * Only reacts once the synced delivery has actually changed since last
+ * observed, not whenever it merely differs from what's rendered — a live
+ * read is briefly stale right after this client's own optimistic
+ * deliverHeldItem, and reacting to that would flicker.
  *
- * If the models match what's already rendered, this is our own optimistic
- * guess being corrected to the server's authoritative timestamp/verdict,
- * not a new delivery — startTimestamp/success are adopted (and
- * builtStartTimestamp kept in step) without going through
- * tickDeliveryAnimation's isNewDelivery rebuild, since destroying and
- * recreating the item entities for an unchanged item is what caused a
- * visible flicker right after every delivery. The sit/shrink animation
- * still restarts correctly from the corrected timestamp either way, since
- * it's derived purely from elapsed time, not from when the entities were built.
+ * Same models as already rendered means this is that optimistic guess
+ * being corrected, not a new delivery — startTimestamp/success are
+ * adopted in place, skipping tickDeliveryAnimation's rebuild, since
+ * destroying and recreating the item entities is what caused the flicker.
  *
- * If a delivery's 1.4s window already closed by the time it's first
- * observed (latency ate the whole window), it's re-anchored to start now
- * instead of never showing — but only within
- * DELIVERY_LATE_ARRIVAL_GRACE_SECONDS of closing, so a player joining long
- * after the fact sees stale state as nothing, not a replay.
+ * A delivery whose 1.4s window already closed by the time it's first
+ * observed is re-anchored to start now, within
+ * DELIVERY_LATE_ARRIVAL_GRACE_SECONDS, instead of never showing.
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
@@ -200,14 +182,7 @@ function arrivedLateButRecently(synced: { models: string[]; startTimestamp: numb
   return elapsed >= windowDuration && elapsed < windowDuration + DELIVERY_LATE_ARRIVAL_GRACE_SECONDS
 }
 
-/**
- * Continuous per-frame animation, derived purely from what's rendered —
- * never a fresh synced read. Rebuilds when withinItemWindow flips OR a new
- * delivery's timestamp differs from the one built — the latter covers a
- * second delivery landing while the first is still animating, where
- * withinItemWindow stays true throughout and would otherwise never
- * trigger a rebuild.
- */
+/** Rebuilds when withinItemWindow flips OR a new delivery's timestamp differs from the one built — the latter covers a second delivery landing before the first finishes animating. */
 function tickDeliveryAnimation(): void {
   const active = renderedModels.length > 0
   const withinItemWindow =
@@ -220,7 +195,7 @@ function tickDeliveryAnimation(): void {
   }
 
   if (renderedItem !== null) updateItemScale(renderedStartTimestamp)
-  updateResultMark(active, renderedStartTimestamp, renderedSuccess)
+  revealDeliveryResult(active, renderedStartTimestamp, renderedSuccess)
 }
 
 function rebuildItemEntities(models: string[]): void {
@@ -263,49 +238,45 @@ function updateItemScale(startTimestamp: number): void {
 
 let soundPlayedForStartTimestamp: number | null = null // avoids replaying the result sound every frame the mark stays visible
 
-/** The result mark's whole scale-up/hold/scale-down animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
-function updateResultMark(active: boolean, startTimestamp: number, success: boolean): void {
-  if (checkmarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
+/** Shows and sounds the verdict together, so they stay in step instead of drifting apart in separate functions. */
+function revealDeliveryResult(active: boolean, startTimestamp: number, success: boolean | null): void {
+  if (resultMarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
+
+  if (!active || success === null) {
+    VisibilityComponent.getMutable(getOrCreateCheckmark()).visible = false
+    VisibilityComponent.getMutable(getOrCreateCrossmark()).visible = false
+    return
+  }
 
   const shown = success ? getOrCreateCheckmark() : getOrCreateCrossmark()
   const hidden = success ? getOrCreateCrossmark() : getOrCreateCheckmark()
 
-  if (!active) {
-    VisibilityComponent.getMutable(shown).visible = false
-    VisibilityComponent.getMutable(hidden).visible = false
-    return
-  }
-
-  // Scales up, holds fully scaled for DELIVERY_CHECKMARK_HOLD_SECONDS, then
-  // scales back down — starts once the item finishes sitting.
-  const elapsed = elapsedSince(startTimestamp) - DELIVERY_ITEM_SIT_DURATION
-  const totalDuration = DELIVERY_CHECKMARK_SCALE_SECONDS * 2 + DELIVERY_CHECKMARK_HOLD_SECONDS
+  const elapsed = elapsedSince(startTimestamp)
+  const totalDuration = DELIVERY_RESULT_MARK_SCALE_SECONDS * 2 + DELIVERY_RESULT_MARK_HOLD_SECONDS
   VisibilityComponent.getMutable(hidden).visible = false
   if (elapsed < 0 || elapsed > totalDuration) {
     VisibilityComponent.getMutable(shown).visible = false
     return
   }
 
-  // Played here, not as soon as the verdict is known, so it syncs with the
-  // mark appearing instead of firing ~1s early.
   if (soundPlayedForStartTimestamp !== startTimestamp) {
     soundPlayedForStartTimestamp = startTimestamp
     playDeliveryResultSound(success)
   }
 
   VisibilityComponent.getMutable(shown).visible = true
-  const scale = resultMarkScale(elapsed) * DELIVERY_CHECKMARK_MODEL_SCALE
+  const scale = resultMarkScale(elapsed) * DELIVERY_RESULT_MARK_MODEL_SCALE
   Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
 }
 
 /** 0→1 over the scale-up, held at 1 through the hold, then 1→0 over the scale-down. */
 function resultMarkScale(elapsed: number): number {
-  if (elapsed < DELIVERY_CHECKMARK_SCALE_SECONDS) return elapsed / DELIVERY_CHECKMARK_SCALE_SECONDS
+  if (elapsed < DELIVERY_RESULT_MARK_SCALE_SECONDS) return elapsed / DELIVERY_RESULT_MARK_SCALE_SECONDS
 
-  const holdEnd = DELIVERY_CHECKMARK_SCALE_SECONDS + DELIVERY_CHECKMARK_HOLD_SECONDS
+  const holdEnd = DELIVERY_RESULT_MARK_SCALE_SECONDS + DELIVERY_RESULT_MARK_HOLD_SECONDS
   if (elapsed < holdEnd) return 1
 
-  return 1 - (elapsed - holdEnd) / DELIVERY_CHECKMARK_SCALE_SECONDS
+  return 1 - (elapsed - holdEnd) / DELIVERY_RESULT_MARK_SCALE_SECONDS
 }
 
 function getOrCreateCheckmark(): Entity {
@@ -319,18 +290,16 @@ function getOrCreateCrossmark(): Entity {
 }
 
 /**
- * Both result marks (checkmark, crossmark) are built the same way — only
- * the model differs. The anchor is billboarded so whichever one is showing
- * always faces the player; the model is a child with a static 180°
- * rotation to correct for facing away, since a static rotation on the same
- * entity Billboard controls would just get overwritten by it every frame —
- * see the advanced-rendering skill. Scale/visibility are driven on the
- * anchor (propagateToChildren covers the model).
+ * Anchor is billboarded to face the player; the model is a child with a
+ * static 180° rotation, since a static rotation on the same entity
+ * Billboard controls would get overwritten every frame — see
+ * advanced-rendering. Scale/visibility are driven on the anchor
+ * (propagateToChildren covers the model).
  */
 function createResultMark(model: string): Entity {
   const anchor = engine.addEntity()
   Transform.create(anchor, {
-    position: checkmarkWorldPosition ?? Vector3.Zero(),
+    position: resultMarkWorldPosition ?? Vector3.Zero(),
     scale: Vector3.Zero()
   })
   VisibilityComponent.create(anchor, { visible: false, propagateToChildren: true })
