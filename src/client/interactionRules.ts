@@ -45,15 +45,11 @@ export function evaluateIngredientCounterInteraction(sliceModel: string | undefi
 }
 
 // --- Plate counters ---
-// Allowed. If already holding a plate, interacting is a no-op. Blocked
-// while holding an assembled item, same reasoning as ingredient counters.
+// Allowed except while holding an assembled item — same reasoning as
+// ingredient counters, including re-grabbing a fresh plate while already
+// holding one.
 
 export function evaluatePlateCounterInteraction(): InteractionResult {
-  if (hasHeldItem() && peekHeldItemModel() === MODELS.plate) {
-    // TODO: make this behave like ingredient counters (re-grab a fresh
-    // plate instead of a no-op) for consistency.
-    return { allowed: true, perform: () => {} }
-  }
   if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
   return { allowed: true, perform: () => attachItemToPlayerHand(MODELS.plate) }
 }

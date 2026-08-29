@@ -10,7 +10,9 @@
 // stack above it via itemHeights.ts.
 //
 // Local mutators render the hand immediately for zero-latency feedback AND
-// send setHeldItem so the server updates the synced component. The
+// send setHeldItem so the server updates the synced component — unless the
+// new models already match what's held, in which case applyLocally skips
+// both (e.g. re-grabbing the same ingredient/plate already in hand). The
 // reconciliation system (startRenderingHeldItems) compares every player's
 // synced state against what's rendered and corrects mismatches — this is
 // what makes the item visible to other players, and what corrects this
@@ -65,6 +67,8 @@ function attachModelsToPlayerHand(models: string[]): void {
 
 /** Sends the local player's new hand contents to the server and renders it immediately, ahead of the round trip. */
 function applyLocally(models: string[]): void {
+  if (sameModels(models, localState()?.models ?? [])) return // already holding this — nothing would change, so skip the network round trip
+
   pendingRestoreModels = null // this hand change fully commits, superseding any still-outstanding pending restore — see takeHeldItemPending's comment
   void room.send('setHeldItem', { models })
   renderHeldItem(localPlayerId(), models)
