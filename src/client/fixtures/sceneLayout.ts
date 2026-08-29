@@ -80,7 +80,7 @@ function createSideWall(
       parent,
       height: FIXTURE_HEIGHT,
       displayModel: MODELS.plateDisplay,
-      evaluateInteraction: () => evaluatePlateCounterInteraction()
+      evaluateInteraction: evaluatePlateCounterInteraction
     })
     nextSlot = 1
   }
@@ -173,7 +173,7 @@ function createBackWall(parent: Entity): void {
         rotation,
         parent,
         height: FIXTURE_HEIGHT,
-        evaluateInteraction: () => evaluateTrashBinInteraction()
+        evaluateInteraction: evaluateTrashBinInteraction
       })
     } else {
       const deliveryCounter = createFixture({

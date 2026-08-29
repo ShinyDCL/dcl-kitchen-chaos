@@ -18,6 +18,7 @@ import { startRenderingStoves } from './fixtures/stoveCooking'
 import { startRenderingHeldItems } from './heldItem'
 import { startMobileCamera } from './mobileCamera'
 import { setupMobileControls } from './mobileControls'
+import { startBackgroundMusic } from './sound'
 import { setupOrdersUi } from './ui/ordersUi'
 import { setupPlayerRoleUi } from './ui/playerRole'
 
@@ -38,4 +39,5 @@ export function initClient(): void {
   setupPlayerRoleUi()
   setupMobileControls()
   startMobileCamera()
+  startBackgroundMusic()
 }

@@ -34,6 +34,7 @@ import { MODELS, sameModels } from '../../shared/models'
 import { DeliveryState } from '../../shared/schemas'
 import { takeHeldItemModelsPending } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
+import { playAcceptSound, playRejectSound } from '../sound'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
 
@@ -51,15 +52,29 @@ const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 let deliveryCounterEntity: Entity | null = null
 let checkmarkWorldPosition: Vector3 | null = null
 
+// Separate entity per sound role — sharing one AudioSource would let a
+// later call cut off a clip still playing (see sound.ts).
+let acceptSoundEntity: Entity | null = null
+let rejectSoundEntity: Entity | null = null
+
 /** Call once when the delivery counter fixture is created. */
 export function registerDeliveryCounter(fixtureEntity: Entity): void {
   deliveryCounterEntity = fixtureEntity
+  acceptSoundEntity = createSoundAnchor(fixtureEntity)
+  rejectSoundEntity = createSoundAnchor(fixtureEntity)
+
   const worldPosition = getWorldPosition(fixtureEntity)
   checkmarkWorldPosition = Vector3.create(
     worldPosition.x,
     worldPosition.y + DELIVERY_CHECKMARK_Y_OFFSET,
     worldPosition.z
   )
+}
+
+function createSoundAnchor(parent: Entity): Entity {
+  const anchor = engine.addEntity()
+  Transform.create(anchor, { position: Vector3.create(0, FIXTURE_HEIGHT, 0), parent })
+  return anchor
 }
 
 /** Takes whatever's held, sends it to the server, and renders the sit-then-shrink sequence locally right away. No-op if nothing's held. */
@@ -173,6 +188,11 @@ function reconcileDelivery(): void {
   renderedSuccess = synced.success
 }
 
+function playDeliveryResultSound(success: boolean): void {
+  if (success) playAcceptSound(acceptSoundEntity)
+  else playRejectSound(rejectSoundEntity)
+}
+
 function arrivedLateButRecently(synced: { models: string[]; startTimestamp: number }): boolean {
   if (synced.models.length === 0) return false
   const windowDuration = DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
@@ -241,6 +261,8 @@ function updateItemScale(startTimestamp: number): void {
   Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 
+let soundPlayedForStartTimestamp: number | null = null // avoids replaying the result sound every frame the mark stays visible
+
 /** The result mark's whole scale-up/hold/scale-down animation is a pure function of elapsed time, so there's no separate "is it animating" state to track. */
 function updateResultMark(active: boolean, startTimestamp: number, success: boolean): void {
   if (checkmarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
@@ -262,6 +284,13 @@ function updateResultMark(active: boolean, startTimestamp: number, success: bool
   if (elapsed < 0 || elapsed > totalDuration) {
     VisibilityComponent.getMutable(shown).visible = false
     return
+  }
+
+  // Played here, not as soon as the verdict is known, so it syncs with the
+  // mark appearing instead of firing ~1s early.
+  if (soundPlayedForStartTimestamp !== startTimestamp) {
+    soundPlayedForStartTimestamp = startTimestamp
+    playDeliveryResultSound(success)
   }
 
   VisibilityComponent.getMutable(shown).visible = true

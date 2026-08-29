@@ -5,8 +5,9 @@
 // A focused fixture's `evaluate` callback re-runs every frame, not just on
 // focus change — its InteractionResult can change while still looking at
 // it (e.g. picking something up changes whether cooking is now allowed).
-// On interact: `perform` runs if allowed, otherwise `message` shows via
-// the on-screen message UI.
+// On interact: `perform` runs if allowed (also playing the interaction
+// sound at the fixture's position), otherwise `message` shows via the
+// on-screen message UI.
 //
 // Spectators are gated out here (isLocalPlayerPlaying) rather than
 // per-fixture in interactionRules.ts, so one check covers every kind.
@@ -20,6 +21,7 @@ import { showMessage } from './fixtureMessage'
 import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
 import { InteractionResult } from './interactionRules'
 import { isLocalPlayerPlaying } from './playerRoleState'
+import { playInteractionSoundAt } from './sound'
 import { getWorldPosition, getWorldRotation } from './worldPosition'
 
 const INTERACTION_RANGE = 2.5 // meters
@@ -138,6 +140,7 @@ function focusSystem(): void {
 
   if (result.allowed) {
     result.perform?.()
+    playInteractionSoundAt(nearest.worldPosition)
   } else if (result.message) {
     showMessage(result.message, nearest.worldPosition)
   }

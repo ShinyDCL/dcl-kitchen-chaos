@@ -50,6 +50,8 @@ export function evaluateIngredientCounterInteraction(sliceModel: string | undefi
 
 export function evaluatePlateCounterInteraction(): InteractionResult {
   if (hasHeldItem() && peekHeldItemModel() === MODELS.plate) {
+    // TODO: make this behave like ingredient counters (re-grab a fresh
+    // plate instead of a no-op) for consistency.
     return { allowed: true, perform: () => {} }
   }
   if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
