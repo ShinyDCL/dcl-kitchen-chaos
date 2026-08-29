@@ -38,9 +38,9 @@ export const Messages = {
   placePlateOnCounter: Schemas.Map({ counterId: Schemas.Int }),
   pickUpPlateFromCounter: Schemas.Map({ counterId: Schemas.Int }),
   pickUpFromCounter: Schemas.Map({ counterId: Schemas.Int }),
-  // A single ingredient is just a one-element models array — same as a
-  // picked-up assembled stack, no separate message needed for the two.
-  placeOnCounter: Schemas.Map({ counterId: Schemas.Int, models: Schemas.Array(Schemas.String) }),
+  // The server places whatever the sender's real HeldItem holds — no
+  // separate message for a single ingredient vs. a stack.
+  placeOnCounter: Schemas.Map({ counterId: Schemas.Int }),
 
   // Start cooking a raw cookable at this stove. rawModel identifies which
   // CookableIngredientDefinition (shared/ingredients.ts) — the server looks
@@ -55,13 +55,11 @@ export const Messages = {
   // walking away with a copy.
   collectFromStove: Schemas.Map({ stoveId: Schemas.Int }),
 
-  // Deliver whatever's held. The server verifies `models` against the
-  // sender's real HeldItem before accepting it (see
-  // server/fixtures/deliveryCounter.ts) rather than trusting the claim, then
-  // timestamps it into the synced DeliveryState everyone animates from.
-  // deliveryCounterId just picks a syncEntity id that doesn't collide with
-  // any other fixture's.
-  deliverHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String), deliveryCounterId: Schemas.Int }),
+  // Deliver whatever's held. The server reads the sender's real HeldItem
+  // (see server/fixtures/deliveryCounter.ts) and timestamps it into the
+  // synced DeliveryState everyone animates from. deliveryCounterId just
+  // avoids colliding with another fixture's sync id.
+  deliverHeldItem: Schemas.Map({ deliveryCounterId: Schemas.Int }),
 
   // Server -> all: broadcast on a matched delivery. Each client times its
   // own success display locally from receipt, not a shared deadline

@@ -17,19 +17,19 @@
 // has no counter slot at all (see sceneLayout.ts). classifyItem/
 // getRequiredModelForIngredient just won't resolve it until it's added.
 
-import { MODELS } from './models'
+import { MODELS, ModelPath } from './models'
 
 export interface CookableIngredientDefinition {
   cookable: true
-  heldModel: string // model held before cooking; used as the lookup key
-  stoveModel: string // model placed on the stove while cooking
-  cookedModel: string // model swapped in once cooking finishes
+  heldModel: ModelPath // model held before cooking; used as the lookup key
+  stoveModel: ModelPath // model placed on the stove while cooking
+  cookedModel: ModelPath // model swapped in once cooking finishes
   cookDurationSeconds: number
 }
 
 interface NonCookableIngredientDefinition {
   cookable: false
-  model: string
+  model: ModelPath
 }
 
 type IngredientDefinition = CookableIngredientDefinition | NonCookableIngredientDefinition
@@ -74,7 +74,7 @@ export function getCookableItemDefinition(heldModel: string): CookableIngredient
 }
 
 /** The model an ingredient key (shared/recipes.ts) must resolve to — the cooked model for a cookable, otherwise its one model. */
-export function getRequiredModelForIngredient(key: string): string | undefined {
+export function getRequiredModelForIngredient(key: string): ModelPath | undefined {
   const definition = INGREDIENTS[key]
   if (!definition) return undefined
   return definition.cookable ? definition.cookedModel : definition.model

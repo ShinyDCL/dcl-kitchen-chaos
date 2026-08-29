@@ -9,24 +9,25 @@
 // client already hides highlight/interaction (see focusManager.ts), but
 // every server module calls this too so a modified client can't bypass it.
 
-import { engine, Entity, EntityUtils, PlayerIdentityData, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
+import { engine, Entity, PlayerIdentityData } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 import { getPlayer } from '@dcl/sdk/src/players'
 
 import { SERVER_HEARTBEAT_INTERVAL_MS } from '../shared/constants'
 import { room } from '../shared/messages'
 import { GAME_STATE_SYNC_ID, GameState, PlayerRole, PlayerRoleValue } from '../shared/schemas'
+import { createPerPlayerStore } from './perPlayerSyncedStore'
 
-const playerEntities = new Map<string, Entity>()
+const store = createPerPlayerStore(PlayerRole, (playerId) => ({ playerId, role: PlayerRoleValue.Spectate }))
 let gameStateEntity: Entity | null = null
 
 export function initPlayerRoster(): void {
-  reconcilePlayerEntities()
+  store.reconcile()
   reconcileGameStateEntity()
 
   room.onMessage('setPlayerRole', (data, context) => {
     if (!context) return
-    const entity = getOrCreatePlayerEntity(context.from.toLowerCase())
+    const entity = store.getOrCreateEntity(context.from.toLowerCase())
     const mutable = PlayerRole.getMutableOrNull(entity)
     if (!mutable) return
     mutable.role = data.role
@@ -38,7 +39,7 @@ export function initPlayerRoster(): void {
 
 /** Whether the given player is currently allowed to act on fixtures — i.e. their PlayerRole is 'play'. */
 export function isPlayerAllowedToAct(playerId: string): boolean {
-  const entity = playerEntities.get(playerId.toLowerCase())
+  const entity = store.getEntity(playerId.toLowerCase())
   if (entity === undefined) return false
   return PlayerRole.getOrNull(entity)?.role === PlayerRoleValue.Play
 }
@@ -93,40 +94,6 @@ function pulseServerHeartbeat(): void {
 
   const mutable = getGameStateMutable()
   if (mutable) mutable.serverHeartbeatAt = now
-}
-
-function getOrCreatePlayerEntity(playerId: string): Entity {
-  const cached = playerEntities.get(playerId)
-  if (cached !== undefined && PlayerRole.getOrNull(cached) !== null) return cached
-  if (cached !== undefined) {
-    playerEntities.delete(playerId)
-    try {
-      engine.removeEntity(cached)
-    } catch {
-      // already gone
-    }
-  }
-
-  const entity = engine.addEntity()
-  PlayerRole.create(entity, { playerId, role: PlayerRoleValue.Spectate })
-  syncEntity(entity, [PlayerRole.componentId]) // no explicit id — auto-allocated, identity lives in playerId
-  playerEntities.set(playerId, entity)
-  return entity
-}
-
-/** Re-adopts PlayerRole entities that may already exist in the CRDT snapshot from a previous server run. */
-function reconcilePlayerEntities(): void {
-  for (const [entity, data] of engine.getEntitiesWith(PlayerRole)) {
-    const [entityNumber] = EntityUtils.fromEntityId(entity)
-    if (entityNumber < RESERVED_STATIC_ENTITIES) continue
-    const playerId = data.playerId.toLowerCase()
-    const existing = playerEntities.get(playerId)
-    if (existing === undefined) {
-      playerEntities.set(playerId, entity)
-    } else if (existing !== entity) {
-      engine.removeEntity(entity)
-    }
-  }
 }
 
 function getOrCreateGameStateEntity(): Entity {

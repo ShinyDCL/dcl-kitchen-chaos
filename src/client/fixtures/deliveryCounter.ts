@@ -11,10 +11,10 @@
 // Both animations are pure functions of `Date.now() - startTimestamp`, so
 // only the delivery (models + one timestamp) ever crosses the network —
 // every client derives the same frame from that shared instant, including
-// one joining mid-animation. The hand-clear goes through
-// takeHeldItemModelsPending rather than broadcasting, since the server
-// verifies the claimed models against the real held item and can reject
-// (restoring the hand) instead of trusting the claim outright.
+// one joining mid-animation. The hand-clear (takeHeldItemModels) doesn't
+// broadcast setHeldItem — deliverHeldItem carries no models of its own, so
+// the server reads the real HeldItem when it processes that message, and a
+// prior setHeldItem here would race ahead and clear it first.
 
 import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -25,7 +25,7 @@ import { room } from '../../shared/messages'
 import { MODELS, sameModels } from '../../shared/models'
 import { DeliveryState } from '../../shared/schemas'
 import { createCameraFacingTransform } from '../cameraFacing'
-import { takeHeldItemModelsPending } from '../heldItem'
+import { takeHeldItemModels } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
 import { isLocalPlayerPlaying } from '../playerRoleState'
 import { playAcceptSound, playRejectSound } from '../sound'
@@ -76,11 +76,11 @@ function createSoundAnchor(parent: Entity): Entity {
 export function deliverHeldItem(): void {
   if (deliveryCounterEntity === null) return
 
-  const models = takeHeldItemModelsPending()
+  const models = takeHeldItemModels()
   if (models.length === 0) return
 
   const startTimestamp = Date.now()
-  void room.send('deliverHeldItem', { models, deliveryCounterId: getFixtureSyncId(deliveryCounterEntity) })
+  void room.send('deliverHeldItem', { deliveryCounterId: getFixtureSyncId(deliveryCounterEntity) })
 
   renderedModels = models
   renderedStartTimestamp = startTimestamp

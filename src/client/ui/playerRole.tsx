@@ -15,10 +15,10 @@
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Button, Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
 import { PlayerRoleValue } from '../../shared/schemas'
+import { onPlatformResolved } from '../platformDetection'
 import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from '../playerRoleState'
 import { isServerAlive } from '../serverReadiness'
 import { ENTRY_PANEL_TRANSFORM, OVERLAY_WRAPPER_TRANSFORM, PANEL_BACKGROUND } from './entryOverlayStyle'
@@ -64,15 +64,8 @@ export function setupPlayerRoleUi(): void {
   })
 
   startPlayerRoleSync()
-  startPlatformDetection()
-}
-
-/** Polls until getPlatform() resolves (null briefly at startup), then locks in the switcher layout once. */
-function startPlatformDetection(): void {
-  engine.addSystem(function detectPlatform() {
-    if (getPlatform() === null) return
-    engine.removeSystem(detectPlatform)
-    currentSwitcherLayout = isMobile() ? MOBILE_SWITCHER_LAYOUT : DESKTOP_SWITCHER_LAYOUT
+  onPlatformResolved((mobile) => {
+    currentSwitcherLayout = mobile ? MOBILE_SWITCHER_LAYOUT : DESKTOP_SWITCHER_LAYOUT
   })
 }
 

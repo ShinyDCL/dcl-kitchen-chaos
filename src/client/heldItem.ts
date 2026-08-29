@@ -21,10 +21,6 @@
 // duplicating a scarce item). setHeldItem itself still isn't validated —
 // see server/heldItems.ts — so outside the stove flow this remains a
 // visibility fix, not anti-cheat.
-//
-// takeHeldItem only returns a model for a single-item hold (null for an
-// assembled stack — check isHoldingAssembledItem() instead).
-// takeHeldItemModels returns every model regardless of shape.
 
 import { AvatarAnchorPointType, AvatarAttach, engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -53,15 +49,11 @@ function localState(): RenderedHeldItem | undefined {
 }
 
 export function attachItemToPlayerHand(model: string): void {
-  attachModelsToPlayerHand([model])
+  applyLocally([model])
 }
 
 /** Attaches a vertical stack of models as one assembled item — e.g. everything picked up off a plate. */
 export function attachAssembledItemToPlayerHand(models: string[]): void {
-  attachModelsToPlayerHand(models)
-}
-
-function attachModelsToPlayerHand(models: string[]): void {
   applyLocally(models)
 }
 
@@ -91,40 +83,37 @@ export function peekHeldItemModel(): string | null {
   return state.models[0]
 }
 
-/** Removes a single-item hold and returns its model, or null if empty-handed or holding an assembled stack. */
-export function takeHeldItem(): string | null {
-  const model = peekHeldItemModel()
-  if (model === null) return null
-  applyLocally([])
-  return model
-}
-
-/** Removes the held item (single or assembled) and returns its models in stacking order, or an empty array if empty-handed. */
-export function takeHeldItemModels(): string[] {
-  const models = localState()?.models ?? []
-  applyLocally([])
-  return models
-}
-
 /** Removes whatever's held (single or assembled) without returning anything. */
 export function discardHeldItem(): void {
   applyLocally([])
 }
 
+/**
+ * Removes the held item and returns its models, clearing the hand locally
+ * WITHOUT broadcasting setHeldItem — for actions whose paired fixture
+ * message carries no models of its own and reads the player's current
+ * HeldItem server-side instead (placeOnCounter, deliverHeldItem).
+ * Broadcasting here first would race ahead of that message and clear the
+ * server's copy before its handler reads it, delivering/placing nothing.
+ */
+export function takeHeldItemModels(): string[] {
+  const models = localState()?.models ?? []
+  renderHeldItem(localPlayerId(), [])
+  return models
+}
+
 let pendingRestoreModels: string[] | null = null
 
 /**
- * Like takeHeldItem, but for an action paired with a server-arbitrated
- * fixture intent whose outcome isn't known yet. Clears the hand prediction
- * immediately WITHOUT broadcasting setHeldItem — the paired intent's own
- * server handler grants the empty hand on success or sends actionRejected
- * on failure, which restorePendingHeldItem uses to put the item back.
- * Broadcasting unconditionally here is how items used to vanish or
- * duplicate in a race.
+ * For a fixture action whose server outcome isn't known yet. Clears the
+ * hand prediction immediately WITHOUT broadcasting setHeldItem — the
+ * paired intent's own server handler grants the empty hand on success or
+ * sends actionRejected on failure, which restorePendingHeldItem uses to
+ * put the item back. Broadcasting unconditionally is how items used to
+ * vanish or duplicate in a race.
  *
  * pendingRestoreModels is a single slot: applyLocally and heldItemsSystem
- * (reconciling the local player's own synced state) both null it out when
- * the hand changes for an unrelated reason, so a stale rejection can't
+ * null it out on an unrelated hand change, so a stale rejection can't
  * restore it over a hand that's since moved on.
  */
 export function takeHeldItemPending(): string | null {
@@ -133,15 +122,6 @@ export function takeHeldItemPending(): string | null {
   pendingRestoreModels = [model]
   renderHeldItem(localPlayerId(), [])
   return model
-}
-
-/** Assembled-stack version of takeHeldItemPending — see its comment. */
-export function takeHeldItemModelsPending(): string[] {
-  const models = localState()?.models ?? []
-  if (models.length === 0) return models
-  pendingRestoreModels = models
-  renderHeldItem(localPlayerId(), [])
-  return models
 }
 
 /** Restores whatever the most recent *Pending call cleared, when its paired fixture action was rejected by the server. */

@@ -34,12 +34,10 @@ export interface InteractionResult {
 }
 
 // --- Ingredient counters ---
-// Allowed except a slot with no model yet, or while holding an assembled
-// item — otherwise grabbing a fresh ingredient silently discards whatever
-// was already built.
+// Allowed except while holding an assembled item — grabbing fresh would
+// silently discard it.
 
-export function evaluateIngredientCounterInteraction(sliceModel: string | undefined): InteractionResult {
-  if (!sliceModel) return { allowed: false, message: 'Not available yet' }
+export function evaluateIngredientCounterInteraction(sliceModel: string): InteractionResult {
   if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
   return { allowed: true, perform: () => attachItemToPlayerHand(sliceModel) }
 }

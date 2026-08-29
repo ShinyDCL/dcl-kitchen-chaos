@@ -1,21 +1,19 @@
 // Ingredient pickup counters — each has a display model showing what's
 // available and, once interacted with, attaches the matching slice to the
 // player's hand, discarding whatever was held before (attachItemToPlayerHand
-// always clears the previous held item). A definition with no
-// displayModel/sliceModel would show a "not available" message instead —
-// currently unused, since every listed ingredient has real models.
+// always clears the previous held item).
 
 import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { FIXTURE_HEIGHT } from '../../shared/constants'
-import { MODELS } from '../../shared/models'
+import { MODELS, ModelPath } from '../../shared/models'
 import { evaluateIngredientCounterInteraction } from '../interactionRules'
 import { createFixture } from './fixtures'
 
 export interface IngredientDefinition {
-  displayModel?: string
-  sliceModel?: string
+  displayModel: ModelPath
+  sliceModel: ModelPath
 }
 
 export const RIGHT_SIDE_INGREDIENTS: IngredientDefinition[] = [

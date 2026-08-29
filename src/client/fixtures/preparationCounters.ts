@@ -28,7 +28,7 @@ import { FIXTURE_HEIGHT } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
 import { PreparationCounterState } from '../../shared/schemas'
-import { takeHeldItemModelsPending, takeHeldItemPending } from '../heldItem'
+import { takeHeldItemModels, takeHeldItemPending } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
 import { getFixtureSyncId } from './fixtures'
 
@@ -127,9 +127,9 @@ export function pickUpFromCounter(counter: Entity): void {
 
 /** Places whatever's held — a single ingredient or an assembled stack — onto the counter's existing stack, on top of whatever's already there. */
 export function placeOnCounter(counter: Entity): void {
-  const models = takeHeldItemModelsPending()
+  const models = takeHeldItemModels()
   if (models.length === 0) return
-  void room.send('placeOnCounter', { counterId: getFixtureSyncId(counter), models })
+  void room.send('placeOnCounter', { counterId: getFixtureSyncId(counter) })
   const { hasPlate, ingredientModels } = getRenderedContents(counter)
   renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
 }

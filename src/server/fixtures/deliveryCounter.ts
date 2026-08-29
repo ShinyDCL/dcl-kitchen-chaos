@@ -3,20 +3,13 @@
 // there's no per-fixture Map — one lazily-created entity, keyed by the
 // client's fixture sync id.
 //
-// The claimed models are verified against the player's real held item
-// (heldItems.ts's getHeldItemModels) before being trusted, rejecting
-// outright on a mismatch — otherwise a modified client could claim to be
-// delivering items it never held, matching any order for free. That's
-// distinct from a verified-but-wrong delivery (an honestly held
-// combination that just misses the recipe), which still "succeeds"
-// visually and consumes the hand — orderQueue.ts's evaluateDelivery picks
-// that verdict.
+// Delivers whatever the player's real HeldItem holds (heldItems.ts's
+// getHeldItemModels), not a client-claimed stack.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../../shared/messages'
-import { sameModels } from '../../shared/models'
 import { DeliveryState } from '../../shared/schemas'
 import { getHeldItemModels, grantHeldItem } from '../heldItems'
 import { evaluateDelivery } from '../orderQueue'
@@ -31,10 +24,6 @@ export function initDeliveryCounter(): void {
     if (!context || !isPlayerAllowedToAct(context.from)) return
     const playerId = context.from.toLowerCase()
     const heldModels = getHeldItemModels(playerId)
-    if (!sameModels(heldModels, data.models)) {
-      void room.send('actionRejected', {}, { to: [context.from] })
-      return
-    }
 
     const success = evaluateDelivery(heldModels, context.from)
     grantHeldItem(playerId, [])

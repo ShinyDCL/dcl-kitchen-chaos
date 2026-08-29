@@ -24,13 +24,13 @@
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
-import { getPlatform, isMobile } from '@dcl/sdk/platform'
 import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
 import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../../shared/recipes'
 import { OrderSlotState } from '../../shared/schemas'
+import { onPlatformResolved } from '../platformDetection'
 import { isLocalPlayerPlaying } from '../playerRoleState'
 
 export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
@@ -129,7 +129,9 @@ let currentLayout: OrderCardLayout = DESKTOP_LAYOUT
 
 export function setupOrdersUi(): void {
   ReactEcsRenderer.setUiRenderer(OrdersUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'interactable' })
-  startPlatformDetection()
+  onPlatformResolved((mobile) => {
+    currentLayout = mobile ? MOBILE_LAYOUT : DESKTOP_LAYOUT
+  })
 
   room.onMessage('orderDelivered', (data) => {
     const recipe = getRecipeById(data.recipeId)
@@ -159,15 +161,6 @@ export function setupOrdersUi(): void {
 
   room.onMessage('orderGenerated', (data) => {
     pendingNewFlashSlots.add(data.slotIndex)
-  })
-}
-
-/** Polls until getPlatform() resolves (null briefly at startup), then locks in the layout once. */
-function startPlatformDetection(): void {
-  engine.addSystem(function detectPlatform() {
-    if (getPlatform() === null) return
-    engine.removeSystem(detectPlatform)
-    currentLayout = isMobile() ? MOBILE_LAYOUT : DESKTOP_LAYOUT
   })
 }
 

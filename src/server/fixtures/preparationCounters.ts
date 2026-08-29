@@ -15,10 +15,8 @@
 //   actionRejected otherwise so the client restores what it optimistically
 //   took out (heldItem.ts's takeHeldItemPending) — otherwise a losing
 //   player's plate could be destroyed on a rejected placement.
-// - placeOnCounter verifies the claimed models against the player's real
-//   held item (heldItems.ts's getHeldItemModels) before trusting them,
-//   rejecting a mismatch the same way — otherwise a modified client could
-//   claim to be placing items it never held.
+// - placeOnCounter places the player's real held item (heldItems.ts's
+//   getHeldItemModels), not a client-claimed stack.
 //
 // Unlike per-player entities, counters are a small fixed set for the
 // scene's whole life, so each uses an EXPLICIT sync id — its counterId,
@@ -29,7 +27,7 @@ import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/
 import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../../shared/messages'
-import { MODELS, sameModels } from '../../shared/models'
+import { MODELS } from '../../shared/models'
 import { PreparationCounterState } from '../../shared/schemas'
 import { getHeldItemModels, grantHeldItem } from '../heldItems'
 import { isPlayerAllowedToAct } from '../playerRoster'
@@ -71,10 +69,6 @@ export function initPreparationCounters(): void {
     if (!context || !isPlayerAllowedToAct(context.from)) return
     const playerId = context.from.toLowerCase()
     const heldModels = getHeldItemModels(playerId)
-    if (!sameModels(heldModels, data.models)) {
-      void room.send('actionRejected', {}, { to: [context.from] })
-      return
-    }
     const state = getMutableState(data.counterId)
     if (!state) return
     state.ingredientModels = [...state.ingredientModels, ...heldModels]
