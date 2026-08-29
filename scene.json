@@ -2,14 +2,14 @@
   "ecs7": true,
   "runtimeVersion": "7",
   "display": {
-    "title": "SDK7 Scene Template",
-    "description": "template scene with SDK7",
+    "title": "Kitchen Chaos",
+    "description": "Team up to grab ingredients, cook them up, and deliver orders before the timer runs out. Keep your streak alive - and don't leave anything on the stove too long, or it'll burn! Game created for the Regenesis Labs Buildathon.",
     "navmapThumbnail": "images/scene-thumbnail.png",
     "favicon": "favicon_asset"
   },
-  "owner": "",
+  "owner": "Shiny",
   "contact": {
-    "name": "SDK",
+    "name": "Shiny",
     "email": ""
   },
   "main": "bin/index.js",
