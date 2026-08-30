@@ -8,13 +8,14 @@
 // authoritative-server skill. Single fixture, so module-level state is
 // fine here unlike stoveCooking.ts's per-stove Map.
 //
-// Both animations are pure functions of `Date.now() - startTimestamp`, so
-// only the delivery (models + one timestamp) ever crosses the network —
-// every client derives the same frame from that shared instant, including
-// one joining mid-animation. The hand-clear (takeHeldItemModels) doesn't
-// broadcast setHeldItem — deliverHeldItem carries no models of its own, so
-// the server reads the real HeldItem when it processes that message, and a
-// prior setHeldItem here would race ahead and clear it first.
+// Both animations run on a local per-client timer, started fresh the
+// moment this client first sees a new `models` value — not a shared
+// network timestamp, since nothing here needs cross-client lockstep, just
+// the right duration once seen.
+//
+// The hand-clear (takeHeldItemModels) doesn't broadcast setHeldItem —
+// deliverHeldItem reads the real HeldItem server-side, and broadcasting
+// here first would race ahead and clear it before that.
 
 import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -39,10 +40,6 @@ const DELIVERY_RESULT_MARK_HOLD_SECONDS = 0.6 // seconds at full scale
 const DELIVERY_RESULT_MARK_MODEL_SCALE = 1.5
 const MOBILE_RESULT_MARK_SCALE = 1.4 // bigger on mobile — see fixtureMessage.ts's MOBILE_SCALE
 const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
-
-// Grace window for a delivery observed just after its 1.4s window closed
-// (latency) — replays from now instead of not showing at all.
-const DELIVERY_LATE_ARRIVAL_GRACE_SECONDS = 5
 
 let deliveryCounterEntity: Entity | null = null
 let resultMarkWorldPosition: Vector3 | null = null
@@ -72,34 +69,26 @@ function createSoundAnchor(parent: Entity): Entity {
   return anchor
 }
 
-/** Takes whatever's held, sends it to the server, and renders the sit-then-shrink sequence locally right away. No-op if nothing's held. */
+/** Takes whatever's held, sends it to the server, and starts the animation locally. No-op if nothing's held. */
 export function deliverHeldItem(): void {
   if (deliveryCounterEntity === null) return
 
   const models = takeHeldItemModels()
   if (models.length === 0) return
 
-  const startTimestamp = Date.now()
   void room.send('deliverHeldItem', { deliveryCounterId: getFixtureSyncId(deliveryCounterEntity) })
-
-  renderedModels = models
-  renderedStartTimestamp = startTimestamp
-  renderedSuccess = null // unknown until the server responds
-  tickDeliveryAnimation() // apply immediately, same as the system's per-frame call
+  startAnimating(models, null) // success unknown until the server responds
+  tickDeliveryAnimation(0) // apply immediately, same as the system's per-frame call
 }
 
-function getSyncedState(): { models: string[]; startTimestamp: number; success: boolean } {
+function getSyncedState(): { models: string[]; success: boolean } {
   for (const [, data] of engine.getEntitiesWith(DeliveryState)) {
-    return { models: [...data.models], startTimestamp: Number(data.startTimestamp), success: data.success }
+    return { models: [...data.models], success: data.success }
   }
-  return { models: [], startTimestamp: 0, success: true }
+  return { models: [], success: true }
 }
 
-function elapsedSince(startTimestamp: number): number {
-  return (Date.now() - startTimestamp) / 1000
-}
-
-// --- Rendering, reconciled against the synced DeliveryState component ---
+// --- Rendering: local timer, reconciled against synced DeliveryState ---
 
 interface RenderedItem {
   root: Entity
@@ -107,12 +96,10 @@ interface RenderedItem {
 }
 
 let renderedItem: RenderedItem | null = null
-let builtStartTimestamp = 0 // startTimestamp renderedItem reflects — detects a new delivery landing while one is still showing
 let renderedModels: string[] = []
-let renderedStartTimestamp = 0
 let renderedSuccess: boolean | null = null // null until the server's verdict is known for the current delivery
+let elapsed = 0 // seconds since this client started animating the current delivery
 let lastSyncedModels: string[] = []
-let lastSyncedStartTimestamp = 0
 let lastSyncedSuccess = true
 let checkmarkEntity: Entity | null = null
 let crossmarkEntity: Entity | null = null
@@ -137,9 +124,9 @@ function prebuildResultMarksOnceReady(): void {
   getOrCreateCrossmark()
 }
 
-function deliveryRenderSystem(): void {
+function deliveryRenderSystem(dt: number): void {
   reconcileDelivery()
-  tickDeliveryAnimation()
+  tickDeliveryAnimation(dt)
 }
 
 /**
@@ -148,42 +135,31 @@ function deliveryRenderSystem(): void {
  * read is briefly stale right after this client's own optimistic
  * deliverHeldItem, and reacting to that would flicker.
  *
- * Same models as already rendered means this is that optimistic guess
- * being corrected, not a new delivery — startTimestamp/success are
- * adopted in place, skipping tickDeliveryAnimation's rebuild, since
- * destroying and recreating the item entities is what caused the flicker.
- *
- * A delivery whose 1.4s window already closed by the time it's first
- * observed is re-anchored to start now, within
- * DELIVERY_LATE_ARRIVAL_GRACE_SECONDS, instead of never showing.
+ * Same models as already rendered means this is that guess being
+ * confirmed, not a new delivery — just adopt success, don't restart.
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
-  const syncedChanged =
-    !sameModels(synced.models, lastSyncedModels) ||
-    synced.startTimestamp !== lastSyncedStartTimestamp ||
-    synced.success !== lastSyncedSuccess
+  const syncedChanged = !sameModels(synced.models, lastSyncedModels) || synced.success !== lastSyncedSuccess
   if (!syncedChanged) return
   lastSyncedModels = synced.models
-  lastSyncedStartTimestamp = synced.startTimestamp
   lastSyncedSuccess = synced.success
 
-  const renderedMatches =
-    sameModels(synced.models, renderedModels) &&
-    synced.startTimestamp === renderedStartTimestamp &&
-    synced.success === renderedSuccess
-  if (renderedMatches) return
-
   if (sameModels(synced.models, renderedModels)) {
-    renderedStartTimestamp = synced.startTimestamp
     renderedSuccess = synced.success
-    builtStartTimestamp = synced.startTimestamp
     return
   }
 
-  renderedModels = synced.models
-  renderedStartTimestamp = arrivedLateButRecently(synced) ? Date.now() : synced.startTimestamp
-  renderedSuccess = synced.success
+  startAnimating(synced.models, synced.success)
+}
+
+/** Starts the local animation for a delivery this client hasn't animated yet. */
+function startAnimating(models: string[], success: boolean | null): void {
+  renderedModels = models
+  renderedSuccess = success
+  elapsed = 0
+  soundPlayed = false
+  rebuildItemEntities(models)
 }
 
 function playDeliveryResultSound(success: boolean): void {
@@ -191,35 +167,21 @@ function playDeliveryResultSound(success: boolean): void {
   else playRejectSound(rejectSoundEntity)
 }
 
-function arrivedLateButRecently(synced: { models: string[]; startTimestamp: number }): boolean {
-  if (synced.models.length === 0) return false
-  const windowDuration = DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
-  const elapsed = elapsedSince(synced.startTimestamp)
-  return elapsed >= windowDuration && elapsed < windowDuration + DELIVERY_LATE_ARRIVAL_GRACE_SECONDS
-}
+function tickDeliveryAnimation(dt: number): void {
+  if (renderedModels.length === 0) return
+  elapsed += dt
 
-/** Rebuilds when withinItemWindow flips OR a new delivery's timestamp differs from the one built — the latter covers a second delivery landing before the first finishes animating. */
-function tickDeliveryAnimation(): void {
-  const active = renderedModels.length > 0
-  const withinItemWindow =
-    active && elapsedSince(renderedStartTimestamp) < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION
-
-  const isNewDelivery = withinItemWindow && renderedStartTimestamp !== builtStartTimestamp
-  if (withinItemWindow !== (renderedItem !== null) || isNewDelivery) {
-    rebuildItemEntities(withinItemWindow ? renderedModels : [])
-    builtStartTimestamp = renderedStartTimestamp
+  if (elapsed < DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION) {
+    updateItemScale(elapsed)
+  } else {
+    teardownItemEntities()
   }
 
-  if (renderedItem !== null) updateItemScale(renderedStartTimestamp)
-  revealDeliveryResult(active, renderedStartTimestamp, renderedSuccess)
+  revealDeliveryResult(elapsed, renderedSuccess)
 }
 
 function rebuildItemEntities(models: string[]): void {
-  if (renderedItem !== null) {
-    for (const entity of renderedItem.entities) engine.removeEntity(entity)
-    engine.removeEntity(renderedItem.root)
-    renderedItem = null
-  }
+  teardownItemEntities()
   if (models.length === 0 || deliveryCounterEntity === null) return
 
   const root = engine.addEntity()
@@ -238,29 +200,35 @@ function rebuildItemEntities(models: string[]): void {
   renderedItem = { root, entities }
 }
 
-function updateItemScale(startTimestamp: number): void {
+function teardownItemEntities(): void {
+  if (renderedItem === null) return
+  for (const entity of renderedItem.entities) engine.removeEntity(entity)
+  engine.removeEntity(renderedItem.root)
+  renderedItem = null
+}
+
+function updateItemScale(elapsedSeconds: number): void {
   if (renderedItem === null) return
 
-  const elapsed = elapsedSince(startTimestamp)
-  if (elapsed < DELIVERY_ITEM_SIT_DURATION) {
+  if (elapsedSeconds < DELIVERY_ITEM_SIT_DURATION) {
     Transform.getMutable(renderedItem.root).scale = Vector3.One()
     return
   }
 
-  const shrinkT = Math.min((elapsed - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_ITEM_SHRINK_DURATION, 1)
+  const shrinkT = Math.min((elapsedSeconds - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_ITEM_SHRINK_DURATION, 1)
   const scale = 1 - shrinkT
   Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 
-let soundPlayedForStartTimestamp: number | null = null // avoids replaying the result sound every frame the mark stays visible
+let soundPlayed = false // avoids replaying the result sound every frame the mark stays visible
 
 /** Shows and sounds the verdict together, so they stay in step instead of drifting apart in separate functions. */
-function revealDeliveryResult(active: boolean, startTimestamp: number, success: boolean | null): void {
+function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): void {
   if (resultMarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
   // Hidden for spectators. Marks may not be built yet (see
   // prebuildResultMarksOnceReady) — nothing to hide in that case.
-  if (!active || success === null || !isLocalPlayerPlaying()) {
+  if (success === null || !isLocalPlayerPlaying()) {
     if (checkmarkEntity !== null) VisibilityComponent.getMutable(checkmarkEntity).visible = false
     if (crossmarkEntity !== null) VisibilityComponent.getMutable(crossmarkEntity).visible = false
     return
@@ -269,22 +237,21 @@ function revealDeliveryResult(active: boolean, startTimestamp: number, success: 
   const shown = success ? getOrCreateCheckmark() : getOrCreateCrossmark()
   const hidden = success ? getOrCreateCrossmark() : getOrCreateCheckmark()
 
-  const elapsed = elapsedSince(startTimestamp)
   const totalDuration = DELIVERY_RESULT_MARK_SCALE_SECONDS * 2 + DELIVERY_RESULT_MARK_HOLD_SECONDS
   VisibilityComponent.getMutable(hidden).visible = false
-  if (elapsed < 0 || elapsed > totalDuration) {
+  if (elapsedSeconds > totalDuration) {
     VisibilityComponent.getMutable(shown).visible = false
     return
   }
 
-  if (soundPlayedForStartTimestamp !== startTimestamp) {
-    soundPlayedForStartTimestamp = startTimestamp
+  if (!soundPlayed) {
+    soundPlayed = true
     playDeliveryResultSound(success)
   }
 
   VisibilityComponent.getMutable(shown).visible = true
   const modelScale = DELIVERY_RESULT_MARK_MODEL_SCALE * (isMobile() ? MOBILE_RESULT_MARK_SCALE : 1)
-  const scale = resultMarkScale(elapsed) * modelScale
+  const scale = resultMarkScale(elapsedSeconds) * modelScale
   Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
 }
 

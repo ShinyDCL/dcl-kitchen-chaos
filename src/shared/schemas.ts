@@ -81,16 +81,13 @@ lockToServer(StoveState)
 
 /**
  * Singleton — the scene only ever creates one delivery counter (see
- * client/fixtures/sceneLayout.ts). `models` is what was last delivered (bottom to
- * top), empty meaning nothing to show right now. `startTimestamp` (server
- * clock, ms) is when that delivery landed; every client derives the item
- * sit/shrink animation and the checkmark/crossmark flourish from
- * `Date.now() - startTimestamp`. `success` (see orderQueue.ts) picks
- * checkmark vs crossmark.
+ * client/fixtures/sceneLayout.ts). `models` is what was last delivered
+ * (bottom to top), empty meaning nothing to show. Each client animates the
+ * item and the checkmark/crossmark on its own local timer, started when it
+ * observes a `models` change. `success` (see orderQueue.ts) picks the mark.
  */
 export const DeliveryState = engine.defineComponent('game::DeliveryState', {
   models: Schemas.Array(Schemas.String),
-  startTimestamp: Schemas.Int64,
   success: Schemas.Boolean
 })
 
