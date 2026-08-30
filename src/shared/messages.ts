@@ -65,27 +65,25 @@ export const Messages = {
   // own success display locally from receipt, not a shared deadline
   // latency could cut short — see orderQueue.ts/ordersUi.tsx.
   orderDelivered: Schemas.Map({
-    slotIndex: Schemas.Int,
     recipeId: Schemas.String,
     deliveredByName: Schemas.String,
-    generatedAt: Schemas.Int64, // the order's own generatedAt, so its card keeps its row position instead of jumping to the front
-    orderNumber: Schemas.Int // the order's own ticket number, so its badge doesn't change during the result display
+    generatedAt: Schemas.Int64, // keeps the card's row position instead of jumping to the front
+    orderNumber: Schemas.Int // the order's ticket number — also the result card's key
   }),
 
-  // Server -> all: broadcast when a slot's timer runs out before anyone
+  // Server -> all: broadcast when an order's timer runs out before anyone
   // delivers it. Same shape/purpose as orderDelivered minus
   // deliveredByName (nobody delivered it) — see ordersUi.tsx's 'timedOut'
   // visual state.
   orderExpired: Schemas.Map({
-    slotIndex: Schemas.Int,
     recipeId: Schemas.String,
     generatedAt: Schemas.Int64,
     orderNumber: Schemas.Int
   }),
 
-  // Server -> all: broadcast whenever a slot gets a fresh order. Same
+  // Server -> all: broadcast whenever a fresh order is generated. Same
   // local-timing reasoning as orderDelivered, for a brief "New!" flash.
-  orderGenerated: Schemas.Map({ slotIndex: Schemas.Int, recipeId: Schemas.String })
+  orderGenerated: Schemas.Map({ recipeId: Schemas.String, orderNumber: Schemas.Int })
 }
 
 export const room = registerMessages(Messages)

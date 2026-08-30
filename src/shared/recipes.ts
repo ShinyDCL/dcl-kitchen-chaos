@@ -23,7 +23,7 @@ export const SAMPLE_RECIPES: Recipe[] = [
   {
     id: 'veggie',
     ingredients: ['bunBottom', 'salad', 'tomato', 'cucumber', 'bunTop'],
-    timerSeconds: 18,
+    timerSeconds: 35,
     difficulty: 1
   },
 
@@ -74,7 +74,7 @@ export const SAMPLE_RECIPES: Recipe[] = [
 
 const RECIPES_BY_ID = new Map(SAMPLE_RECIPES.map((recipe) => [recipe.id, recipe]))
 
-/** Looks up a recipe by id — resolves a synced OrderSlotState's recipeId for rendering. */
+/** Looks up a recipe by id — resolves a synced OrderState's recipeId for rendering. */
 export function getRecipeById(id: string): Recipe | undefined {
   return RECIPES_BY_ID.get(id)
 }

@@ -21,16 +21,12 @@ function lockToServer(component: ServerOnlyComponent): void {
   }
 }
 
-// Reserved explicit sync ids for the scene's non-fixture singletons/fixed
-// sets (GameState, the order queue slots) — contiguous from 100000, well
-// clear of client/fixtures/fixtures.ts's separate 0-based, dynamically-sized
-// fixture id space, so neither can ever collide no matter how large the
-// scene's fixture count grows. Every other component below either derives
-// its id from a fixture (PreparationCounterState, StoveState,
-// DeliveryState) or needs no explicit id at all (per-player components,
-// matched by playerId instead).
+// Reserved explicit sync id for GameState, the scene's one non-fixture
+// singleton — clear of fixtures.ts's separate 0-based fixture id space so
+// neither can ever collide. Every other component below either derives
+// its id from a fixture, or needs no explicit id at all (matched by a
+// field instead — playerId, orderNumber).
 export const GAME_STATE_SYNC_ID = 100000
-export const ORDER_SLOT_SYNC_ID_BASE = 100001 // + slotIndex, one id per MAX_QUEUE_SIZE slot
 
 /**
  * One entity per player who has held something this session. `models` is
@@ -139,24 +135,19 @@ export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
 lockToServer(PlayerCoins)
 
 /**
- * One entity per order queue slot (a fixed set — MAX_QUEUE_SIZE — same
- * explicit-id pattern as PreparationCounterState). `active` is toggled by
- * orderQueue.ts; `recipeId` looks up shared/recipes.ts for which dish this
- * order is for (inactive slots leave it '' and clients skip rendering);
- * `generatedAt` (server clock, ms) drives the HUD's countdown. A delivery
- * advances the slot immediately — the HUD's result display is timed
- * client-side off the orderDelivered/orderExpired broadcast, not a field
- * on this component. `orderNumber` is a session-wide ticket counter,
- * assigned the next value whenever a slot gets a fresh order — it climbs
- * for the whole session, unlike slotIndex which just names the fixed HUD
- * position.
+ * One entity per currently-active order — created on generation, destroyed
+ * on resolution (delivered or expired). No fixed slot count; live count vs.
+ * target queue size is the whole model (see orderQueue.ts). Matched by
+ * `orderNumber` (a session-wide ticket counter, never reused), same
+ * per-entity-field-matching reasoning as HeldItem/PlayerRole's playerId.
+ * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock, ms)
+ * drives the HUD's countdown. Result display is timed client-side off the
+ * orderDelivered/orderExpired broadcast, not a field here.
  */
-export const OrderSlotState = engine.defineComponent('game::OrderSlotState', {
-  slotIndex: Schemas.Int,
-  active: Schemas.Boolean,
+export const OrderState = engine.defineComponent('game::OrderState', {
+  orderNumber: Schemas.Int,
   recipeId: Schemas.String,
-  generatedAt: Schemas.Int64,
-  orderNumber: Schemas.Int
+  generatedAt: Schemas.Int64
 })
 
-lockToServer(OrderSlotState)
+lockToServer(OrderState)

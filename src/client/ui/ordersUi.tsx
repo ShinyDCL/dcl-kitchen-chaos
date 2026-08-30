@@ -1,26 +1,23 @@
-// Order queue HUD — cards along the top-left, newest slot first. Reads
-// straight from the synced OrderSlotState entities every frame; no local
-// prediction to protect, so no reconcile step like heldItem.ts's. Only
-// visible to players in the 'play' role.
+// Order queue HUD — cards centered horizontally, newest first, top on
+// desktop and bottom on mobile (see orderQueueStyle.ts's DESKTOP_LAYOUT/
+// MOBILE_LAYOUT — mobile is short on vertical room, so this stays clear of
+// the top where the player's own view is centered). Reads straight from
+// the synced OrderState entities every frame; no local prediction to
+// protect, so no reconcile step like heldItem.ts's. Only visible to
+// players in the 'play' role.
 //
 // The server broadcasts 'orderDelivered'/'orderExpired'/'orderGenerated'
-// once each, and each client times its result/new-order highlight locally
-// from receipt — not a shared server deadline latency could cut short. A
-// result card (success or timed out) and its slot's live card are
-// independent entries (getActiveOrders) — if a client sees the live
-// update before its own result display ends (latency skew), both just
-// render at once. pendingNewFlashSlots guards the case where
-// 'orderGenerated' beats the OrderSlotState sync itself.
+// once each; each client times its result/new-order highlight locally
+// from receipt. A result card and a live order are independent entries
+// (getActiveOrders), keyed by orderNumber (never reused) — both can render
+// at once if a fresh order beats an earlier result display ending. The
+// server delays a resolved order's replacement by
+// ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so that's rare.
 //
-// Card background eases between normal/new/success via getCardBackground's
-// per-card lerp state — cheap, since this UI rebuilds fully every frame.
-//
-// Ingredients stack bottom-to-top via absolute positioning with an
-// explicitly computed height, not flex + negative margins — flex's 'auto'
-// height isn't reliable with those.
-//
-// DESKTOP_LAYOUT/MOBILE_LAYOUT hold platform-tuned sizing; currentLayout
-// starts as desktop and updates once getPlatform() resolves.
+// New/success/timedOut render as a colorful overlay drawn ON TOP of the
+// ingredient stack and progress bar, not a background color change — the
+// ingredients are opaque textures, so a color behind them wouldn't show.
+// Eases in/out via getStatusOverlayColor.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
@@ -29,106 +26,55 @@ import ReactEcs, { Label, ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
 import { room } from '../../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../../shared/recipes'
-import { OrderSlotState } from '../../shared/schemas'
+import { OrderState } from '../../shared/schemas'
 import { onPlatformResolved } from '../platformDetection'
 import { isLocalPlayerPlaying } from '../playerRoleState'
-
-export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
+import {
+  ATLAS_TEXTURE_SRC,
+  CARD_BACKGROUND,
+  CARD_BORDER_RADIUS,
+  DELIVERED_BY_NAME_MAX_LENGTH,
+  DESKTOP_LAYOUT,
+  MOBILE_LAYOUT,
+  ORDER_BADGE_BACKGROUND,
+  ORDER_BADGE_BORDER_RADIUS,
+  ORDER_BADGE_FONT_SIZE,
+  ORDER_BADGE_HEIGHT,
+  ORDER_BADGE_MARGIN,
+  ORDER_BADGE_TEXT_COLOR,
+  ORDER_BADGE_Z_INDEX,
+  OrderCardLayout,
+  OVERLAY_NEW_BACKGROUND,
+  OVERLAY_SUCCESS_BACKGROUND,
+  OVERLAY_TIMED_OUT_BACKGROUND,
+  OVERLAY_TRANSPARENT,
+  PROGRESS_FILL_COLOR,
+  PROGRESS_TRACK_COLOR,
+  STATUS_BADGE_FONT_SIZE,
+  STATUS_BADGE_HEIGHT,
+  STATUS_BADGE_TEXT_COLOR,
+  STATUS_OVERLAY_BG_TRANSFORM,
+  STATUS_OVERLAY_TEXT_TRANSFORM,
+  SUCCESS_LINE_GAP,
+  SUCCESS_SUBTEXT_FONT_SIZE,
+  SUCCESS_SUBTEXT_HEIGHT,
+  SUCCESS_TEXT_COLOR,
+  SUCCESS_TITLE_FONT_SIZE,
+  SUCCESS_TITLE_HEIGHT
+} from './orderQueueStyle'
 
 // How long a freshly generated order flashes its "New!" highlight.
 const ORDER_NEW_FLASH_SECONDS = 1
 
-const SUCCESS_GREEN = Color4.create(0.2, 0.85, 0.3, 1) // shared base hue for every "success" signal on this HUD
-const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1) // shared base hue for every "timed out/overdue" signal on this HUD
-
-const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
-const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8)
-const CARD_SUCCESS_BACKGROUND = Color4.create(SUCCESS_GREEN.r, SUCCESS_GREEN.g, SUCCESS_GREEN.b, 0.9)
-const CARD_TIMED_OUT_BACKGROUND = Color4.create(DANGER_RED.r, DANGER_RED.g, DANGER_RED.b, 0.9)
-const CARD_NEW_BACKGROUND = Color4.create(0.15, 0.4, 0.85, 0.9) // blue — distinct from success green and the timer bar's red
-const CARD_COLOR_TRANSITION_SECONDS = 0.3
-const TIMER_BAR_HEIGHT = 8
-const TIMER_BAR_BORDER_RADIUS = 4
-const TIMER_BAR_MARGIN_TOP = 8
-
-const SUCCESS_TITLE_FONT_SIZE = 14
-const SUCCESS_TITLE_HEIGHT = 18 // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
-const SUCCESS_SUBTEXT_FONT_SIZE = 11
-const SUCCESS_SUBTEXT_HEIGHT = 14
-const SUCCESS_LINE_GAP = 2
-const SUCCESS_MESSAGE_MARGIN_TOP = 2
-const SUCCESS_TEXT_COLOR = Color4.White()
-const DELIVERED_BY_NAME_MAX_LENGTH = 10 // truncated (no ellipsis) so a long display name can't overflow the card
-
-// Shared by every simple one-line footer badge (New!, Timed Out!) — see StatusBadge.
-const STATUS_BADGE_FONT_SIZE = 14
-const STATUS_BADGE_HEIGHT = 18
-const STATUS_BADGE_MARGIN_TOP = 2
-const STATUS_BADGE_TEXT_COLOR = Color4.White()
-
-// Order badge — a session-wide ticket number (climbs for the whole
-// session, see server/orderQueue.ts's orderNumber), overlaid on the
-// card's top-left corner rather than its own row, since card height
-// already varies by recipe (see the file header). A fixed dark color
-// rather than the card's own background keeps it readable against all
-// three card states. Width is fixed rather than 'auto' — an auto-sized
-// parent around a text child doesn't reliably size itself in this
-// renderer (see playerRole.tsx's switcher for the same gotcha) — sized
-// generously enough for a 3-digit number without measuring text.
-const ORDER_BADGE_WIDTH = 36
-const ORDER_BADGE_HEIGHT = 20
-const ORDER_BADGE_MARGIN = 2
-const ORDER_BADGE_FONT_SIZE = 12
-const ORDER_BADGE_BORDER_RADIUS = 10
-const ORDER_BADGE_BACKGROUND = Color4.create(0, 0, 0, 0.85)
-const ORDER_BADGE_TEXT_COLOR = Color4.White()
-
-// Two fixed zones (green/red) instead of a single growing fill — a dark
-// mask anchored to the right shrinks as progress increases, revealing
-// whether the deadline reached is still safely green or overdue in red.
-// Mask is nearly opaque so the edge stays sharp on a small bar.
-const TIMER_ZONE_GREEN_PERCENT = 75
-const TIMER_ZONE_RED_PERCENT = 25
-const TIMER_MASK_COLOR = Color4.create(0, 0, 0, 0.92)
-
-interface OrderCardLayout {
-  cardWidth: number
-  cardPadding: number
-  cardGap: number
-  iconWidth: number
-  iconHeight: number
-  iconOverlap: number
-  topOffset: number
-  leftOffset: number
-}
-
-const DESKTOP_LAYOUT: OrderCardLayout = {
-  cardWidth: 96,
-  cardPadding: 10,
-  cardGap: 12,
-  iconWidth: 64,
-  iconHeight: 32, // half of the atlas's native 128x64 per ingredient cell
-  iconOverlap: 16,
-  topOffset: 24,
-  leftOffset: 24
-}
-
-// Smaller, tighter-packed cards tuned from on-device testing.
-const MOBILE_LAYOUT: OrderCardLayout = {
-  cardWidth: 76,
-  cardPadding: 6,
-  cardGap: 8,
-  iconWidth: 56,
-  iconHeight: 28,
-  iconOverlap: 15,
-  topOffset: 0,
-  leftOffset: 24
-}
+const OVERLAY_COLOR_TRANSITION_SECONDS = 0.3
 
 let currentLayout: OrderCardLayout = DESKTOP_LAYOUT
 
 export function setupOrdersUi(): void {
-  ReactEcsRenderer.setUiRenderer(OrdersUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'interactable' })
+  // 'device' only clears the hardware safe area (no-op on desktop), unlike
+  // 'interactable' which also excludes the minimap/chat and would keep the
+  // queue off true screen-center.
+  ReactEcsRenderer.setUiRenderer(OrdersUI, { virtualWidth: 1920, virtualHeight: 1080, screenInset: 'device' })
   onPlatformResolved((mobile) => {
     currentLayout = mobile ? MOBILE_LAYOUT : DESKTOP_LAYOUT
   })
@@ -136,7 +82,7 @@ export function setupOrdersUi(): void {
   room.onMessage('orderDelivered', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    cardOverrides.set(data.slotIndex, {
+    cardOverrides.set(data.orderNumber, {
       kind: 'success',
       recipe,
       deliveredByName: data.deliveredByName,
@@ -149,7 +95,7 @@ export function setupOrdersUi(): void {
   room.onMessage('orderExpired', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    cardOverrides.set(data.slotIndex, {
+    cardOverrides.set(data.orderNumber, {
       kind: 'timedOut',
       recipe,
       deliveredByName: '',
@@ -160,7 +106,7 @@ export function setupOrdersUi(): void {
   })
 
   room.onMessage('orderGenerated', (data) => {
-    pendingNewFlashSlots.add(data.slotIndex)
+    newOrderFlashUntil.set(data.orderNumber, Date.now() + ORDER_NEW_FLASH_SECONDS * 1000)
   })
 }
 
@@ -173,23 +119,16 @@ interface CardOverride {
   endsAt: number
 }
 
-// Keyed by slotIndex — client-local timing, see the file header comment.
+// Keyed by orderNumber — client-local timing, see the file header comment.
 const cardOverrides = new Map<number, CardOverride>()
 
-// Keyed by slotIndex — a slot that got 'orderGenerated' but hasn't been
-// rendered yet (still covered by its own result display). The flash
-// timer only starts once actually rendered, so a refill right after this
-// client's own delivery still gets its full flash instead of elapsing
-// unseen underneath the longer result display.
-const pendingNewFlashSlots = new Set<number>()
-
-// Keyed by slotIndex, value is when the "New!" flash ends locally, once started.
+// Keyed by orderNumber, value is when its "New!" flash ends locally.
 const newOrderFlashUntil = new Map<number, number>()
 
 type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
 interface ActiveOrder {
-  cardKey: string // unique per rendered card — a result card and its already-regenerated live slot can render simultaneously, so slotIndex alone isn't unique
+  cardKey: string // orderNumber as a string — never reused, so unique across both overrides and live orders
   recipe: Recipe
   generatedAt: number
   orderNumber: number
@@ -198,48 +137,40 @@ interface ActiveOrder {
 }
 
 /**
- * Newest first by generatedAt. A result override and its slot's live state
- * are independent entries, not mutually exclusive — if the server's
- * regenerated order becomes visible before this client's own result
- * display ends (latency skew), both simply show at once instead of one
- * hiding the other.
+ * Newest first by generatedAt. A result override and a live order are
+ * independent entries, not mutually exclusive — if a fresh order becomes
+ * visible before this client's own earlier result display ends (latency
+ * skew), both simply show at once instead of one hiding the other.
  */
 function getActiveOrders(): ActiveOrder[] {
   const now = Date.now()
   const active: ActiveOrder[] = []
 
-  for (const [slotIndex, override] of cardOverrides) {
+  for (const [orderNumber, override] of cardOverrides) {
     if (now >= override.endsAt) {
-      cardOverrides.delete(slotIndex)
+      cardOverrides.delete(orderNumber)
       continue
     }
     active.push({
-      cardKey: `${override.kind}-${slotIndex}`,
+      cardKey: String(orderNumber),
       recipe: override.recipe,
       generatedAt: override.generatedAt,
-      orderNumber: override.orderNumber,
+      orderNumber,
       visualState: override.kind,
       deliveredByName: override.deliveredByName
     })
   }
 
-  for (const [, data] of engine.getEntitiesWith(OrderSlotState)) {
-    if (!data.active) continue
+  for (const [, data] of engine.getEntitiesWith(OrderState)) {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
 
-    let isNew: boolean
-    if (pendingNewFlashSlots.delete(data.slotIndex)) {
-      newOrderFlashUntil.set(data.slotIndex, now + ORDER_NEW_FLASH_SECONDS * 1000)
-      isNew = true
-    } else {
-      const flashUntil = newOrderFlashUntil.get(data.slotIndex)
-      isNew = flashUntil !== undefined && now < flashUntil
-      if (flashUntil !== undefined && !isNew) newOrderFlashUntil.delete(data.slotIndex)
-    }
+    const flashUntil = newOrderFlashUntil.get(data.orderNumber)
+    const isNew = flashUntil !== undefined && now < flashUntil
+    if (flashUntil !== undefined && !isNew) newOrderFlashUntil.delete(data.orderNumber)
 
     active.push({
-      cardKey: `live-${data.slotIndex}`,
+      cardKey: String(data.orderNumber),
       recipe,
       generatedAt: Number(data.generatedAt),
       orderNumber: data.orderNumber,
@@ -248,44 +179,47 @@ function getActiveOrders(): ActiveOrder[] {
     })
   }
 
-  return active.sort((a, b) => b.generatedAt - a.generatedAt)
+  // orderNumber as a tiebreaker: orders generated in the same server tick
+  // (e.g. filling the queue at session start) can share a generatedAt
+  // millisecond; orderNumber is always a correct stand-in for creation order.
+  return active.sort((a, b) => b.generatedAt - a.generatedAt || b.orderNumber - a.orderNumber)
 }
 
-// Keyed by slotIndex — an in-progress background ease; see getCardBackground.
-interface CardColorTransition {
+// Keyed by cardKey — an in-progress overlay color ease; see getStatusOverlayColor.
+interface OverlayColorTransition {
   fromColor: Color4
   toColor: Color4
   state: CardVisualState
   startedAt: number
 }
-const cardColorTransitions = new Map<string, CardColorTransition>()
+const overlayColorTransitions = new Map<string, OverlayColorTransition>()
 
 function visualStateColor(state: CardVisualState): Color4 {
-  if (state === 'success') return CARD_SUCCESS_BACKGROUND
-  if (state === 'timedOut') return CARD_TIMED_OUT_BACKGROUND
-  if (state === 'new') return CARD_NEW_BACKGROUND
-  return CARD_BACKGROUND
+  if (state === 'success') return OVERLAY_SUCCESS_BACKGROUND
+  if (state === 'timedOut') return OVERLAY_TIMED_OUT_BACKGROUND
+  if (state === 'new') return OVERLAY_NEW_BACKGROUND
+  return OVERLAY_TRANSPARENT
 }
 
-/** The card background for this card, easing toward `state`'s color whenever `state` just changed, rather than snapping instantly. */
-function getCardBackground(cardKey: string, state: CardVisualState): Color4 {
+/** This card's overlay color, easing toward `state`'s color whenever `state` just changed, rather than snapping instantly. */
+function getStatusOverlayColor(cardKey: string, state: CardVisualState): Color4 {
   const now = Date.now()
-  const existing = cardColorTransitions.get(cardKey)
+  const existing = overlayColorTransitions.get(cardKey)
   const targetColor = visualStateColor(state)
 
   if (!existing || existing.state !== state) {
     // Start from the current eased color, not the old target, so a state change mid-fade doesn't jump.
     const fromColor = existing ? lerpTransitionColor(existing, now) : targetColor
-    const transition: CardColorTransition = { fromColor, toColor: targetColor, state, startedAt: now }
-    cardColorTransitions.set(cardKey, transition)
+    const transition: OverlayColorTransition = { fromColor, toColor: targetColor, state, startedAt: now }
+    overlayColorTransitions.set(cardKey, transition)
     return fromColor
   }
 
   return lerpTransitionColor(existing, now)
 }
 
-function lerpTransitionColor(transition: CardColorTransition, now: number): Color4 {
-  const t = Math.min((now - transition.startedAt) / (CARD_COLOR_TRANSITION_SECONDS * 1000), 1)
+function lerpTransitionColor(transition: OverlayColorTransition, now: number): Color4 {
+  const t = Math.min((now - transition.startedAt) / (OVERLAY_COLOR_TRANSITION_SECONDS * 1000), 1)
   return Color4.lerp(transition.fromColor, transition.toColor, t)
 }
 
@@ -300,13 +234,11 @@ function OrdersUI() {
       <UiEntity
         uiTransform={{
           positionType: 'absolute',
-          position: { top: layout.topOffset, left: layout.leftOffset },
-          width: 'auto',
+          position: layout.verticalAnchor === 'top' ? { top: layout.edgeOffset } : { bottom: layout.edgeOffset },
+          width: '100%',
           height: 'auto',
           flexDirection: 'row',
-          // Default alignItems is 'stretch', which would force every card
-          // to the tallest sibling's height — 'flex-start' lets each size
-          // to its own content instead.
+          justifyContent: 'center',
           alignItems: 'flex-start'
         }}
       >
@@ -343,59 +275,86 @@ function OrderCard({
   deliveredByName: string
   layout: OrderCardLayout
 }) {
-  const background = getCardBackground(cardKey, visualState)
+  const overlayColor = getStatusOverlayColor(cardKey, visualState)
 
   return (
     <UiEntity
       uiTransform={{
         width: layout.cardWidth,
         height: 'auto',
-        flexDirection: 'column',
-        alignItems: 'center',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
         padding: layout.cardPadding,
         margin: { right: layout.cardGap },
-        borderRadius: CARD_BORDER_RADIUS
+        borderRadius: CARD_BORDER_RADIUS,
+        overflow: 'hidden' // clips the status overlay (and progress bar) to the card's rounded corners
       }}
-      uiBackground={{ color: background }}
+      uiBackground={{ color: CARD_BACKGROUND }}
     >
       <IngredientStack ingredients={recipe.ingredients} layout={layout} />
+      <ProgressBar generatedAt={generatedAt} timerSeconds={recipe.timerSeconds} layout={layout} />
+      <StatusOverlayBackground color={overlayColor} />
       {visualState === 'success' ? (
         <SuccessMessage deliveredByName={deliveredByName} />
       ) : visualState === 'timedOut' ? (
-        <StatusBadge text="Timed Out!" />
+        <StatusText text="Timed out!" />
       ) : visualState === 'new' ? (
-        <StatusBadge text="New!" />
-      ) : (
-        <TimerBar timerSeconds={recipe.timerSeconds} generatedAt={generatedAt} />
-      )}
-      {/* Rendered last (and given a zIndex) so it paints over the ingredient stack rather than under it. */}
-      <OrderBadge orderNumber={orderNumber} />
+        <StatusText text="New!" />
+      ) : null}
+      <OrderBadge orderNumber={orderNumber} layout={layout} />
     </UiEntity>
   )
 }
 
-/** A pill, not a circle — a circle only has room for 1-2 digits before text starts clipping at the rounded edges; a pill can grow wider as the session-wide ticket number climbs. */
-function OrderBadge({ orderNumber }: { orderNumber: number }) {
+/**
+ * A pill, not a circle — a circle only fits 1-2 digits before clipping; a
+ * pill can grow with the ticket number. Uses uiText directly rather than a
+ * nested Label, so there's one centering mechanism, not two stacked. Still
+ * reads slightly off-center vertically — no line-height/baseline control
+ * available, and padding nudges didn't help — left as-is.
+ */
+function OrderBadge({ orderNumber, layout }: { orderNumber: number; layout: OrderCardLayout }) {
   return (
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
         position: { top: ORDER_BADGE_MARGIN, left: ORDER_BADGE_MARGIN },
-        zIndex: 10,
-        width: ORDER_BADGE_WIDTH,
+        zIndex: ORDER_BADGE_Z_INDEX,
+        width: layout.badgeWidth,
         height: ORDER_BADGE_HEIGHT,
-        justifyContent: 'center',
-        alignItems: 'center',
         borderRadius: ORDER_BADGE_BORDER_RADIUS
       }}
       uiBackground={{ color: ORDER_BADGE_BACKGROUND }}
-    >
+      uiText={{
+        value: `#${orderNumber}`,
+        fontSize: ORDER_BADGE_FONT_SIZE,
+        color: ORDER_BADGE_TEXT_COLOR,
+        textAlign: 'middle-center'
+      }}
+    />
+  )
+}
+
+/**
+ * Dims the ingredient stack/progress bar for text legibility — drawn above
+ * them, below the status text. Rounds itself explicitly rather than
+ * relying on the card's `overflow: 'hidden'`, which clips to a rectangle,
+ * not the card's rounded shape (most visible on mobile).
+ */
+function StatusOverlayBackground({ color }: { color: Color4 }) {
+  return <UiEntity uiTransform={STATUS_OVERLAY_BG_TRANSFORM} uiBackground={{ color }} />
+}
+
+/** A one-line status message centered over the whole card — used for "New!"/"Timed out!". */
+function StatusText({ text }: { text: string }) {
+  return (
+    <UiEntity uiTransform={STATUS_OVERLAY_TEXT_TRANSFORM}>
       <Label
-        value={`#${orderNumber}`}
-        fontSize={ORDER_BADGE_FONT_SIZE}
-        color={ORDER_BADGE_TEXT_COLOR}
+        value={text}
+        fontSize={STATUS_BADGE_FONT_SIZE}
+        color={STATUS_BADGE_TEXT_COLOR}
         textAlign="middle-center"
-        uiTransform={{ width: '100%', height: '100%' }}
+        uiTransform={{ width: '100%', height: STATUS_BADGE_HEIGHT }}
       />
     </UiEntity>
   )
@@ -403,15 +362,7 @@ function OrderBadge({ orderNumber }: { orderNumber: number }) {
 
 function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
   return (
-    <UiEntity
-      uiTransform={{
-        width: '100%',
-        height: SUCCESS_TITLE_HEIGHT + SUCCESS_LINE_GAP + SUCCESS_SUBTEXT_HEIGHT,
-        flexDirection: 'column',
-        alignItems: 'center',
-        margin: { top: SUCCESS_MESSAGE_MARGIN_TOP }
-      }}
-    >
+    <UiEntity uiTransform={{ ...STATUS_OVERLAY_TEXT_TRANSFORM, flexDirection: 'column' }}>
       <Label
         value="Success!"
         fontSize={SUCCESS_TITLE_FONT_SIZE}
@@ -430,40 +381,16 @@ function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
   )
 }
 
-/** A simple one-line footer badge — used for both the "New!" flash and the "Timed Out!" result. */
-function StatusBadge({ text }: { text: string }) {
-  return (
-    <UiEntity
-      uiTransform={{
-        width: '100%',
-        height: STATUS_BADGE_HEIGHT,
-        alignItems: 'center',
-        margin: { top: STATUS_BADGE_MARGIN_TOP }
-      }}
-    >
-      <Label
-        value={text}
-        fontSize={STATUS_BADGE_FONT_SIZE}
-        color={STATUS_BADGE_TEXT_COLOR}
-        textAlign="middle-center"
-        uiTransform={{ width: '100%', height: STATUS_BADGE_HEIGHT }}
-      />
-    </UiEntity>
-  )
-}
-
 /**
- * Stacks ingredients bottom-up: ingredients[0] sits at the bottom, each
- * next one overlaps higher up, last one on top in z-order. Height is
- * computed from the ingredient count so the card shrink-wraps exactly —
- * different recipes intentionally get different card heights.
+ * Stacks ingredients bottom-up, each one overlapping higher, last on top
+ * in z-order. Container height is fixed to fit the longest recipe, so a
+ * shorter stack just leaves empty space above it.
  */
 function IngredientStack({ ingredients, layout }: { ingredients: string[]; layout: OrderCardLayout }) {
   const iconStep = layout.iconHeight - layout.iconOverlap
-  const stackHeight = layout.iconHeight + (ingredients.length - 1) * iconStep
 
   return (
-    <UiEntity uiTransform={{ width: layout.iconWidth, height: stackHeight }}>
+    <UiEntity uiTransform={{ width: layout.iconWidth, height: layout.cardContentHeight }}>
       {ingredients.map((ingredient, index) => (
         <UiEntity
           key={`${ingredient}-${index}`}
@@ -485,38 +412,42 @@ function IngredientStack({ ingredients, layout }: { ingredients: string[]; layou
   )
 }
 
-function TimerBar({ timerSeconds, generatedAt }: { timerSeconds: number; generatedAt: number }) {
+/** Vertical fill draining top-to-bottom as the deadline approaches — anchored to the bottom, shrinking upward, one color throughout (no separate danger-zone color, kept simple). */
+function ProgressBar({
+  generatedAt,
+  timerSeconds,
+  layout
+}: {
+  generatedAt: number
+  timerSeconds: number
+  layout: OrderCardLayout
+}) {
   const elapsedSeconds = (Date.now() - generatedAt) / 1000
-  const progress = Math.min(elapsedSeconds / timerSeconds, 1)
-  const maskWidthPercent = (1 - progress) * 100
+  const remainingPercent = (1 - Math.min(elapsedSeconds / timerSeconds, 1)) * 100
 
   return (
     <UiEntity
       uiTransform={{
-        width: '100%',
-        height: TIMER_BAR_HEIGHT,
-        margin: { top: TIMER_BAR_MARGIN_TOP },
-        flexDirection: 'row',
-        borderRadius: TIMER_BAR_BORDER_RADIUS,
+        width: layout.barWidth,
+        height: layout.cardContentHeight,
+        margin: { left: layout.barGap },
+        borderRadius: layout.barBorderRadius,
         overflow: 'hidden'
       }}
+      uiBackground={{ color: PROGRESS_TRACK_COLOR }}
     >
-      <UiEntity
-        uiTransform={{ width: `${TIMER_ZONE_GREEN_PERCENT}%`, height: '100%' }}
-        uiBackground={{ color: SUCCESS_GREEN }}
-      />
-      <UiEntity
-        uiTransform={{ width: `${TIMER_ZONE_RED_PERCENT}%`, height: '100%' }}
-        uiBackground={{ color: DANGER_RED }}
-      />
       <UiEntity
         uiTransform={{
           positionType: 'absolute',
-          position: { top: 0, right: 0 },
-          width: `${maskWidthPercent}%`,
-          height: '100%'
+          position: { bottom: 0, left: 0 },
+          width: '100%',
+          height: `${remainingPercent}%`,
+          // Own radius rather than relying on the track's overflow:'hidden'
+          // to round it — that clips to a rectangle, not the track's actual
+          // rounded shape (see StatusOverlayBackground's comment).
+          borderRadius: layout.barBorderRadius
         }}
-        uiBackground={{ color: TIMER_MASK_COLOR }}
+        uiBackground={{ color: PROGRESS_FILL_COLOR }}
       />
     </UiEntity>
   )

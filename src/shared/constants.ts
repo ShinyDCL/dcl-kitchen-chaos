@@ -16,7 +16,9 @@ export const FIRE_TEXTURE = 'assets/scene/textures/SpriteFire.png'
 // server (which model collectFromStove grants) must agree on this.
 export const BURN_GRACE_SECONDS = 10
 
-// Result display duration — client and server must agree on this.
+// Result card display duration, and the server's minimum gap before
+// regenerating — must agree, so a fresh order doesn't appear mid-display
+// (see orderQueue.ts).
 export const ORDER_RESULT_DISPLAY_SECONDS = 2
 
 // Server heartbeat — see client/serverReadiness.ts.

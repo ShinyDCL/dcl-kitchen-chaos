@@ -7,7 +7,7 @@ import { AssetLoad, engine } from '@dcl/sdk/ecs'
 import { FIRE_TEXTURE, SMOKE_TEXTURE } from '../shared/constants'
 import { MODELS } from '../shared/models'
 import { ACCEPT_SOUND, INTERACTION_SOUND, REJECT_SOUND } from './sound'
-import { ATLAS_TEXTURE_SRC } from './ui/ordersUi'
+import { ATLAS_TEXTURE_SRC } from './ui/orderQueueStyle'
 
 export function preloadAssets(): void {
   AssetLoad.create(engine.RootEntity, {
