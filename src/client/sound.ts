@@ -2,11 +2,15 @@
 // one shared, repositioned entity (see playInteractionSoundAt) since it
 // can happen at any fixture; accept/reject are delivery-counter-specific
 // and keep their own dedicated entities (see deliveryCounter.ts) so one
-// can't cut the other off mid-playback. Background music is separate:
-// attached to the camera instead of `global`, which didn't play reliably.
+// can't cut the other off mid-playback. Background music is desktop-only:
+// it cut out on mobile whether attached to the camera (see
+// mobileCamera.ts's follow camera) or set `global`, so it's simply not
+// started there rather than chasing a third workaround.
 
 import { AudioSource, engine, Entity, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
+
+import { onPlatformResolved } from './platformDetection'
 
 export const INTERACTION_SOUND = 'assets/scene/sounds/pickup.mp3'
 export const ACCEPT_SOUND = 'assets/scene/sounds/accept.mp3'
@@ -42,12 +46,15 @@ export function playRejectSound(entity: Entity | null): void {
   playSoundAt(entity, REJECT_SOUND)
 }
 
-/** Call once during client setup. */
+/** Call once during client setup. Desktop only — see the file header. */
 export function startBackgroundMusic(): void {
-  AudioSource.create(engine.CameraEntity, {
-    audioClipUrl: BACKGROUND_MUSIC,
-    playing: true,
-    loop: true,
-    volume: BACKGROUND_MUSIC_VOLUME
+  onPlatformResolved((mobile) => {
+    if (mobile) return
+    AudioSource.create(engine.CameraEntity, {
+      audioClipUrl: BACKGROUND_MUSIC,
+      playing: true,
+      loop: true,
+      volume: BACKGROUND_MUSIC_VOLUME
+    })
   })
 }
