@@ -80,11 +80,15 @@ lockToServer(StoveState)
  * client/fixtures/sceneLayout.ts). `models` is what was last delivered
  * (bottom to top), empty meaning nothing to show. Each client animates the
  * item and the checkmark/crossmark on its own local timer, started when it
- * observes a `models` change. `success` (see orderQueue.ts) picks the mark.
+ * observes a `deliveryId` change. `success` (see orderQueue.ts) picks the
+ * mark. `deliveryId` is bumped by the server on every resolved delivery —
+ * needed because two deliveries in a row can have identical `models`/
+ * `success`, which content-diffing alone can't tell apart from a stale read.
  */
 export const DeliveryState = engine.defineComponent('game::DeliveryState', {
   models: Schemas.Array(Schemas.String),
-  success: Schemas.Boolean
+  success: Schemas.Boolean,
+  deliveryId: Schemas.Int
 })
 
 lockToServer(DeliveryState)

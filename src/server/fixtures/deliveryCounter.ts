@@ -33,6 +33,7 @@ export function initDeliveryCounter(): void {
     if (!mutable) return
     mutable.models = heldModels
     mutable.success = success
+    mutable.deliveryId += 1
   })
 }
 
@@ -40,7 +41,7 @@ function getOrCreateDeliveryEntity(deliveryCounterId: number): Entity {
   if (deliveryEntity !== null && DeliveryState.getOrNull(deliveryEntity) !== null) return deliveryEntity
 
   const entity = engine.addEntity()
-  DeliveryState.create(entity, { models: [], success: true })
+  DeliveryState.create(entity, { models: [], success: true, deliveryId: 0 })
   syncEntity(entity, [DeliveryState.componentId], deliveryCounterId)
   deliveryEntity = entity
   return entity

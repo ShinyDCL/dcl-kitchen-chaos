@@ -81,11 +81,11 @@ export function deliverHeldItem(): void {
   tickDeliveryAnimation(0) // apply immediately, same as the system's per-frame call
 }
 
-function getSyncedState(): { models: string[]; success: boolean } {
+function getSyncedState(): { models: string[]; success: boolean; deliveryId: number } {
   for (const [, data] of engine.getEntitiesWith(DeliveryState)) {
-    return { models: [...data.models], success: data.success }
+    return { models: [...data.models], success: data.success, deliveryId: data.deliveryId }
   }
-  return { models: [], success: true }
+  return { models: [], success: true, deliveryId: 0 }
 }
 
 // --- Rendering: local timer, reconciled against synced DeliveryState ---
@@ -99,8 +99,7 @@ let renderedItem: RenderedItem | null = null
 let renderedModels: string[] = []
 let renderedSuccess: boolean | null = null // null until the server's verdict is known for the current delivery
 let elapsed = 0 // seconds since this client started animating the current delivery
-let lastSyncedModels: string[] = []
-let lastSyncedSuccess = true
+let lastSyncedDeliveryId = 0 // matches DeliveryState's initial value, so startup doesn't look like a change
 let checkmarkEntity: Entity | null = null
 let crossmarkEntity: Entity | null = null
 let systemRegistered = false
@@ -130,20 +129,20 @@ function deliveryRenderSystem(dt: number): void {
 }
 
 /**
- * Only reacts once the synced delivery has actually changed since last
- * observed, not whenever it merely differs from what's rendered — a live
+ * Only reacts once deliveryId has actually advanced since last observed,
+ * not whenever synced state merely differs from what's rendered — a live
  * read is briefly stale right after this client's own optimistic
- * deliverHeldItem, and reacting to that would flicker.
+ * deliverHeldItem, and reacting to that would flicker. deliveryId (not a
+ * content diff) is what detects the change, since two deliveries in a row
+ * can share identical models/success.
  *
  * Same models as already rendered means this is that guess being
  * confirmed, not a new delivery — just adopt success, don't restart.
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
-  const syncedChanged = !sameModels(synced.models, lastSyncedModels) || synced.success !== lastSyncedSuccess
-  if (!syncedChanged) return
-  lastSyncedModels = synced.models
-  lastSyncedSuccess = synced.success
+  if (synced.deliveryId === lastSyncedDeliveryId) return
+  lastSyncedDeliveryId = synced.deliveryId
 
   if (sameModels(synced.models, renderedModels)) {
     renderedSuccess = synced.success
