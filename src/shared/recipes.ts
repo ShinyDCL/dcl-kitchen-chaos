@@ -26,6 +26,14 @@ export const SAMPLE_RECIPES: Recipe[] = [
     timerSeconds: 35,
     difficulty: 1
   },
+  {
+    id: 'doubleCheesemelt',
+    ingredients: ['bunBottom', 'cheese', 'cheese', 'bunTop'],
+    timerSeconds: 32,
+    difficulty: 1
+  },
+  { id: 'tomatoMelt', ingredients: ['bunBottom', 'tomato', 'cheese', 'bunTop'], timerSeconds: 32, difficulty: 1 },
+  { id: 'gardenEgg', ingredients: ['bunBottom', 'egg', 'salad', 'bunTop'], timerSeconds: 34, difficulty: 1 },
   // Salads — plate takes the base slot instead of bunBottom/bunTop. No
   // cheese/egg/patty/buns; toppings (salad, tomato, cucumber, onion) can
   // repeat as long as no two in a row are the same.
@@ -44,6 +52,24 @@ export const SAMPLE_RECIPES: Recipe[] = [
   { id: 'brunch', ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'bunTop'], timerSeconds: 65, difficulty: 2 },
   { id: 'picnic', ingredients: ['bunBottom', 'patty', 'onion', 'cucumber', 'bunTop'], timerSeconds: 58, difficulty: 2 },
   { id: 'eggstra', ingredients: ['bunBottom', 'egg', 'egg', 'cheese', 'bunTop'], timerSeconds: 62, difficulty: 2 },
+  {
+    id: 'stackedCheese',
+    ingredients: ['bunBottom', 'patty', 'cheese', 'patty', 'bunTop'],
+    timerSeconds: 65,
+    difficulty: 2
+  },
+  {
+    id: 'pattyMelt',
+    ingredients: ['bunBottom', 'patty', 'onion', 'patty', 'cheese', 'bunTop'],
+    timerSeconds: 70,
+    difficulty: 2
+  },
+  {
+    id: 'eggSandwich',
+    ingredients: ['bunBottom', 'egg', 'onion', 'egg', 'bunTop'],
+    timerSeconds: 66,
+    difficulty: 2
+  },
   {
     id: 'cobbSalad',
     ingredients: ['plate', 'salad', 'tomato', 'cucumber', 'onion'],
@@ -92,6 +118,24 @@ export const SAMPLE_RECIPES: Recipe[] = [
     id: 'tripledeck',
     ingredients: ['bunBottom', 'patty', 'patty', 'patty', 'cheese', 'cheese', 'bunTop'],
     timerSeconds: 105,
+    difficulty: 3
+  },
+  {
+    id: 'doubleDecker',
+    ingredients: ['bunBottom', 'patty', 'cheese', 'bunBottom', 'patty', 'cheese', 'bunTop'],
+    timerSeconds: 100,
+    difficulty: 3
+  },
+  {
+    id: 'towering',
+    ingredients: ['bunBottom', 'patty', 'tomato', 'patty', 'onion', 'patty', 'bunTop'],
+    timerSeconds: 105,
+    difficulty: 3
+  },
+  {
+    id: 'farmstack',
+    ingredients: ['bunBottom', 'egg', 'cheese', 'patty', 'onion', 'tomato', 'salad', 'bunTop'],
+    timerSeconds: 110,
     difficulty: 3
   },
   {
