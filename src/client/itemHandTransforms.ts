@@ -45,7 +45,7 @@ export const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
   [MODELS.plate]: handTransform(
     Vector3.create(0.04, 0.32),
     Quaternion.fromEulerDegrees(0, 0, 90),
-    Vector3.create(0.7, 0.7, 0.7)
+    Vector3.create(0.8, 0.8, 0.8)
   )
 }
 

@@ -49,7 +49,7 @@ import { isLocalPlayerPlaying } from '../playerRoleState'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
 
-const STOVE_ITEM_OFFSET = Vector3.create(0.25, FIXTURE_HEIGHT + 0.05, 0.25) // sits on the pan, not the stove base
+const STOVE_ITEM_OFFSET = Vector3.create(0.24, FIXTURE_HEIGHT + 0.05, 0.22) // sits on the pan, not the stove base
 
 const PROGRESS_BAR_WIDTH = 0.6
 const PROGRESS_BAR_HEIGHT = 0.1
@@ -66,7 +66,7 @@ const MOBILE_PROGRESS_BAR_SCALE = 1.4 // bigger on mobile — also scales the ch
 // Smoke particles above a stove while cooking. Tuned for ~11 steady-state
 // per stove. Emission point sits inside the stove model so particles drift
 // out from under the pan instead of spawning as one thin visible column.
-const SMOKE_OFFSET = Vector3.create(STOVE_ITEM_OFFSET.x, STOVE_ITEM_OFFSET.y - 0.1, STOVE_ITEM_OFFSET.z)
+const SMOKE_OFFSET = Vector3.create(STOVE_ITEM_OFFSET.x, STOVE_ITEM_OFFSET.y - 0.05, STOVE_ITEM_OFFSET.z)
 const SMOKE_SPAWN_RADIUS = 0.12
 const SMOKE_RATE = 6 // particles per second
 const SMOKE_MAX_PARTICLES = 18
@@ -80,7 +80,7 @@ const SMOKE_COLOR = Color4.create(0.85, 0.85, 0.85, 0.85) // birth color; fades 
 // Fire particles once a finished cook has burnt. Same spawn point/spread as
 // smoke, but a bit more velocity/upward pull so flames reach a little
 // higher than the smoke plume did while cooking.
-const FIRE_SPAWN_RADIUS = 0.09
+const FIRE_SPAWN_RADIUS = 0.07
 const FIRE_RATE = 10 // particles per second
 const FIRE_MAX_PARTICLES = 25
 const FIRE_LIFETIME = 1.8 // seconds

@@ -9,8 +9,8 @@ export const DEFAULT_ITEM_HEIGHT = 0.1
 
 export const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.cucumberSlice]: 0.06,
-  [MODELS.onionSlice]: 0.06,
-  [MODELS.tomatoSlice]: 0.06,
+  [MODELS.onionSlice]: 0.07,
+  [MODELS.tomatoSlice]: 0.07,
   [MODELS.saladLeaf]: 0.06,
   [MODELS.cheeseSlice]: 0.06,
   [MODELS.bunBottom]: 0.06,
