@@ -35,6 +35,7 @@ interface NonCookableIngredientDefinition {
 type IngredientDefinition = CookableIngredientDefinition | NonCookableIngredientDefinition
 
 export const INGREDIENTS: Record<string, IngredientDefinition> = {
+  plate: { cookable: false, model: MODELS.plate },
   tomato: { cookable: false, model: MODELS.tomatoSlice },
   cucumber: { cookable: false, model: MODELS.cucumberSlice },
   onion: { cookable: false, model: MODELS.onionSlice },

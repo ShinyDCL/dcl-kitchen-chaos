@@ -26,6 +26,12 @@ export const SAMPLE_RECIPES: Recipe[] = [
     timerSeconds: 35,
     difficulty: 1
   },
+  // Salads — plate takes the base slot instead of bunBottom/bunTop. No
+  // cheese/egg/patty/buns; toppings (salad, tomato, cucumber, onion) can
+  // repeat as long as no two in a row are the same.
+  { id: 'gardenSalad', ingredients: ['plate', 'salad', 'tomato', 'cucumber'], timerSeconds: 25, difficulty: 1 },
+  { id: 'sideSalad', ingredients: ['plate', 'cucumber', 'onion', 'salad'], timerSeconds: 24, difficulty: 1 },
+  { id: 'choppedSalad', ingredients: ['plate', 'tomato', 'onion', 'salad'], timerSeconds: 26, difficulty: 1 },
 
   // Difficulty 2 — more toppings, or two cooked ingredients to juggle.
   {
@@ -38,6 +44,24 @@ export const SAMPLE_RECIPES: Recipe[] = [
   { id: 'brunch', ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'bunTop'], timerSeconds: 65, difficulty: 2 },
   { id: 'picnic', ingredients: ['bunBottom', 'patty', 'onion', 'cucumber', 'bunTop'], timerSeconds: 58, difficulty: 2 },
   { id: 'eggstra', ingredients: ['bunBottom', 'egg', 'egg', 'cheese', 'bunTop'], timerSeconds: 62, difficulty: 2 },
+  {
+    id: 'cobbSalad',
+    ingredients: ['plate', 'salad', 'tomato', 'cucumber', 'onion'],
+    timerSeconds: 45,
+    difficulty: 2
+  },
+  {
+    id: 'doubleTomatoSalad',
+    ingredients: ['plate', 'tomato', 'salad', 'tomato', 'cucumber'],
+    timerSeconds: 48,
+    difficulty: 2
+  },
+  {
+    id: 'doubleOnionSalad',
+    ingredients: ['plate', 'onion', 'salad', 'cucumber', 'onion'],
+    timerSeconds: 46,
+    difficulty: 2
+  },
 
   // Difficulty 3 — long ingredient stacks, both cookables, or multiple duplicate cookables.
   {
@@ -69,6 +93,24 @@ export const SAMPLE_RECIPES: Recipe[] = [
     ingredients: ['bunBottom', 'patty', 'patty', 'patty', 'cheese', 'cheese', 'bunTop'],
     timerSeconds: 105,
     difficulty: 3
+  },
+  {
+    id: 'harvestSalad',
+    ingredients: ['plate', 'salad', 'tomato', 'cucumber', 'onion', 'salad'],
+    timerSeconds: 75,
+    difficulty: 3
+  },
+  {
+    id: 'megaSalad',
+    ingredients: ['plate', 'tomato', 'onion', 'tomato', 'cucumber', 'onion'],
+    timerSeconds: 82,
+    difficulty: 3
+  },
+  {
+    id: 'deluxeSalad',
+    ingredients: ['plate', 'salad', 'cucumber', 'tomato', 'salad', 'onion', 'cucumber'],
+    timerSeconds: 92,
+    difficulty: 3
   }
 ]
 
@@ -92,7 +134,7 @@ export function pickRandomRecipeByDifficulty(difficulty: number): Recipe {
 }
 
 // IngredientAtlas.png: 256x512, 2x8 grid of 128x64 cells. Only column 0
-// and column 1's bottom row (bunTop) are populated — rest is reserved.
+// and column 1's bottom two rows (bunTop, plate) are populated — rest is reserved.
 const ATLAS_COLUMNS = 2
 const ATLAS_ROWS = 8
 
@@ -106,7 +148,8 @@ const INGREDIENT_ATLAS_POSITION: Record<string, [number, number]> = {
   egg: [0, 5],
   patty: [0, 6],
   bunBottom: [0, 7],
-  bunTop: [1, 7]
+  bunTop: [1, 7],
+  plate: [1, 6]
 }
 
 /** UV coordinates (bottom-left, top-left, top-right, bottom-right) for an ingredient's cell in IngredientAtlas.png. */

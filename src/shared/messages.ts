@@ -35,8 +35,6 @@ export const Messages = {
   // other: both used to compute their "new full state" from the same
   // stale synced snapshot and push it wholesale, so whichever message the
   // server processed last silently discarded the other's addition.
-  placePlateOnCounter: Schemas.Map({ counterId: Schemas.Int }),
-  pickUpPlateFromCounter: Schemas.Map({ counterId: Schemas.Int }),
   pickUpFromCounter: Schemas.Map({ counterId: Schemas.Int }),
   // The server places whatever the sender's real HeldItem holds — no
   // separate message for a single ingredient vs. a stack.

@@ -11,13 +11,7 @@ import { Entity } from '@dcl/sdk/ecs'
 import { classifyItem, getCookableItemDefinition } from '../shared/ingredients'
 import { MODELS } from '../shared/models'
 import { deliverHeldItem } from './fixtures/deliveryCounter'
-import {
-  getPreparationCounterSnapshot,
-  pickUpFromCounter,
-  pickUpPlateFromCounter,
-  placeOnCounter,
-  placePlateOnCounter
-} from './fixtures/preparationCounters'
+import { getPreparationCounterSnapshot, pickUpFromCounter, placeOnCounter } from './fixtures/preparationCounters'
 import { collectFromStove, getStoveStatus, startCookingOnStove } from './fixtures/stoveCooking'
 import {
   attachItemToPlayerHand,
@@ -53,46 +47,28 @@ export function evaluatePlateCounterInteraction(): InteractionResult {
 }
 
 // --- Preparation counters ---
-// Empty-handed: empty counter -> place a plate first; plate only -> pick
-// it up; plate + ingredients -> pick up the assembled stack, plate stays.
-// Holding a plate: empty counter -> place it; already has a plate -> blocked.
-// Holding a raw cookable: always blocked — message depends on plate presence.
-// Holding non-cookable/cooked: stacks on the plate if one is present.
-// Holding an assembled item: blocked, can't be placed back down.
+// Empty-handed: pick up whatever's on the counter (a plate underneath
+// comes along with it) — blocked if there's nothing there.
+// Holding a raw cookable: always blocked, cook it first.
+// Holding anything else (plate included) or an assembled item: stacks on
+// top of whatever's already on the counter.
 
 export function evaluatePreparationCounterInteraction(counter: Entity): InteractionResult {
-  const { hasPlate, ingredientCount } = getPreparationCounterSnapshot(counter)
+  const { ingredientCount } = getPreparationCounterSnapshot(counter)
 
   if (!hasHeldItem()) {
-    if (!hasPlate) return { allowed: false, message: 'Place a plate first' }
-    if (ingredientCount > 0) return { allowed: true, perform: () => pickUpFromCounter(counter) }
-    return { allowed: true, perform: () => pickUpPlateFromCounter(counter) }
+    if (ingredientCount === 0) return { allowed: false, message: 'Nothing to pick up' }
+    return { allowed: true, perform: () => pickUpFromCounter(counter) }
   }
 
-  if (isHoldingAssembledItem()) {
-    return hasPlate
-      ? { allowed: true, perform: () => placeOnCounter(counter) }
-      : { allowed: false, message: 'Place a plate first' }
-  }
+  if (isHoldingAssembledItem()) return { allowed: true, perform: () => placeOnCounter(counter) }
 
   const model = peekHeldItemModel()
   if (!model) return { allowed: false, message: "Can't place this here" }
 
-  const category = classifyItem(model)
+  if (classifyItem(model) === 'rawCookable') return { allowed: false, message: 'Cook this first' }
 
-  if (category === 'plate') {
-    if (hasPlate) return { allowed: false, message: 'Counter already has a plate' }
-    return { allowed: true, perform: () => placePlateOnCounter(counter) }
-  }
-
-  if (category === 'rawCookable') {
-    return hasPlate
-      ? { allowed: false, message: 'Cook this first' }
-      : { allowed: false, message: 'Place a plate first' }
-  }
-
-  // nonCookable or cookedCookable — both placeable directly on a plate
-  if (!hasPlate) return { allowed: false, message: 'Place a plate first' }
+  // plate, nonCookable, or cookedCookable — all placeable directly on the counter
   return { allowed: true, perform: () => placeOnCounter(counter) }
 }
 

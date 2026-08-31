@@ -4,8 +4,8 @@
 // interactionRules.ts. Every action function assumes the caller already
 // checked it's allowed.
 //
-// Each action function sends a narrow intent (place a plate, pick up the
-// ingredient stack, ...), not the counter's whole computed new state — the
+// Each action function sends a narrow intent (place an item, pick up the
+// stack, ...), not the counter's whole computed new state — the
 // server applies each atomically against its own live state (see
 // server/fixtures/preparationCounters.ts), which is what lets two players place
 // different ingredients on the same counter at once and have both stick,
@@ -26,19 +26,16 @@ import { Vector3 } from '@dcl/sdk/math'
 
 import { FIXTURE_HEIGHT } from '../../shared/constants'
 import { room } from '../../shared/messages'
-import { MODELS } from '../../shared/models'
 import { PreparationCounterState } from '../../shared/schemas'
-import { takeHeldItemModels, takeHeldItemPending } from '../heldItem'
+import { takeHeldItemModels } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
 import { getFixtureSyncId } from './fixtures'
 
 interface CounterContents {
-  hasPlate: boolean
   ingredientModels: string[]
 }
 
 interface RenderedCounter extends CounterContents {
-  plateEntity: Entity | null
   ingredientEntities: Entity[]
 }
 
@@ -67,7 +64,7 @@ function reconcileCountersSystem(): void {
     const counter = countersById.get(data.counterId)
     if (!counter) continue // synced state for a counter this client hasn't registered
 
-    const synced: CounterContents = { hasPlate: data.hasPlate, ingredientModels: [...data.ingredientModels] }
+    const synced: CounterContents = { ingredientModels: [...data.ingredientModels] }
     const lastSynced = lastSyncedStates.get(counter) ?? emptyContents()
     if (sameContents(synced, lastSynced)) continue // nothing new from the server since last frame
 
@@ -77,7 +74,6 @@ function reconcileCountersSystem(): void {
 }
 
 export interface PreparationCounterSnapshot {
-  hasPlate: boolean
   ingredientCount: number
 }
 
@@ -90,20 +86,13 @@ export interface PreparationCounterSnapshot {
  * allowed/disallowed for a moment until the real update caught up.
  */
 export function getPreparationCounterSnapshot(counter: Entity): PreparationCounterSnapshot {
-  const { hasPlate, ingredientModels } = getRenderedContents(counter)
-  return { hasPlate, ingredientCount: ingredientModels.length }
+  const { ingredientModels } = getRenderedContents(counter)
+  return { ingredientCount: ingredientModels.length }
 }
 
 function getRenderedContents(counter: Entity): CounterContents {
   const rendered = renderedStates.get(counter)
-  return rendered ? { hasPlate: rendered.hasPlate, ingredientModels: [...rendered.ingredientModels] } : emptyContents()
-}
-
-export function placePlateOnCounter(counter: Entity): void {
-  takeHeldItemPending()
-  void room.send('placePlateOnCounter', { counterId: getFixtureSyncId(counter) })
-  const { ingredientModels } = getRenderedContents(counter)
-  renderCounter(counter, { hasPlate: true, ingredientModels })
+  return rendered ? { ingredientModels: [...rendered.ingredientModels] } : emptyContents()
 }
 
 // Pickups below deliberately don't render the hand optimistically — the
@@ -112,26 +101,19 @@ export function placePlateOnCounter(counter: Entity): void {
 // it here would broadcast an unconditional setHeldItem regardless of
 // success, which is how a losing player used to end up with a duplicate.
 
-export function pickUpPlateFromCounter(counter: Entity): void {
-  void room.send('pickUpPlateFromCounter', { counterId: getFixtureSyncId(counter) })
-  const { ingredientModels } = getRenderedContents(counter)
-  renderCounter(counter, { hasPlate: false, ingredientModels })
-}
-
-/** Picks up just the ingredient stack (as an assembled item) — the plate stays on the counter. */
+/** Picks up the whole stack (as a single item or an assembled item) — a plate underneath comes along with it. */
 export function pickUpFromCounter(counter: Entity): void {
-  const { hasPlate, ingredientModels } = getRenderedContents(counter)
   void room.send('pickUpFromCounter', { counterId: getFixtureSyncId(counter) })
-  renderCounter(counter, { hasPlate, ingredientModels: [] })
+  renderCounter(counter, { ingredientModels: [] })
 }
 
-/** Places whatever's held — a single ingredient or an assembled stack — onto the counter's existing stack, on top of whatever's already there. */
+/** Places whatever's held — a single item or an assembled stack — onto the counter's existing stack, on top of whatever's already there. */
 export function placeOnCounter(counter: Entity): void {
   const models = takeHeldItemModels()
   if (models.length === 0) return
   void room.send('placeOnCounter', { counterId: getFixtureSyncId(counter) })
-  const { hasPlate, ingredientModels } = getRenderedContents(counter)
-  renderCounter(counter, { hasPlate, ingredientModels: [...ingredientModels, ...models] })
+  const { ingredientModels } = getRenderedContents(counter)
+  renderCounter(counter, { ingredientModels: [...ingredientModels, ...models] })
 }
 
 // --- Rendering: full rebuild whenever a counter's contents differ from what's rendered ---
@@ -143,17 +125,11 @@ function renderCounter(counter: Entity, contents: CounterContents): void {
   teardownVisuals(rendered)
 
   const newRendered: RenderedCounter = {
-    hasPlate: contents.hasPlate,
     ingredientModels: [...contents.ingredientModels],
-    plateEntity: null,
     ingredientEntities: []
   }
 
   let yOffset = 0
-  if (contents.hasPlate) {
-    newRendered.plateEntity = placeVisual(counter, MODELS.plate, yOffset)
-    yOffset += getItemHeight(MODELS.plate)
-  }
   for (const model of contents.ingredientModels) {
     newRendered.ingredientEntities.push(placeVisual(counter, model, yOffset))
     yOffset += getItemHeight(model)
@@ -163,7 +139,6 @@ function renderCounter(counter: Entity, contents: CounterContents): void {
 }
 
 function teardownVisuals(rendered: RenderedCounter): void {
-  if (rendered.plateEntity) engine.removeEntity(rendered.plateEntity)
   for (const entity of rendered.ingredientEntities) engine.removeEntity(entity)
 }
 
@@ -175,15 +150,14 @@ function placeVisual(counter: Entity, model: string, yOffset: number): Entity {
 }
 
 function emptyRenderedCounter(): RenderedCounter {
-  return { hasPlate: false, ingredientModels: [], plateEntity: null, ingredientEntities: [] }
+  return { ingredientModels: [], ingredientEntities: [] }
 }
 
 function emptyContents(): CounterContents {
-  return { hasPlate: false, ingredientModels: [] }
+  return { ingredientModels: [] }
 }
 
 function sameContents(a: CounterContents, b: CounterContents): boolean {
-  if (a.hasPlate !== b.hasPlate) return false
   if (a.ingredientModels.length !== b.ingredientModels.length) return false
   return a.ingredientModels.every((model, index) => model === b.ingredientModels[index])
 }

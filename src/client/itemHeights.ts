@@ -18,7 +18,7 @@ export const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.pattyRaw]: 0.07,
   [MODELS.pattyCooked]: 0.07,
   [MODELS.eggRaw]: 0.05,
-  [MODELS.plate]: 0.02
+  [MODELS.plate]: 0.06
 }
 
 /** Falls back to DEFAULT_ITEM_HEIGHT for any model not listed above (e.g. a new item added to models.ts but not measured yet). */

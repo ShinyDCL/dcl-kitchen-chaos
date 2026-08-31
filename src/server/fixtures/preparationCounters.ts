@@ -1,5 +1,5 @@
 // Owns every preparation counter's PreparationCounterState. Clients send a
-// narrow intent (place a plate, pick up the stack, ...) rather than a
+// narrow intent (place an item, pick up the stack, ...) rather than a
 // computed full snapshot, and each handler applies it atomically against
 // the counter's own current state — see shared/messages.ts's comment for
 // why: two clients computing "current state + my change" from the same
@@ -10,11 +10,9 @@
 // Every handler grants/clears the held item itself via grantHeldItem,
 // never trusting the client's own setHeldItem broadcast:
 // - Pickups grant only on success, so two players racing the same stack
-//   leaves the second with nothing left to take.
-// - placePlateOnCounter grants the empty hand only on success, replying
-//   actionRejected otherwise so the client restores what it optimistically
-//   took out (heldItem.ts's takeHeldItemPending) — otherwise a losing
-//   player's plate could be destroyed on a rejected placement.
+//   leaves the second with nothing left to take. Picking up the stack
+//   takes everything on it, plate included — a plate is just whichever
+//   model the player placed first, not a tracked precondition.
 // - placeOnCounter places the player's real held item (heldItems.ts's
 //   getHeldItemModels), not a client-claimed stack.
 //
@@ -27,7 +25,6 @@ import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/
 import { syncEntity } from '@dcl/sdk/network'
 
 import { room } from '../../shared/messages'
-import { MODELS } from '../../shared/models'
 import { PreparationCounterState } from '../../shared/schemas'
 import { getHeldItemModels, grantHeldItem } from '../heldItems'
 import { isPlayerAllowedToAct } from '../playerRoster'
@@ -36,25 +33,6 @@ const counterEntities = new Map<number, Entity>()
 
 export function initPreparationCounters(): void {
   reconcileCounterEntities()
-
-  room.onMessage('placePlateOnCounter', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    const state = getMutableState(data.counterId)
-    if (!state || state.hasPlate) {
-      void room.send('actionRejected', {}, { to: [context.from] })
-      return
-    }
-    state.hasPlate = true
-    grantHeldItem(context.from.toLowerCase(), [])
-  })
-
-  room.onMessage('pickUpPlateFromCounter', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    const state = getMutableState(data.counterId)
-    if (!state || !state.hasPlate) return // no plate to pick up — ignore
-    state.hasPlate = false
-    grantHeldItem(context.from.toLowerCase(), [MODELS.plate])
-  })
 
   room.onMessage('pickUpFromCounter', (data, context) => {
     if (!context || !isPlayerAllowedToAct(context.from)) return
@@ -85,7 +63,7 @@ function getOrCreateCounterEntity(counterId: number): Entity {
   if (cached !== undefined && PreparationCounterState.getOrNull(cached) !== null) return cached
 
   const entity = engine.addEntity()
-  PreparationCounterState.create(entity, { counterId, hasPlate: false, ingredientModels: [] })
+  PreparationCounterState.create(entity, { counterId, ingredientModels: [] })
   syncEntity(entity, [PreparationCounterState.componentId], counterId)
   counterEntities.set(counterId, entity)
   return entity
