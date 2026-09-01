@@ -63,9 +63,8 @@ export function evaluatePreparationCounterInteraction(counter: Entity): Interact
 
   if (isHoldingAssembledItem()) return { allowed: true, perform: () => placeOnCounter(counter) }
 
-  const model = peekHeldItemModel()
-  if (!model) return { allowed: false, message: "Can't place this here" }
-
+  // Exactly one model is held here, so peekHeldItemModel can't be null.
+  const model = peekHeldItemModel()!
   if (classifyItem(model) === 'rawCookable') return { allowed: false, message: 'Cook this first' }
 
   // plate, nonCookable, or cookedCookable — all placeable directly on the counter
@@ -89,9 +88,8 @@ export function evaluateStoveInteraction(stove: Entity): InteractionResult {
   if (!model) return { allowed: false, message: "Can't cook this" }
 
   const category = classifyItem(model)
-  if (category === 'plate') return { allowed: false, message: "Can't cook a plate" }
   if (category === 'cookedCookable') return { allowed: false, message: 'Already cooked' }
-  if (category === 'nonCookable') return { allowed: false, message: "Doesn't need cooking" }
+  if (category === 'nonCookable') return { allowed: false, message: 'Not cookable' }
 
   const definition = getCookableItemDefinition(model)
   if (!definition) return { allowed: false, message: "Can't cook this" }

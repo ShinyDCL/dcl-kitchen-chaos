@@ -81,10 +81,9 @@ export function getRequiredModelForIngredient(key: string): ModelPath | undefine
   return definition.cookable ? definition.cookedModel : definition.model
 }
 
-export type ItemCategory = 'nonCookable' | 'rawCookable' | 'cookedCookable' | 'plate'
+export type ItemCategory = 'nonCookable' | 'rawCookable' | 'cookedCookable'
 
 export function classifyItem(model: string): ItemCategory {
-  if (model === MODELS.plate) return 'plate'
   if (HELD_MODEL_TO_DEFINITION.has(model)) return 'rawCookable'
   if (COOKED_MODELS.has(model)) return 'cookedCookable'
   return 'nonCookable'
