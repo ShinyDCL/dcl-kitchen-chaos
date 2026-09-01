@@ -151,6 +151,8 @@ const lastSyncedHeldItems = new Map<string, string[]>() // last models actually 
  * differs from what's rendered. Right after this client's own optimistic
  * applyLocally, a live read is briefly stale; gating on an actual change
  * makes that a no-op instead of a spurious revert-then-reapply flicker.
+ * Compares the synced array directly before copying it — copying every
+ * player every frame just to discard most was needless churn.
  */
 function heldItemsSystem(): void {
   const localId = localPlayerId()
@@ -160,9 +162,9 @@ function heldItemsSystem(): void {
     const playerId = data.playerId.toLowerCase()
     seenPlayerIds.add(playerId)
 
+    const lastSynced = lastSyncedHeldItems.get(playerId)
+    if (lastSynced && sameModels(data.models, lastSynced)) continue // nothing new from the server since last frame
     const models = [...data.models]
-    const lastSynced = lastSyncedHeldItems.get(playerId) ?? []
-    if (sameModels(models, lastSynced)) continue // nothing new from the server since last frame
     lastSyncedHeldItems.set(playerId, models)
 
     // An authoritative update to our own hand supersedes any still-outstanding pending restore — see takeHeldItemPending's comment.
@@ -171,9 +173,14 @@ function heldItemsSystem(): void {
     renderHeldItem(playerId, models)
   }
 
+  // playerId is never reused, so without this a disconnected player lingers here forever.
   for (const playerId of renderedHeldItems.keys()) {
     if (playerId === localId) continue // an unsynced local prediction is expected, not stale — see applyLocally
     if (!seenPlayerIds.has(playerId)) renderHeldItem(playerId, [])
+  }
+  for (const playerId of lastSyncedHeldItems.keys()) {
+    if (playerId === localId) continue
+    if (!seenPlayerIds.has(playerId)) lastSyncedHeldItems.delete(playerId)
   }
 }
 

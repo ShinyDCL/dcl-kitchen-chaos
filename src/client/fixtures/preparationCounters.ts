@@ -26,6 +26,7 @@ import { Vector3 } from '@dcl/sdk/math'
 
 import { FIXTURE_HEIGHT } from '../../shared/constants'
 import { room } from '../../shared/messages'
+import { sameModels } from '../../shared/models'
 import { PreparationCounterState } from '../../shared/schemas'
 import { takeHeldItemModels } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
@@ -64,10 +65,12 @@ function reconcileCountersSystem(): void {
     const counter = countersById.get(data.counterId)
     if (!counter) continue // synced state for a counter this client hasn't registered
 
-    const synced: CounterContents = { ingredientModels: [...data.ingredientModels] }
-    const lastSynced = lastSyncedStates.get(counter) ?? emptyContents()
-    if (sameContents(synced, lastSynced)) continue // nothing new from the server since last frame
+    // Compares the synced array directly before copying — copying every
+    // counter every frame just to discard most was needless churn.
+    const lastSynced = lastSyncedStates.get(counter)
+    if (lastSynced && sameModels(data.ingredientModels, lastSynced.ingredientModels)) continue
 
+    const synced: CounterContents = { ingredientModels: [...data.ingredientModels] }
     lastSyncedStates.set(counter, synced)
     renderCounter(counter, synced)
   }
@@ -120,7 +123,7 @@ export function placeOnCounter(counter: Entity): void {
 
 function renderCounter(counter: Entity, contents: CounterContents): void {
   const rendered = renderedStates.get(counter) ?? emptyRenderedCounter()
-  if (sameContents(rendered, contents)) return
+  if (sameModels(rendered.ingredientModels, contents.ingredientModels)) return
 
   teardownVisuals(rendered)
 
@@ -155,9 +158,4 @@ function emptyRenderedCounter(): RenderedCounter {
 
 function emptyContents(): CounterContents {
   return { ingredientModels: [] }
-}
-
-function sameContents(a: CounterContents, b: CounterContents): boolean {
-  if (a.ingredientModels.length !== b.ingredientModels.length) return false
-  return a.ingredientModels.every((model, index) => model === b.ingredientModels[index])
 }
