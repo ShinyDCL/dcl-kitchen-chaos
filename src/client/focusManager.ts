@@ -27,6 +27,12 @@ import { getWorldPosition, getWorldRotation } from './worldPosition'
 const INTERACTION_RANGE = 2.5 // meters
 const FACING_THRESHOLD = 0.1 // dot product; ~0.1 ≈ wide ±84° cone
 
+// Without this, focus flickers between near-tied fixtures (e.g. the 2x2
+// island) as per-frame noise (avatar bob, mouse-look drift) flips which is
+// a hair closer. Keeps the current focus unless something is clearly
+// nearer, not just marginally.
+const FOCUS_SWITCH_MARGIN = 0.3 // meters
+
 interface FocusableFixture {
   id: number
   worldPosition: Vector3
@@ -89,7 +95,7 @@ function getCandidatesInRange(playerPosition: Vector3, playerForward: Vector3): 
   return candidates
 }
 
-function pickBestCandidate(candidates: FixtureCandidate[]): FocusableFixture | null {
+function pickBestCandidate(candidates: FixtureCandidate[], currentFocusId: number | null): FocusableFixture | null {
   if (candidates.length === 0) return null
 
   const facedCandidates = candidates.filter((c) => c.facingScore >= FACING_THRESHOLD)
@@ -99,6 +105,10 @@ function pickBestCandidate(candidates: FixtureCandidate[]): FocusableFixture | n
   for (const candidate of pool) {
     if (candidate.distance < best.distance) best = candidate
   }
+
+  // Stick with the current focus unless something beats it by more than FOCUS_SWITCH_MARGIN.
+  const current = pool.find((c) => c.fixture.id === currentFocusId)
+  if (current && current.distance <= best.distance + FOCUS_SWITCH_MARGIN) return current.fixture
 
   return best.fixture
 }
@@ -117,7 +127,7 @@ function focusSystem(): void {
 
   const playerForward = getPlayerForward(playerTransform.rotation)
   const candidates = getCandidatesInRange(playerTransform.position, playerForward)
-  const nearest = pickBestCandidate(candidates)
+  const nearest = pickBestCandidate(candidates, focusedFixtureId)
 
   if (nearest === null) {
     if (focusedFixtureId !== null) {
