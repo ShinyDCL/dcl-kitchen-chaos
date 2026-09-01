@@ -67,11 +67,7 @@ export const Messages = {
     deliveredByName: Schemas.String,
     generatedAt: Schemas.Int64, // keeps the card's row position instead of jumping to the front
     orderNumber: Schemas.Int // the order's ticket number — also the result card's key
-  }),
-
-  // Server -> all: broadcast whenever a fresh order is generated. Same
-  // local-timing reasoning as orderDelivered, for a brief "New!" flash.
-  orderGenerated: Schemas.Map({ recipeId: Schemas.String, orderNumber: Schemas.Int })
+  })
 }
 
 export const room = registerMessages(Messages)

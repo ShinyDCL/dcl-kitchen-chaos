@@ -8,11 +8,9 @@
 // resets nothing — only a wrong delivery resets the streak.
 //
 // evaluateDelivery pays every active player and broadcasts
-// 'orderDelivered' on a match; a miss resets the streak. Expiry gets no
-// broadcast — it's purely a function of time (generatedAt + the recipe's
-// timerSeconds), which clients already have, so they detect and display
-// it locally instead (see ordersUi.tsx's getActiveOrders) — fewer
-// messages, and no race against this entity's own CRDT removal. A
+// 'orderDelivered' on a match; a miss resets the streak. Expiry and
+// generation get no broadcast — clients derive both locally from
+// OrderState's generatedAt (see ordersUi.tsx's getActiveOrders). A
 // resolved order's replacement is held off for
 // ORDER_RESULT_DISPLAY_SECONDS (nextGenerationAt) so it doesn't appear
 // while the old result card is still showing — one shared cooldown, not
@@ -102,7 +100,6 @@ function getTargetQueueSize(activePlayerCount: number): number {
   return activePlayerCount <= 0 ? 0 : Math.min(activePlayerCount + 1, MAX_QUEUE_SIZE)
 }
 
-/** Creates a new order and broadcasts orderGenerated for the client's "New!" flash. */
 function generateOrder(streak: number): void {
   const recipe = pickRandomRecipeByDifficulty(getDifficultyForStreak(streak))
   const orderNumber = nextOrderNumber++
@@ -112,8 +109,6 @@ function generateOrder(streak: number): void {
   OrderState.create(entity, { orderNumber, recipeId: recipe.id, generatedAt })
   syncEntity(entity, [OrderState.componentId]) // no explicit id — auto-allocated, identity lives in orderNumber
   orderEntities.set(orderNumber, entity)
-
-  void room.send('orderGenerated', { recipeId: recipe.id, orderNumber })
 }
 
 /** Removes a resolved order and pushes back its replacement's earliest generation time — see the module comment. */

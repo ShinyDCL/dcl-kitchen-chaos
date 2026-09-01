@@ -6,11 +6,10 @@
 // protect, so no reconcile step like heldItem.ts's. Only visible to
 // players in the 'play' role.
 //
-// The server broadcasts 'orderDelivered'/'orderGenerated' once each; each
-// client times its result/new-order highlight locally from receipt.
-// Timing out gets no broadcast — it's purely a function of time
-// (generatedAt + the recipe's timerSeconds), so getActiveOrders detects
-// and displays it locally instead. A result card and a live order are
+// The server broadcasts 'orderDelivered' once; each client times its
+// result highlight locally from receipt. Timing out and the "New!" flash
+// are derived locally from generatedAt instead — see getActiveOrders. A
+// result card and a live order are
 // independent entries (getActiveOrders), keyed by orderNumber (never
 // reused) — both can render at once if a fresh order beats an earlier
 // result display ending. The server delays a resolved order's replacement
@@ -93,10 +92,6 @@ export function setupOrdersUi(): void {
       endsAt: Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000
     })
   })
-
-  room.onMessage('orderGenerated', (data) => {
-    newOrderFlashUntil.set(data.orderNumber, Date.now() + ORDER_NEW_FLASH_SECONDS * 1000)
-  })
 }
 
 interface CardOverride {
@@ -110,9 +105,6 @@ interface CardOverride {
 
 // Keyed by orderNumber — client-local timing, see the file header comment.
 const cardOverrides = new Map<number, CardOverride>()
-
-// Keyed by orderNumber, value is when its "New!" flash ends locally.
-const newOrderFlashUntil = new Map<number, number>()
 
 type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
@@ -136,10 +128,9 @@ interface ActiveOrder {
  * getStatusOverlayColor. So once an order has an override, its live entry
  * is skipped.
  *
- * Timing out is detected here locally (generatedAt + timerSeconds)
- * instead of via a server message, unlike delivery, which depends on
- * unpredictable player action — sidesteps the race above for this
- * transition entirely.
+ * Timing out and the "New!" flash are both derived locally from
+ * generatedAt, unlike delivery (unpredictable player action) — no
+ * broadcast, no race against CRDT removal/creation.
  */
 function getActiveOrders(): ActiveOrder[] {
   const now = Date.now()
@@ -192,16 +183,12 @@ function getActiveOrders(): ActiveOrder[] {
       continue
     }
 
-    const flashUntil = newOrderFlashUntil.get(data.orderNumber)
-    const isNew = flashUntil !== undefined && now < flashUntil
-    if (flashUntil !== undefined && !isNew) newOrderFlashUntil.delete(data.orderNumber)
-
     active.push({
       cardKey: String(data.orderNumber),
       recipe,
       generatedAt,
       orderNumber: data.orderNumber,
-      visualState: isNew ? 'new' : 'normal',
+      visualState: elapsedSeconds <= ORDER_NEW_FLASH_SECONDS ? 'new' : 'normal',
       deliveredByName: ''
     })
   }
