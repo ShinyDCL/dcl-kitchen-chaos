@@ -6,13 +6,15 @@
 // protect, so no reconcile step like heldItem.ts's. Only visible to
 // players in the 'play' role.
 //
-// The server broadcasts 'orderDelivered'/'orderExpired'/'orderGenerated'
-// once each; each client times its result/new-order highlight locally
-// from receipt. A result card and a live order are independent entries
-// (getActiveOrders), keyed by orderNumber (never reused) — both can render
-// at once if a fresh order beats an earlier result display ending. The
-// server delays a resolved order's replacement by
-// ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so that's rare.
+// The server broadcasts 'orderDelivered'/'orderGenerated' once each; each
+// client times its result/new-order highlight locally from receipt.
+// Timing out gets no broadcast — it's purely a function of time
+// (generatedAt + the recipe's timerSeconds), so getActiveOrders detects
+// and displays it locally instead. A result card and a live order are
+// independent entries (getActiveOrders), keyed by orderNumber (never
+// reused) — both can render at once if a fresh order beats an earlier
+// result display ending. The server delays a resolved order's replacement
+// by ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so that's rare.
 //
 // New/success/timedOut render as a colorful overlay drawn ON TOP of the
 // ingredient stack and progress bar, not a background color change — the
@@ -92,19 +94,6 @@ export function setupOrdersUi(): void {
     })
   })
 
-  room.onMessage('orderExpired', (data) => {
-    const recipe = getRecipeById(data.recipeId)
-    if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    cardOverrides.set(data.orderNumber, {
-      kind: 'timedOut',
-      recipe,
-      deliveredByName: '',
-      generatedAt: Number(data.generatedAt),
-      orderNumber: data.orderNumber,
-      endsAt: Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000
-    })
-  })
-
   room.onMessage('orderGenerated', (data) => {
     newOrderFlashUntil.set(data.orderNumber, Date.now() + ORDER_NEW_FLASH_SECONDS * 1000)
   })
@@ -137,10 +126,20 @@ interface ActiveOrder {
 }
 
 /**
- * Newest first by generatedAt. A result override and a live order are
- * independent entries, not mutually exclusive — if a fresh order becomes
- * visible before this client's own earlier result display ends (latency
- * skew), both simply show at once instead of one hiding the other.
+ * Newest first by generatedAt. A result override and a *different*
+ * order's live entry can render at once (e.g. a fresh order beating an
+ * earlier result display ending). But the *same* order's override and
+ * live entry are mutually exclusive: a delivered order's override and its
+ * entity's CRDT removal propagate on separate channels with no ordering
+ * guarantee, so a brief window can show both — without deduping that's a
+ * duplicate cardKey, confusing the keyed reconciler and thrashing
+ * getStatusOverlayColor. So once an order has an override, its live entry
+ * is skipped.
+ *
+ * Timing out is detected here locally (generatedAt + timerSeconds)
+ * instead of via a server message, unlike delivery, which depends on
+ * unpredictable player action — sidesteps the race above for this
+ * transition entirely.
  */
 function getActiveOrders(): ActiveOrder[] {
   const now = Date.now()
@@ -162,8 +161,36 @@ function getActiveOrders(): ActiveOrder[] {
   }
 
   for (const [, data] of engine.getEntitiesWith(OrderState)) {
+    if (cardOverrides.has(data.orderNumber)) continue // already represented by its override above — see this function's comment
+
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
+    const generatedAt = Number(data.generatedAt)
+    const elapsedSeconds = (now - generatedAt) / 1000
+
+    if (elapsedSeconds >= recipe.timerSeconds) {
+      // Detected locally the moment this client's clock crosses the
+      // deadline — see this function's comment. The skip above dedupes
+      // against this once the server's own removal catches up.
+      const override: CardOverride = {
+        kind: 'timedOut',
+        recipe,
+        deliveredByName: '',
+        generatedAt,
+        orderNumber: data.orderNumber,
+        endsAt: now + ORDER_RESULT_DISPLAY_SECONDS * 1000
+      }
+      cardOverrides.set(data.orderNumber, override)
+      active.push({
+        cardKey: String(data.orderNumber),
+        recipe,
+        generatedAt,
+        orderNumber: data.orderNumber,
+        visualState: 'timedOut',
+        deliveredByName: ''
+      })
+      continue
+    }
 
     const flashUntil = newOrderFlashUntil.get(data.orderNumber)
     const isNew = flashUntil !== undefined && now < flashUntil
@@ -172,12 +199,14 @@ function getActiveOrders(): ActiveOrder[] {
     active.push({
       cardKey: String(data.orderNumber),
       recipe,
-      generatedAt: Number(data.generatedAt),
+      generatedAt,
       orderNumber: data.orderNumber,
       visualState: isNew ? 'new' : 'normal',
       deliveredByName: ''
     })
   }
+
+  pruneOverlayColorTransitions(active)
 
   // orderNumber as a tiebreaker: orders generated in the same server tick
   // (e.g. filling the queue at session start) can share a generatedAt
@@ -193,6 +222,14 @@ interface OverlayColorTransition {
   startedAt: number
 }
 const overlayColorTransitions = new Map<string, OverlayColorTransition>()
+
+/** cardKey is a never-reused orderNumber, so without this, a transition entry would linger forever once its card is gone. */
+function pruneOverlayColorTransitions(activeOrders: ActiveOrder[]): void {
+  const activeCardKeys = new Set(activeOrders.map((order) => order.cardKey))
+  for (const cardKey of overlayColorTransitions.keys()) {
+    if (!activeCardKeys.has(cardKey)) overlayColorTransitions.delete(cardKey)
+  }
+}
 
 function visualStateColor(state: CardVisualState): Color4 {
   if (state === 'success') return OVERLAY_SUCCESS_BACKGROUND
@@ -279,6 +316,7 @@ function OrderCard({
 
   return (
     <UiEntity
+      key={cardKey}
       uiTransform={{
         width: layout.cardWidth,
         height: 'auto',
@@ -412,7 +450,16 @@ function IngredientStack({ ingredients, layout }: { ingredients: string[]; layou
   )
 }
 
-/** Vertical fill draining top-to-bottom as the deadline approaches — anchored to the bottom, shrinking upward, one color throughout (no separate danger-zone color, kept simple). */
+/**
+ * Vertical fill draining top-to-bottom — one color, square corners (this
+ * renderer's overflow:'hidden' clips to a rectangle regardless of radius,
+ * so rounding was never reliably achievable; see git history).
+ *
+ * The fill is a constant cardContentHeight tall, never resized — it
+ * slides downward out of the track (position.bottom going negative) as
+ * time passes, clipped by overflow:'hidden'. Animating height instead of
+ * position was the root cause of a real jumpiness bug this once had.
+ */
 function ProgressBar({
   generatedAt,
   timerSeconds,
@@ -423,7 +470,8 @@ function ProgressBar({
   layout: OrderCardLayout
 }) {
   const elapsedSeconds = (Date.now() - generatedAt) / 1000
-  const remainingPercent = (1 - Math.min(elapsedSeconds / timerSeconds, 1)) * 100
+  const drainedFraction = Math.min(elapsedSeconds / timerSeconds, 1)
+  const fillOffset = drainedFraction * layout.cardContentHeight
 
   return (
     <UiEntity
@@ -431,7 +479,6 @@ function ProgressBar({
         width: layout.barWidth,
         height: layout.cardContentHeight,
         margin: { left: layout.barGap },
-        borderRadius: layout.barBorderRadius,
         overflow: 'hidden'
       }}
       uiBackground={{ color: PROGRESS_TRACK_COLOR }}
@@ -439,13 +486,9 @@ function ProgressBar({
       <UiEntity
         uiTransform={{
           positionType: 'absolute',
-          position: { bottom: 0, left: 0 },
+          position: { bottom: -fillOffset, left: 0 },
           width: '100%',
-          height: `${remainingPercent}%`,
-          // Own radius rather than relying on the track's overflow:'hidden'
-          // to round it — that clips to a rectangle, not the track's actual
-          // rounded shape (see StatusOverlayBackground's comment).
-          borderRadius: layout.barBorderRadius
+          height: layout.cardContentHeight
         }}
         uiBackground={{ color: PROGRESS_FILL_COLOR }}
       />

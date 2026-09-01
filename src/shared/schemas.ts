@@ -146,8 +146,9 @@ lockToServer(PlayerCoins)
  * `orderNumber` (a session-wide ticket counter, never reused), same
  * per-entity-field-matching reasoning as HeldItem/PlayerRole's playerId.
  * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock, ms)
- * drives the HUD's countdown. Result display is timed client-side off the
- * orderDelivered/orderExpired broadcast, not a field here.
+ * drives the HUD's countdown. Delivery result display is timed off the
+ * orderDelivered broadcast; timing out is detected and timed purely from
+ * generatedAt/timerSeconds, no broadcast — see ordersUi.tsx's getActiveOrders.
  */
 export const OrderState = engine.defineComponent('game::OrderState', {
   orderNumber: Schemas.Int,

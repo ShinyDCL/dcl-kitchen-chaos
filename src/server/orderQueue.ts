@@ -8,9 +8,12 @@
 // resets nothing — only a wrong delivery resets the streak.
 //
 // evaluateDelivery pays every active player and broadcasts
-// 'orderDelivered' on a match; a miss resets the streak. Clients time
-// their own result/new-order highlight locally from these broadcasts
-// (see ordersUi.tsx). A resolved order's replacement is held off for
+// 'orderDelivered' on a match; a miss resets the streak. Expiry gets no
+// broadcast — it's purely a function of time (generatedAt + the recipe's
+// timerSeconds), which clients already have, so they detect and display
+// it locally instead (see ordersUi.tsx's getActiveOrders) — fewer
+// messages, and no race against this entity's own CRDT removal. A
+// resolved order's replacement is held off for
 // ORDER_RESULT_DISPLAY_SECONDS (nextGenerationAt) so it doesn't appear
 // while the old result card is still showing — one shared cooldown, not
 // per-order, so overlapping resolutions just extend it.
@@ -77,7 +80,6 @@ function growQueueSystem(): void {
   for (const [orderNumber, entity] of orderEntities) {
     const data = OrderState.getOrNull(entity)
     if (data && isExpired(data.recipeId, Number(data.generatedAt))) {
-      void room.send('orderExpired', { recipeId: data.recipeId, generatedAt: data.generatedAt, orderNumber })
       removeOrder(entity, orderNumber)
     }
   }

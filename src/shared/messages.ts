@@ -69,16 +69,6 @@ export const Messages = {
     orderNumber: Schemas.Int // the order's ticket number — also the result card's key
   }),
 
-  // Server -> all: broadcast when an order's timer runs out before anyone
-  // delivers it. Same shape/purpose as orderDelivered minus
-  // deliveredByName (nobody delivered it) — see ordersUi.tsx's 'timedOut'
-  // visual state.
-  orderExpired: Schemas.Map({
-    recipeId: Schemas.String,
-    generatedAt: Schemas.Int64,
-    orderNumber: Schemas.Int
-  }),
-
   // Server -> all: broadcast whenever a fresh order is generated. Same
   // local-timing reasoning as orderDelivered, for a brief "New!" flash.
   orderGenerated: Schemas.Map({ recipeId: Schemas.String, orderNumber: Schemas.Int })

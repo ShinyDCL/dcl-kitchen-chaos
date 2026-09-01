@@ -80,7 +80,6 @@ export interface OrderCardLayout {
   iconHeight: number
   iconOverlap: number
   barWidth: number
-  barBorderRadius: number // half of barWidth, for a pill-shaped cap on a bar this narrow
   barGap: number // space between the ingredient stack and the progress bar
   badgeWidth: number // OrderBadge's width — sized generously enough for a 3-digit number without measuring text
   verticalAnchor: 'top' | 'bottom' // which screen edge the queue hugs
@@ -112,7 +111,6 @@ export const DESKTOP_LAYOUT: OrderCardLayout = {
   ...iconLayout(32, 16), // 32 = half of the atlas's native 128x64 per ingredient cell
   iconWidth: 64,
   barWidth: 10,
-  barBorderRadius: 5,
   barGap: 10,
   badgeWidth: 44,
   verticalAnchor: 'top',
@@ -129,7 +127,6 @@ export const MOBILE_LAYOUT: OrderCardLayout = {
   ...iconLayout(28, 17),
   iconWidth: 56,
   barWidth: 8,
-  barBorderRadius: 4,
   barGap: 8,
   badgeWidth: 36,
   verticalAnchor: 'bottom',
