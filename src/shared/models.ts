@@ -5,6 +5,7 @@ export const MODELS = {
   trashBin: 'assets/scene/models/TrashBin.glb',
   checkmark: 'assets/scene/models/Checkmark.glb',
   crossmark: 'assets/scene/models/Crossmark.glb',
+  message: 'assets/scene/models/Message.glb',
 
   // Pickup items (attached to player's hand)
   cucumberSlice: 'assets/scene/models/CucumberSlice.glb',

@@ -45,6 +45,7 @@ import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemPending } from '../heldItem'
+import { createPopState, PopState, tickPopState } from '../popScale'
 import { isLocalPlayerPlaying } from '../playerRoleState'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
@@ -96,6 +97,7 @@ interface ProgressBar {
   root: Entity // background + fill, no own VisibilityComponent — controlled via root's propagateToChildren
   fill: Entity
   checkmarkAnchor: Entity // checkmark legs, no own VisibilityComponent — controlled via this entity's propagateToChildren
+  checkmarkPop: PopState // see tickCheckmarkPop — the bar itself just snaps visible/hidden, no pop
 }
 
 interface StoveVisuals {
@@ -159,14 +161,17 @@ export function collectFromStove(stove: Entity): void {
   void room.send('collectFromStove', { stoveId: getFixtureSyncId(stove) })
 }
 
-/** One pass over every synced StoveState, keyed by the local stove entity — built fresh each frame instead of re-scanned per stove. */
+// Reused every frame instead of allocating a fresh Map — safe since callers only read it synchronously within the same tick.
+const syncedStatesScratch = new Map<Entity, { rawModel: string; startTimestamp: number }>()
+
+/** One pass over every synced StoveState, keyed by the local stove entity — avoids an O(stoves × synced entities) scan per stove. */
 function getSyncedStates(): Map<Entity, { rawModel: string; startTimestamp: number }> {
-  const states = new Map<Entity, { rawModel: string; startTimestamp: number }>()
+  syncedStatesScratch.clear()
   for (const [, data] of engine.getEntitiesWith(StoveState)) {
     const stove = stovesById.get(data.stoveId)
-    if (stove) states.set(stove, { rawModel: data.rawModel, startTimestamp: Number(data.startTimestamp) })
+    if (stove) syncedStatesScratch.set(stove, { rawModel: data.rawModel, startTimestamp: Number(data.startTimestamp) })
   }
-  return states
+  return syncedStatesScratch
 }
 
 function elapsedSeconds(startTimestamp: number): number {
@@ -194,11 +199,12 @@ function prebuildVisualsOnceReady(): void {
   for (const stove of registeredStoves) getOrCreateVisuals(stove)
 }
 
-function stoveCookingSystem(): void {
+function stoveCookingSystem(dt: number): void {
   const synced = getSyncedStates()
   for (const stove of registeredStoves) {
     reconcileTransition(stove, synced.get(stove) ?? { rawModel: '', startTimestamp: 0 })
     tickProgress(stove)
+    tickCheckmarkPop(stove, dt)
   }
 }
 
@@ -244,7 +250,7 @@ function computePhase(elapsedSecondsValue: number, definition: CookableIngredien
  * Continuous per-frame progress, derived purely from what's currently
  * rendered — never from a fresh (possibly stale) synced read.
  *
- * Also recomputes bar/checkmark visibility every frame (not just on phase
+ * Also recomputes bar visibility every frame (not just on phase
  * transitions), so switching Spectate -> Play restores it correctly.
  */
 function tickProgress(stove: Entity): void {
@@ -279,9 +285,27 @@ function tickProgress(stove: Entity): void {
     }
   }
 
-  const showBar = isLocalPlayerPlaying() && phase !== 'burnt'
-  VisibilityComponent.getMutable(visuals.progressBar.root).visible = showBar
-  VisibilityComponent.getMutable(visuals.progressBar.checkmarkAnchor).visible = showBar && phase === 'done'
+  VisibilityComponent.getMutable(visuals.progressBar.root).visible = isLocalPlayerPlaying() && phase !== 'burnt'
+}
+
+/**
+ * Runs every frame regardless of idle state (unlike tickProgress) so the
+ * checkmark still eases out via tickPopState when a stove goes idle,
+ * instead of being cut off by tickProgress's early return.
+ */
+function tickCheckmarkPop(stove: Entity, dt: number): void {
+  const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
+  const { progressBar } = getOrCreateVisuals(stove)
+
+  const showCheckmark = isLocalPlayerPlaying() && rendered.rawModel !== '' && rendered.phase === 'done'
+
+  const checkmark = tickPopState(progressBar.checkmarkPop, showCheckmark, dt)
+  VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = checkmark.shown
+  Transform.getMutable(progressBar.checkmarkAnchor).scale = Vector3.create(
+    checkmark.scale,
+    checkmark.scale,
+    checkmark.scale
+  )
 }
 
 /** Applies a rawModel/startTimestamp change (idle->cooking or any->idle) to this stove's visuals. */
@@ -294,7 +318,9 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   }
 
   if (synced.rawModel === '') {
-    hideProgressBar(visuals.progressBar)
+    // tickProgress owns bar visibility but early-returns while idle, so
+    // it never re-runs to hide the bar — this is the one place that does.
+    VisibilityComponent.getMutable(visuals.progressBar.root).visible = false
     ParticleSystem.getMutable(visuals.smokeEmitter).active = false
     ParticleSystem.getMutable(visuals.fireEmitter).active = false
     renderedCooks.set(stove, emptyRenderedCook())
@@ -321,14 +347,14 @@ function applySyncedState(stove: Entity, synced: { rawModel: string; startTimest
   if (phase === 'burnt') applyBurntVisual(stove)
 }
 
-/** Visibility is owned by tickProgress, called right after this. */
+/** Bar visibility is owned by tickProgress, checkmark's by tickCheckmarkPop — both called right after this. */
 function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition): void {
   const visuals = getOrCreateVisuals(stove)
   if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: definition.cookedModel })
   ParticleSystem.getMutable(visuals.smokeEmitter).active = false
 }
 
-/** Neglected too long — burnt model, fire replaces smoke. Visibility owned by tickProgress. */
+/** Neglected too long — burnt model, fire replaces smoke. Visibility owned by tickProgress/tickCheckmarkPop. */
 function applyBurntVisual(stove: Entity): void {
   const visuals = getOrCreateVisuals(stove)
   if (visuals.itemEntity !== null) GltfContainer.createOrReplace(visuals.itemEntity, { src: MODELS.burntCookable })
@@ -402,7 +428,7 @@ function getOrCreateProgressBar(stove: Entity): ProgressBar {
   VisibilityComponent.create(checkmarkAnchor, { visible: false, propagateToChildren: true })
   createCheckmark(checkmarkAnchor)
 
-  return { root, fill, checkmarkAnchor }
+  return { root, fill, checkmarkAnchor, checkmarkPop: createPopState() }
 }
 
 function createCheckmark(parent: Entity): void {
@@ -465,11 +491,6 @@ function getOrCreateFireEmitter(stove: Entity): Entity {
 function resetProgressBar(progressBar: ProgressBar, progress: number): void {
   updateFill(progressBar, progress)
   updateFillColor(progressBar, PROGRESS_BAR_FILL_COLOR) // reset in case a previous cook left it mid-drain toward red
-}
-
-function hideProgressBar(progressBar: ProgressBar): void {
-  VisibilityComponent.getMutable(progressBar.root).visible = false
-  VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = false
 }
 
 function updateFill(progressBar: ProgressBar, progress: number): void {

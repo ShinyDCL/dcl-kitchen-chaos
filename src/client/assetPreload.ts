@@ -1,6 +1,6 @@
 // Preloads assets not otherwise referenced until first use (pickup
-// models, checkmark/crossmark, smoke, ingredient atlas), so that first use
-// doesn't hitch. Fixture/display models aren't listed — already eager.
+// models, checkmark/crossmark, message, smoke, ingredient atlas), so that
+// first use doesn't hitch. Fixture/display models aren't listed — already eager.
 
 import { AssetLoad, engine } from '@dcl/sdk/ecs'
 
@@ -27,6 +27,7 @@ export function preloadAssets(): void {
       MODELS.plate,
       MODELS.checkmark,
       MODELS.crossmark,
+      MODELS.message,
       SMOKE_TEXTURE,
       FIRE_TEXTURE,
       ATLAS_TEXTURE_SRC,
