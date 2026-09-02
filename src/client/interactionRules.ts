@@ -96,10 +96,10 @@ export function evaluateStoveInteraction(stove: Entity): InteractionResult {
   return { allowed: true, perform: () => startCookingOnStove(stove, definition) }
 }
 
-// --- Trash bin ---
+// --- Discard counter ---
 // Allowed whenever holding anything (single item or assembled); discards it.
 
-export function evaluateTrashBinInteraction(): InteractionResult {
+export function evaluateDiscardCounterInteraction(): InteractionResult {
   if (!hasHeldItem()) return { allowed: false, message: 'Nothing to discard' }
   return { allowed: true, perform: () => discardHeldItem() }
 }

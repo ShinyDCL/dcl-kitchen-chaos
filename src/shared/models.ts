@@ -2,7 +2,7 @@ export const MODELS = {
   // Fixtures
   counter: 'assets/scene/models/Counter.glb',
   stove: 'assets/scene/models/Stove.glb',
-  trashBin: 'assets/scene/models/DiscardCounter.glb',
+  discardCounter: 'assets/scene/models/DiscardCounter.glb',
   checkmark: 'assets/scene/models/Checkmark.glb',
   crossmark: 'assets/scene/models/Crossmark.glb',
   message: 'assets/scene/models/Message.glb',

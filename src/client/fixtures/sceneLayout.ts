@@ -2,7 +2,7 @@
 // right walls (the right wall's first slot is a plate counter, ahead of its
 // ingredients; both walls are bookended by a preparation counter), a front
 // row alternating preparation counters and stoves, a 2x2 preparation-counter
-// island in the middle, a back/entrance wall with a trash bin and the
+// island in the middle, a back/entrance wall with a discard counter and the
 // delivery counter (each inset from its corner, open walkway between), and
 // a decorative counter in each of the room's four corners. All
 // positions/rotations are local to `parent` (the scene root), matching
@@ -15,10 +15,10 @@ import { FIXTURE_DEPTH, FIXTURE_HEIGHT, FIXTURE_WIDTH } from '../../shared/const
 import { MODELS } from '../../shared/models'
 import {
   evaluateDeliveryCounterInteraction,
+  evaluateDiscardCounterInteraction,
   evaluatePlateCounterInteraction,
   evaluatePreparationCounterInteraction,
-  evaluateStoveInteraction,
-  evaluateTrashBinInteraction
+  evaluateStoveInteraction
 } from '../interactionRules'
 import { registerDeliveryCounter } from './deliveryCounter'
 import { createFixture } from './fixtures'
@@ -37,7 +37,7 @@ const SIDE_WALL_DISTANCE = 5.45 // meters, along X
 const FRONT_ROW_DISTANCE = 5.45 // meters, along Z
 const BACK_WALL_DISTANCE = 5.45 // meters, along Z
 
-// The trash bin/delivery counter models are wider than a standard fixture — also tuned to match Scene.glb.
+// The discard/delivery counter models are wider than a standard fixture — also tuned to match Scene.glb.
 const BACK_WALL_COUNTER_WIDTH = 3.5 // meters
 
 // Y-axis rotation (degrees) for a fixture whose unrotated model faces +Z.
@@ -194,10 +194,10 @@ function createIsland(parent: Entity): void {
 }
 
 /**
- * Places the back wall (the entrance wall): a trash bin and the delivery
- * counter, mirrored around X and each kept half a gap clear of the corner
- * beside it — accounting for BACK_WALL_COUNTER_WIDTH, since these two are
- * wider than a standard fixture — with an open walkway between them.
+ * Places the back wall (the entrance wall): a discard counter and the
+ * delivery counter, mirrored around X and each kept half a gap clear of the
+ * corner beside it — accounting for BACK_WALL_COUNTER_WIDTH, since these
+ * two are wider than a standard fixture — with an open walkway between them.
  */
 function createBackWall(parent: Entity): void {
   const rotation = rotationDegrees(FACE_POSITIVE_Z)
@@ -205,18 +205,18 @@ function createBackWall(parent: Entity): void {
   const insetX = SIDE_WALL_DISTANCE - halfGap - BACK_WALL_COUNTER_WIDTH / 2
 
   createFixture({
-    model: MODELS.trashBin,
+    model: MODELS.discardCounter,
     position: Vector3.create(-insetX, 0, -BACK_WALL_DISTANCE),
     rotation,
     parent,
     height: FIXTURE_HEIGHT,
-    evaluateInteraction: evaluateTrashBinInteraction
+    evaluateInteraction: evaluateDiscardCounterInteraction
   })
 
   const deliveryCounter = createFixture({
     model: MODELS.deliveryCounter,
     position: Vector3.create(insetX, 0, -BACK_WALL_DISTANCE),
-    rotation: rotationDegrees(FACE_NEGATIVE_Z), // DeliveryCounter.glb faces the opposite way from the trash bin
+    rotation: rotationDegrees(FACE_NEGATIVE_Z), // DeliveryCounter.glb faces the opposite way from the discard counter
     parent,
     height: FIXTURE_HEIGHT,
     evaluateInteraction: evaluateDeliveryCounterInteraction
