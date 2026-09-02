@@ -1,12 +1,14 @@
 // Assembles the full kitchen layout: ingredient counters along the left and
-// right walls (the right wall's first slot is a plate counter, ahead of
-// its ingredients), a front row alternating preparation counters and
-// stoves, a 2x2 preparation-counter island in the middle, and a back/
-// entrance wall with a trash bin, a walkway gap, and the delivery counter.
-// All positions/rotations are local to `parent` (the scene root), matching
+// right walls (the right wall's first slot is a plate counter, ahead of its
+// ingredients; both walls are bookended by a preparation counter), a front
+// row alternating preparation counters and stoves, a 2x2 preparation-counter
+// island in the middle, a back/entrance wall with a trash bin and the
+// delivery counter (each inset from its corner, open walkway between), and
+// a decorative counter in each of the room's four corners. All
+// positions/rotations are local to `parent` (the scene root), matching
 // the existing world-placement pattern.
 
-import { Entity } from '@dcl/sdk/ecs'
+import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { FIXTURE_DEPTH, FIXTURE_HEIGHT, FIXTURE_WIDTH } from '../../shared/constants'
@@ -31,9 +33,12 @@ import { registerStove } from './stoveCooking'
 
 // Local-space distances from the scene root to each wall/row — tuned to
 // match Scene.glb, can't be derived from the model file.
-const SIDE_WALL_DISTANCE = 6 // meters, along X
-const FRONT_ROW_DISTANCE = 6 // meters, along Z
-const BACK_WALL_DISTANCE = 6 // meters, along Z
+const SIDE_WALL_DISTANCE = 5.45 // meters, along X
+const FRONT_ROW_DISTANCE = 5.45 // meters, along Z
+const BACK_WALL_DISTANCE = 5.45 // meters, along Z
+
+// The trash bin/delivery counter models are wider than a standard fixture — also tuned to match Scene.glb.
+const BACK_WALL_COUNTER_WIDTH = 3.5 // meters
 
 // Y-axis rotation (degrees) for a fixture whose unrotated model faces +Z.
 const FACE_POSITIVE_Z = 0
@@ -45,19 +50,46 @@ function rotationDegrees(degrees: number): Quaternion {
   return Quaternion.fromEulerDegrees(0, degrees, 0)
 }
 
+/** Center of the `index`-th of `count` FIXTURE_WIDTH-wide slots, as a whole row centered on 0. */
+function slotOffset(count: number, index: number): number {
+  return (index - (count - 1) / 2) * FIXTURE_WIDTH
+}
+
+/** The createFixture + registerPreparationCounter pairing shared by every preparation counter in the layout. */
+function createPreparationCounterFixture(position: Vector3, rotation: Quaternion, parent: Entity): void {
+  const fixture = createFixture({
+    model: MODELS.counter,
+    position,
+    rotation,
+    parent,
+    height: FIXTURE_HEIGHT,
+    evaluateInteraction: evaluatePreparationCounterInteraction
+  })
+  registerPreparationCounter(fixture)
+}
+
+/** Static model with no focus highlight or interaction — unlike createFixture's, see fixtures.ts. */
+function createDecorativeModel(model: string, position: Vector3, rotation: Quaternion, parent: Entity): void {
+  const entity = engine.addEntity()
+  Transform.create(entity, { position, rotation, parent })
+  GltfContainer.create(entity, { src: model })
+}
+
 export function createSceneLayout(parent: Entity): void {
   createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X, true)
   createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
   createFrontRow(parent)
   createBackWall(parent)
   createIsland(parent)
+  createCorners(parent)
 }
 
 /**
  * Places a row of ingredient counters along one wall (fixed X), spaced
  * edge-to-edge along Z and centered on Z=0, all facing toward the room's
- * center. When includePlateCounter is set, a plate counter takes the first
- * slot ahead of the ingredients.
+ * center, bookended by a preparation counter at each end. When
+ * includePlateCounter is set, a plate counter takes the next slot ahead of
+ * the ingredients.
  */
 function createSideWall(
   parent: Entity,
@@ -66,29 +98,31 @@ function createSideWall(
   facingDegrees: number,
   includePlateCounter = false
 ): void {
-  const slotCount = ingredients.length + (includePlateCounter ? 1 : 0)
-  const totalDepth = (slotCount - 1) * FIXTURE_WIDTH
-  const startZ = -totalDepth / 2
+  const slotCount = ingredients.length + (includePlateCounter ? 1 : 0) + 2 // +2 for the bookending preparation counters
   const rotation = rotationDegrees(facingDegrees)
+  const slotPosition = (slotIndex: number) => Vector3.create(x, 0, slotOffset(slotCount, slotIndex))
 
-  let nextSlot = 0
+  createPreparationCounterFixture(slotPosition(0), rotation, parent)
+
+  let nextSlot = 1
   if (includePlateCounter) {
     createFixture({
       model: MODELS.counter,
-      position: Vector3.create(x, 0, startZ),
+      position: slotPosition(nextSlot),
       rotation,
       parent,
       height: FIXTURE_HEIGHT,
       displayModel: MODELS.plateDisplay,
       evaluateInteraction: evaluatePlateCounterInteraction
     })
-    nextSlot = 1
+    nextSlot += 1
   }
 
   ingredients.forEach((definition, index) => {
-    const position = Vector3.create(x, 0, startZ + (nextSlot + index) * FIXTURE_WIDTH)
-    createIngredientCounter(position, rotation, parent, definition)
+    createIngredientCounter(slotPosition(nextSlot + index), rotation, parent, definition)
   })
+
+  createPreparationCounterFixture(slotPosition(slotCount - 1), rotation, parent)
 }
 
 /**
@@ -98,24 +132,42 @@ function createSideWall(
  */
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
-  const totalWidth = sequence.length * FIXTURE_WIDTH
   const rotation = rotationDegrees(FACE_NEGATIVE_Z)
 
   sequence.forEach((kind, index) => {
-    const position = Vector3.create(-totalWidth / 2 + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, FRONT_ROW_DISTANCE)
+    const position = Vector3.create(slotOffset(sequence.length, index), 0, FRONT_ROW_DISTANCE)
+
+    if (kind === 'counter') {
+      createPreparationCounterFixture(position, rotation, parent)
+      return
+    }
 
     const fixture = createFixture({
-      model: kind === 'stove' ? MODELS.stove : MODELS.counter,
+      model: MODELS.stove,
       position,
       rotation,
       parent,
       height: FIXTURE_HEIGHT,
-      evaluateInteraction: kind === 'counter' ? evaluatePreparationCounterInteraction : evaluateStoveInteraction
+      evaluateInteraction: evaluateStoveInteraction
     })
-
-    if (kind === 'counter') registerPreparationCounter(fixture)
-    else registerStove(fixture)
+    registerStove(fixture)
   })
+}
+
+/**
+ * Fills the room's four corners — each sits at a side wall's X and the
+ * front row's/back wall's Z, so it reads as belonging to both. Placed
+ * separately from createSideWall/createFrontRow/createBackWall rather than
+ * bundled into any one of them, since no single wall owns a corner.
+ */
+function createCorners(parent: Entity): void {
+  const frontRotation = rotationDegrees(FACE_NEGATIVE_Z)
+  const backRotation = rotationDegrees(FACE_POSITIVE_Z)
+
+  for (const x of [-SIDE_WALL_DISTANCE, SIDE_WALL_DISTANCE]) {
+    createDecorativeModel(MODELS.counterCorner, Vector3.create(x, 0, FRONT_ROW_DISTANCE), frontRotation, parent)
+    createDecorativeModel(MODELS.counterCorner, Vector3.create(x, 0, -BACK_WALL_DISTANCE), backRotation, parent)
+  }
 }
 
 /**
@@ -136,56 +188,38 @@ function createIsland(parent: Entity): void {
   for (const row of rows) {
     const rotation = rotationDegrees(row.facingDegrees)
     for (const x of [-halfWidth, halfWidth]) {
-      const fixture = createFixture({
-        model: MODELS.counter,
-        position: Vector3.create(x, 0, row.z),
-        rotation,
-        parent,
-        height: FIXTURE_HEIGHT,
-        evaluateInteraction: evaluatePreparationCounterInteraction
-      })
-      registerPreparationCounter(fixture)
+      createPreparationCounterFixture(Vector3.create(x, 0, row.z), rotation, parent)
     }
   }
 }
 
 /**
- * Places the back wall (the entrance wall): a trash bin, a 4-counter-wide
- * gap left open as a walkway, then the delivery counter. The trash bin
- * uses the same width/depth/height allotment as a counter even though its
- * model is visually smaller, so it still lines up with the delivery
- * counter's slot.
+ * Places the back wall (the entrance wall): a trash bin and the delivery
+ * counter, mirrored around X and each kept half a gap clear of the corner
+ * beside it — accounting for BACK_WALL_COUNTER_WIDTH, since these two are
+ * wider than a standard fixture — with an open walkway between them.
  */
 function createBackWall(parent: Entity): void {
-  const sequence: Array<'trash' | 'gap' | 'delivery'> = ['trash', 'gap', 'gap', 'gap', 'gap', 'delivery']
-  const totalWidth = sequence.length * FIXTURE_WIDTH
-  const startX = -totalWidth / 2
   const rotation = rotationDegrees(FACE_POSITIVE_Z)
+  const halfGap = FIXTURE_DEPTH / 2
+  const insetX = SIDE_WALL_DISTANCE - halfGap - BACK_WALL_COUNTER_WIDTH / 2
 
-  sequence.forEach((kind, index) => {
-    if (kind === 'gap') return
-    const position = Vector3.create(startX + index * FIXTURE_WIDTH + FIXTURE_WIDTH / 2, 0, -BACK_WALL_DISTANCE)
-
-    if (kind === 'trash') {
-      createFixture({
-        model: MODELS.trashBin,
-        position,
-        rotation,
-        parent,
-        height: FIXTURE_HEIGHT,
-        evaluateInteraction: evaluateTrashBinInteraction
-      })
-    } else {
-      const deliveryCounter = createFixture({
-        model: MODELS.counter,
-        position,
-        rotation,
-        parent,
-        height: FIXTURE_HEIGHT,
-        displayModel: MODELS.deliveryPad,
-        evaluateInteraction: () => evaluateDeliveryCounterInteraction()
-      })
-      registerDeliveryCounter(deliveryCounter)
-    }
+  createFixture({
+    model: MODELS.trashBin,
+    position: Vector3.create(-insetX, 0, -BACK_WALL_DISTANCE),
+    rotation,
+    parent,
+    height: FIXTURE_HEIGHT,
+    evaluateInteraction: evaluateTrashBinInteraction
   })
+
+  const deliveryCounter = createFixture({
+    model: MODELS.deliveryCounter,
+    position: Vector3.create(insetX, 0, -BACK_WALL_DISTANCE),
+    rotation: rotationDegrees(FACE_NEGATIVE_Z), // DeliveryCounter.glb faces the opposite way from the trash bin
+    parent,
+    height: FIXTURE_HEIGHT,
+    evaluateInteraction: evaluateDeliveryCounterInteraction
+  })
+  registerDeliveryCounter(deliveryCounter)
 }

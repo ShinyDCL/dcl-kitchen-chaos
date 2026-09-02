@@ -2,10 +2,11 @@ export const MODELS = {
   // Fixtures
   counter: 'assets/scene/models/Counter.glb',
   stove: 'assets/scene/models/Stove.glb',
-  trashBin: 'assets/scene/models/TrashBin.glb',
+  trashBin: 'assets/scene/models/DiscardCounter.glb',
   checkmark: 'assets/scene/models/Checkmark.glb',
   crossmark: 'assets/scene/models/Crossmark.glb',
   message: 'assets/scene/models/Message.glb',
+  counterCorner: 'assets/scene/models/CounterCorner.glb',
 
   // Pickup items (attached to player's hand)
   cucumberSlice: 'assets/scene/models/CucumberSlice.glb',
@@ -33,7 +34,7 @@ export const MODELS = {
   eggDisplay: 'assets/scene/models/EggDisplay.glb',
   bunTopDisplay: 'assets/scene/models/BunTopDisplay.glb',
   plateDisplay: 'assets/scene/models/PlateDisplay.glb',
-  deliveryPad: 'assets/scene/models/DeliveryPad.glb'
+  deliveryCounter: 'assets/scene/models/DeliveryCounter.glb'
 } as const
 
 /** A known model path — for fields/params authored directly from MODELS, so a typo'd literal fails to compile instead of misclassifying at runtime. Held/synced item data stays plain `string`, since that crosses the network. */

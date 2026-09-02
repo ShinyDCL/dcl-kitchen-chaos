@@ -12,7 +12,7 @@ import { FIXTURE_DEPTH, FIXTURE_WIDTH } from '../shared/constants'
 
 const HIGHLIGHT_WIDTH = FIXTURE_WIDTH
 const HIGHLIGHT_DEPTH = FIXTURE_DEPTH
-const HIGHLIGHT_THICKNESS = 0.02
+const HIGHLIGHT_THICKNESS = 0.01
 
 const ALLOWED_COLOR = Color4.create(0.28, 1, 0.22, 1)
 const DISALLOWED_COLOR = Color4.create(0.5, 0.5, 0.5, 1)
@@ -38,7 +38,8 @@ function getOrCreateHighlight(): Entity {
 export function showHighlightAt(worldPosition: Vector3, rotation: Quaternion, allowed: boolean): void {
   const highlight = getOrCreateHighlight()
   const transform = Transform.getMutable(highlight)
-  transform.position = worldPosition
+  // Raised by half its own thickness so it sits flush on top of the fixture surface instead of embedded halfway into it.
+  transform.position = Vector3.create(worldPosition.x, worldPosition.y + HIGHLIGHT_THICKNESS / 2, worldPosition.z)
   transform.rotation = rotation
   VisibilityComponent.getMutable(highlight).visible = true
   applyAllowedColor(allowed)
