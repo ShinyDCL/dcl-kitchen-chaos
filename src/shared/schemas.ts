@@ -21,12 +21,13 @@ function lockToServer(component: ServerOnlyComponent): void {
   }
 }
 
-// Reserved explicit sync id for GameState, the scene's one non-fixture
-// singleton — clear of fixtures.ts's separate 0-based fixture id space so
-// neither can ever collide. Every other component below either derives
-// its id from a fixture, or needs no explicit id at all (matched by a
-// field instead — playerId, orderNumber).
+// Reserved explicit sync ids for the scene's non-fixture singletons — clear
+// of fixtures.ts's separate 0-based fixture id space so neither can ever
+// collide. Every other component below either derives its id from a
+// fixture, or needs no explicit id at all (matched by a field instead —
+// playerId, orderNumber).
 export const GAME_STATE_SYNC_ID = 100000
+export const LEADERBOARD_SYNC_ID = 100001
 
 /**
  * One entity per player who has held something this session. `models` is
@@ -117,27 +118,60 @@ lockToServer(PlayerRole)
  * Singleton. `activePlayerCount` is currently-connected 'play'-role
  * players, recomputed each tick so a disconnect is reflected for free.
  * `streak` counts consecutive successful deliveries scene-wide, reset to 0
- * on a miss — see orderQueue.ts. `serverHeartbeatAt` (server clock, ms)
- * is pulsed periodically by the server so clients can tell it's actually
- * alive, not just that the CRDT room is connected — see
+ * on a miss — see orderQueue.ts. `totalDeliveredOrders` is the all-time
+ * count, persisted by server/deliveryStats.ts, so unlike `streak` it
+ * survives restarts. `serverHeartbeatAt` (server clock, ms) is pulsed
+ * periodically so clients can tell the server is actually alive, not just
+ * that the CRDT room is connected — see
  * client/serverReadiness.ts and the authoritative-server skill's Server
  * Lifecycle section.
  */
 export const GameState = engine.defineComponent('game::GameState', {
   activePlayerCount: Schemas.Int,
   streak: Schemas.Int,
+  totalDeliveredOrders: Schemas.Int,
   serverHeartbeatAt: Schemas.Int64
 })
 
 lockToServer(GameState)
 
-/** One entity per player's coin balance, matched by `playerId` like HeldItem/PlayerRole. Session-only — no Storage persistence yet. */
+/**
+ * One entity per connected player's coin total, matched by `playerId` like
+ * HeldItem/PlayerRole. Created only once server/playerCoins.ts has loaded
+ * the stored total, so the HUD never shows a 0 that then jumps.
+ * `lifetimeCoins` is only ever added to — if coins ever become spendable,
+ * add a separate `spentCoins` and derive the balance, or the leaderboard's
+ * lifetime ranking breaks.
+ */
 export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
   playerId: Schemas.String,
-  coins: Schemas.Int
+  lifetimeCoins: Schemas.Int
 })
 
 lockToServer(PlayerCoins)
+
+/**
+ * Singleton — the top LEADERBOARD_SIZE players by lifetime coins, sorted
+ * descending by the server (see server/leaderboard.ts). Includes offline
+ * players, which is why it can't be derived from the PlayerCoins entities
+ * above (those exist only for connected players). `name` is captured
+ * whenever an entry is written, since coins only change while a player is
+ * connected and resolvable. `version` is bumped on every publish so a
+ * client can detect a change with one integer compare instead of diffing —
+ * same trick as DeliveryState's deliveryId.
+ */
+export const Leaderboard = engine.defineComponent('game::Leaderboard', {
+  version: Schemas.Int,
+  entries: Schemas.Array(
+    Schemas.Map({
+      playerId: Schemas.String,
+      name: Schemas.String,
+      lifetimeCoins: Schemas.Int
+    })
+  )
+})
+
+lockToServer(Leaderboard)
 
 /**
  * One entity per currently-active order — created on generation, destroyed

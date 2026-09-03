@@ -24,28 +24,24 @@
 import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { room } from '../../shared/messages'
 import { PreparationCounterState } from '../../shared/schemas'
 import { getHeldItemModels, grantHeldItem } from '../heldItems'
-import { isPlayerAllowedToAct } from '../playerRoster'
+import { onPlayerAction } from '../playerActivity'
 
 const counterEntities = new Map<number, Entity>()
 
 export function initPreparationCounters(): void {
   reconcileCounterEntities()
 
-  room.onMessage('pickUpFromCounter', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
+  onPlayerAction('pickUpFromCounter', (data, playerId) => {
     const state = getMutableState(data.counterId)
     if (!state || state.ingredientModels.length === 0) return // nothing to pick up — ignore
     const models = state.ingredientModels
     state.ingredientModels = []
-    grantHeldItem(context.from.toLowerCase(), models)
+    grantHeldItem(playerId, models)
   })
 
-  room.onMessage('placeOnCounter', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    const playerId = context.from.toLowerCase()
+  onPlayerAction('placeOnCounter', (data, playerId) => {
     const heldModels = getHeldItemModels(playerId)
     const state = getMutableState(data.counterId)
     if (!state) return

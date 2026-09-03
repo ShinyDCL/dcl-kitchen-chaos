@@ -6,19 +6,17 @@
 //
 // Per-player entity management is perPlayerSyncedStore.ts's shared pattern.
 
-import { room } from '../shared/messages'
 import { HeldItem } from '../shared/schemas'
 import { createPerPlayerStore } from './perPlayerSyncedStore'
-import { isPlayerAllowedToAct } from './playerRoster'
+import { onPlayerAction } from './playerActivity'
 
 const store = createPerPlayerStore(HeldItem, (playerId) => ({ playerId, models: [] }))
 
 export function initHeldItems(): void {
   store.reconcile()
 
-  room.onMessage('setHeldItem', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    grantHeldItem(context.from.toLowerCase(), data.models)
+  onPlayerAction('setHeldItem', (data, playerId) => {
+    grantHeldItem(playerId, data.models)
   })
 }
 

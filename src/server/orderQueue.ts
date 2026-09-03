@@ -7,8 +7,9 @@
 // see getTargetQueueSize, so a solo player always has a choice. A timeout
 // resets nothing — only a wrong delivery resets the streak.
 //
-// evaluateDelivery pays every active player and broadcasts
-// 'orderDelivered' on a match; a miss resets the streak. Expiry and
+// evaluateDelivery pays every recently-active player (playerActivity.ts)
+// and broadcasts 'orderDelivered' on a match; a miss resets the streak.
+// Expiry and
 // generation get no broadcast — clients derive both locally from
 // OrderState's generatedAt (see ordersUi.tsx's getActiveOrders). A
 // resolved order's replacement is held off for
@@ -28,13 +29,21 @@ import { room } from '../shared/messages'
 import { sameModels } from '../shared/models'
 import { getDifficultyForStreak, getRecipeById, pickRandomRecipeByDifficulty, Recipe } from '../shared/recipes'
 import { OrderState } from '../shared/schemas'
+import { recordDelivery } from './deliveryStats'
+import { getRecentlyActivePlayerIds } from './playerActivity'
 import { grantCoins } from './playerCoins'
-import { getActivePlayerIds, getGameStateMutable, getPlayerDisplayName } from './playerRoster'
+import { getGameStateMutable, getPlayerDisplayName } from './playerRoster'
 
 // Queue size caps at this many by active player count — see getTargetQueueSize.
 const MAX_QUEUE_SIZE = 6
 
-const BASE_ORDER_PAYOUT = 10 // per delivery, scaled by recipe difficulty
+// Payout per delivery = BASE * recipe difficulty * streak multiplier, paid
+// in full to every recently-active player (playerActivity.ts) rather than
+// to the deliverer alone — the game is co-op, and carrying the finished
+// plate is the least of the work that went into it.
+const BASE_ORDER_PAYOUT = 10
+const STREAK_BONUS_PER_DELIVERY = 0.1 // +10% per consecutive success...
+const MAX_STREAK_BONUS = 1 // ...capped at +100%, i.e. 2x from the 11th on
 
 const orderEntities = new Map<number, Entity>() // keyed by orderNumber
 let nextOrderNumber = 1 // session-wide ticket counter — see OrderState.orderNumber
@@ -56,9 +65,17 @@ export function evaluateDelivery(models: string[], delivererId: string): boolean
     return false
   }
 
-  gameState.streak += 1
+  // Multiplier comes off the streak *before* this delivery, so the one that
+  // starts a streak pays plain 1x.
+  const streakBefore = gameState.streak
+  gameState.streak = streakBefore + 1
+
+  recordDelivery()
+
   const recipe = getRecipeById(matched.recipeId)
-  grantCoins(getActivePlayerIds(), recipe ? BASE_ORDER_PAYOUT * recipe.difficulty : BASE_ORDER_PAYOUT)
+  const multiplier = 1 + Math.min(streakBefore * STREAK_BONUS_PER_DELIVERY, MAX_STREAK_BONUS)
+  const payout = Math.round(BASE_ORDER_PAYOUT * (recipe?.difficulty ?? 1) * multiplier)
+  grantCoins(getRecentlyActivePlayerIds(), payout)
 
   void room.send('orderDelivered', {
     recipeId: matched.recipeId,

@@ -21,6 +21,14 @@ export const BURN_GRACE_SECONDS = 10
 // (see orderQueue.ts).
 export const ORDER_RESULT_DISPLAY_SECONDS = 2
 
+// How long after their last action a player still counts toward order
+// payouts — see server/playerActivity.ts.
+export const ACTIVITY_WINDOW_MS = 3 * 60 * 1000
+
+// The server truncates the board to this and the client builds this many
+// rows — they must agree, or the board silently shows fewer.
+export const LEADERBOARD_SIZE = 10
+
 // Server heartbeat — see client/serverReadiness.ts.
 export const SERVER_HEARTBEAT_INTERVAL_MS = 2000
 export const SERVER_HEARTBEAT_FRESHNESS_MS = 6000

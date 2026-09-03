@@ -16,6 +16,8 @@ import { startRenderingPreparationCounters } from './fixtures/preparationCounter
 import { createSceneLayout } from './fixtures/sceneLayout'
 import { startRenderingStoves } from './fixtures/stoveCooking'
 import { startRenderingHeldItems } from './heldItem'
+import { setupInfoDisplay } from './infoDisplay'
+import { setupLeaderboardDisplay } from './leaderboardDisplay'
 import { startMobileCamera } from './mobileCamera'
 import { setupMobileControls } from './mobileControls'
 import { startBackgroundMusic } from './sound'
@@ -30,6 +32,8 @@ export function initClient(): void {
   GltfContainer.create(scene, { src: 'assets/scene/models/Scene.glb' })
 
   createSceneLayout(scene)
+  setupLeaderboardDisplay(scene)
+  setupInfoDisplay(scene)
   preloadAssets()
   startRenderingHeldItems()
   startRenderingPreparationCounters()

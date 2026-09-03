@@ -25,35 +25,33 @@ import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
 import { grantHeldItem } from '../heldItems'
-import { isPlayerAllowedToAct } from '../playerRoster'
+import { onPlayerAction } from '../playerActivity'
 
 const stoveEntities = new Map<number, Entity>()
 
 export function initStoveCooking(): void {
   reconcileStoveEntities()
 
-  room.onMessage('startCookingOnStove', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
+  onPlayerAction('startCookingOnStove', (data, playerId, address) => {
     const definition = getCookableItemDefinition(data.rawModel)
     if (!definition) {
-      void room.send('actionRejected', {}, { to: [context.from] }) // not a real cookable
+      void room.send('actionRejected', {}, { to: [address] }) // not a real cookable
       return
     }
 
     const entity = getOrCreateStoveEntity(data.stoveId)
     const state = StoveState.getMutableOrNull(entity)
     if (!state || state.rawModel !== '') {
-      void room.send('actionRejected', {}, { to: [context.from] }) // already cooking or done
+      void room.send('actionRejected', {}, { to: [address] }) // already cooking or done
       return
     }
 
     state.rawModel = data.rawModel
     state.startTimestamp = Date.now()
-    grantHeldItem(context.from.toLowerCase(), [])
+    grantHeldItem(playerId, [])
   })
 
-  room.onMessage('collectFromStove', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
+  onPlayerAction('collectFromStove', (data, playerId) => {
     const entity = stoveEntities.get(data.stoveId)
     if (entity === undefined) return
 
@@ -68,7 +66,7 @@ export function initStoveCooking(): void {
 
     const isBurnt = elapsedSeconds >= definition.cookDurationSeconds + BURN_GRACE_SECONDS
     state.rawModel = '' // reset first so a second, already-queued collect sees idle and no-ops
-    grantHeldItem(context.from.toLowerCase(), [isBurnt ? MODELS.burntCookable : definition.cookedModel])
+    grantHeldItem(playerId, [isBurnt ? MODELS.burntCookable : definition.cookedModel])
   })
 }
 

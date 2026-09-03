@@ -61,13 +61,30 @@ export function getGameStateMutable() {
   return GameState.getMutableOrNull(getOrCreateGameStateEntity())
 }
 
-/** Display name for a player address, used in the order HUD's "delivered by" message. */
-export function getPlayerDisplayName(playerId: string): string {
-  const name = getPlayer({ userId: playerId })?.name
-  return name && name.length > 0 ? name : 'A player'
+/**
+ * Resolved profile name, or null when it can't be read — getPlayer only
+ * sees players currently in the scene, so an offline player is always null.
+ * Matches case-insensitively and looks up by the address as PlayerIdentityData
+ * actually spells it, since getPlayer compares userId exactly and callers
+ * hold lower-cased ids.
+ */
+export function getPlayerName(playerId: string): string | null {
+  const target = playerId.toLowerCase()
+  for (const [, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
+    if (identity.address.toLowerCase() !== target) continue
+    const name = getPlayer({ userId: identity.address })?.name
+    return name && name.length > 0 ? name : null
+  }
+  return null
 }
 
-function getConnectedPlayerIds(): Set<string> {
+/** Display name for a player address, used in the order HUD's "delivered by" message. */
+export function getPlayerDisplayName(playerId: string): string {
+  return getPlayerName(playerId) ?? 'A player'
+}
+
+/** Lower-cased addresses of everyone currently connected, whatever their role. */
+export function getConnectedPlayerIds(): Set<string> {
   const connectedIds = new Set<string>()
   for (const [, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
     connectedIds.add(identity.address.toLowerCase())
@@ -102,7 +119,7 @@ function getOrCreateGameStateEntity(): Entity {
   const entity = engine.addEntity()
   // Publish the first heartbeat immediately so a client connecting right
   // after a cold start doesn't have to wait a full interval to see one.
-  GameState.create(entity, { activePlayerCount: 0, streak: 0, serverHeartbeatAt: Date.now() })
+  GameState.create(entity, { activePlayerCount: 0, streak: 0, totalDeliveredOrders: 0, serverHeartbeatAt: Date.now() })
   syncEntity(entity, [GameState.componentId], GAME_STATE_SYNC_ID)
   gameStateEntity = entity
   return entity

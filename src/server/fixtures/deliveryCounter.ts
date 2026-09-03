@@ -9,23 +9,20 @@
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { room } from '../../shared/messages'
 import { DeliveryState } from '../../shared/schemas'
 import { getHeldItemModels, grantHeldItem } from '../heldItems'
 import { evaluateDelivery } from '../orderQueue'
-import { isPlayerAllowedToAct } from '../playerRoster'
+import { onPlayerAction } from '../playerActivity'
 
 let deliveryEntity: Entity | null = null
 
 export function initDeliveryCounter(): void {
   reconcileDeliveryEntity()
 
-  room.onMessage('deliverHeldItem', (data, context) => {
-    if (!context || !isPlayerAllowedToAct(context.from)) return
-    const playerId = context.from.toLowerCase()
+  onPlayerAction('deliverHeldItem', (data, playerId, address) => {
     const heldModels = getHeldItemModels(playerId)
 
-    const success = evaluateDelivery(heldModels, context.from)
+    const success = evaluateDelivery(heldModels, address)
     grantHeldItem(playerId, [])
 
     const entity = getOrCreateDeliveryEntity(data.deliveryCounterId)

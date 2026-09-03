@@ -12,6 +12,9 @@
 //
 // The area around the prompt stays click-through so choosing not to answer
 // yet doesn't block movement or interaction.
+//
+// The switcher renderer also hosts coinsUi.tsx's CoinsPanel, so the two
+// stack as one top-right column — see RoleSwitcherRenderer.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
@@ -21,13 +24,21 @@ import { PlayerRoleValue } from '../../shared/schemas'
 import { onPlatformResolved } from '../platformDetection'
 import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from '../playerRoleState'
 import { isServerAlive } from '../serverReadiness'
+import { CoinsPanel } from './coinsUi'
 import { ENTRY_PANEL_TRANSFORM, OVERLAY_WRAPPER_TRANSFORM, PANEL_BACKGROUND } from './entryOverlayStyle'
 import { LoadingPrompt } from './serverLoadingUi'
 
 const BUTTON_BORDER_RADIUS = 8
 
+// Overrides Button's default DCL-brand red/white — pink echoes the delivery
+// counter's glow, cream/brown echoes the counters and checkered floor.
+const PLAY_BUTTON_COLOR = Color4.create(0.95, 0.25, 0.55, 1)
+const SPECTATE_BUTTON_COLOR = Color4.create(0.95, 0.87, 0.74, 1)
+const SPECTATE_BUTTON_TEXT_COLOR = Color4.create(0.32, 0.18, 0.1, 1)
+
 const SWITCHER_BACKGROUND = Color4.create(0, 0, 0, 0.6)
 const SWITCHER_BORDER_RADIUS = 10
+const SWITCHER_EDGE_OFFSET = 24 // from the interactable area's top-right corner
 
 interface SwitcherLayout {
   width: number
@@ -94,6 +105,7 @@ function RolePrompt() {
           value="Play"
           variant="primary"
           fontSize={22}
+          uiBackground={{ color: PLAY_BUTTON_COLOR }}
           onMouseDown={() => chooseRole(PlayerRoleValue.Play)}
           uiTransform={{ width: 240, height: 56, margin: { bottom: 20 }, borderRadius: BUTTON_BORDER_RADIUS }}
         />
@@ -101,6 +113,8 @@ function RolePrompt() {
           value="Spectate"
           variant="secondary"
           fontSize={20}
+          color={SPECTATE_BUTTON_TEXT_COLOR}
+          uiBackground={{ color: SPECTATE_BUTTON_COLOR }}
           onMouseDown={() => chooseRole(PlayerRoleValue.Spectate)}
           uiTransform={{ width: 240, height: 56, borderRadius: BUTTON_BORDER_RADIUS }}
         />
@@ -109,9 +123,30 @@ function RolePrompt() {
   )
 }
 
+/**
+ * Anchors the switcher and the coin panel as one top-right column, so the
+ * coins sit under the button without hardcoding an offset that would go
+ * wrong when the switcher swaps to its taller mobile layout.
+ */
 function RoleSwitcherRenderer() {
   if (showEntryOverlay) return null
-  return RoleSwitcher()
+  const layout = currentSwitcherLayout
+
+  return (
+    <UiEntity
+      uiTransform={{
+        positionType: 'absolute',
+        position: { top: SWITCHER_EDGE_OFFSET, right: SWITCHER_EDGE_OFFSET },
+        width: layout.width,
+        height: 'auto',
+        flexDirection: 'column',
+        alignItems: 'flex-end'
+      }}
+    >
+      <RoleSwitcher />
+      <CoinsPanel layout={{ width: layout.width, height: layout.height, fontSize: layout.fontSize }} />
+    </UiEntity>
+  )
 }
 
 function RoleSwitcher() {
@@ -123,8 +158,6 @@ function RoleSwitcher() {
   return (
     <UiEntity
       uiTransform={{
-        positionType: 'absolute',
-        position: { top: 24, right: 24 },
         width: layout.width,
         height: layout.height,
         justifyContent: 'center',
