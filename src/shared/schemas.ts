@@ -126,11 +126,15 @@ lockToServer(PlayerRole)
  * client/serverReadiness.ts and the authoritative-server skill's Server
  * Lifecycle section.
  */
+// Schemas.Map serializes positionally — no field names, no length prefixes
+// — so field ORDER is the wire format. Only ever append new fields at the
+// end: inserting one shifts every field after it, and a snapshot written by
+// an older build then deserializes misaligned.
 export const GameState = engine.defineComponent('game::GameState', {
   activePlayerCount: Schemas.Int,
   streak: Schemas.Int,
-  totalDeliveredOrders: Schemas.Int,
-  serverHeartbeatAt: Schemas.Int64
+  serverHeartbeatAt: Schemas.Int64,
+  totalDeliveredOrders: Schemas.Int
 })
 
 lockToServer(GameState)

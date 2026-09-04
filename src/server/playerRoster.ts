@@ -92,8 +92,16 @@ export function getConnectedPlayerIds(): Set<string> {
   return connectedIds
 }
 
+/** Short-circuits on the first entity, unlike getConnectedPlayerIds — this runs every frame and an empty scene shouldn't pay for a Set. */
+function hasConnectedPlayers(): boolean {
+  for (const [] of engine.getEntitiesWith(PlayerIdentityData)) return true
+  return false
+}
+
 function recomputeActivePlayerCount(): void {
-  const activePlayerCount = getActivePlayerIds().length
+  // Skips building the Set and array getActivePlayerIds allocates when the
+  // scene is empty — the answer is 0 either way.
+  const activePlayerCount = hasConnectedPlayers() ? getActivePlayerIds().length : 0
 
   const mutable = getGameStateMutable()
   if (mutable && mutable.activePlayerCount !== activePlayerCount) {
@@ -103,7 +111,16 @@ function recomputeActivePlayerCount(): void {
 
 let lastHeartbeatAt = 0
 
-/** Pulses GameState.serverHeartbeatAt every SERVER_HEARTBEAT_INTERVAL_MS so clients can detect this server is actually alive — see client/serverReadiness.ts. */
+/**
+ * Pulses GameState.serverHeartbeatAt every SERVER_HEARTBEAT_INTERVAL_MS so
+ * clients can detect this server is actually alive — see
+ * client/serverReadiness.ts.
+ *
+ * Deliberately unconditional, even with nobody in the scene: the platform
+ * already shuts an empty server down after ~2 minutes, so gating this on
+ * player presence would save almost nothing while putting the one signal
+ * the entry overlay depends on at risk.
+ */
 function pulseServerHeartbeat(): void {
   const now = Date.now()
   if (now - lastHeartbeatAt < SERVER_HEARTBEAT_INTERVAL_MS) return

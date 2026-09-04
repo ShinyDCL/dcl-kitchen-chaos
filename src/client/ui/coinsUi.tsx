@@ -16,11 +16,8 @@ import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 import { PlayerCoins } from '../../shared/schemas'
 import { formatNumber } from '../numberFormat'
 import { getLocalUserId } from '../playerIdentity'
+import { CornerPanelLayout, PANEL_BACKGROUND, PANEL_BORDER_RADIUS, PANEL_MARGIN_TOP } from './cornerPanelStyle'
 import { OVERLAY_SUCCESS_BACKGROUND, SUCCESS_TEXT_COLOR } from './orderQueueStyle'
-
-const PANEL_BACKGROUND = Color4.create(0, 0, 0, 0.6) // matches the switcher's
-const PANEL_BORDER_RADIUS = 10
-const PANEL_MARGIN_TOP = 8
 
 const TOAST_SECONDS = 2
 const TOAST_FADE_FRACTION = 0.4 // last 40% of its life fades out
@@ -36,13 +33,7 @@ let lastSeenCoins: number | null = null
 let toastAmount = 0
 let toastEndsAt = 0
 
-export interface CoinsPanelLayout {
-  width: number
-  height: number
-  fontSize: number
-}
-
-export function CoinsPanel({ layout }: { layout: CoinsPanelLayout }) {
+export function CoinsPanel({ layout }: { layout: CornerPanelLayout }) {
   const coins = getLocalPlayerCoins()
   if (coins === null) return null // total hasn't loaded server-side yet
 
@@ -71,7 +62,7 @@ export function CoinsPanel({ layout }: { layout: CoinsPanelLayout }) {
 }
 
 /** The "+123 coins" panel under the counter — nothing rendered when no grant is in flight. */
-function CoinToast({ layout }: { layout: CoinsPanelLayout }) {
+function CoinToast({ layout }: { layout: CornerPanelLayout }) {
   const fade = getToastFade()
   if (fade === null) return null
 

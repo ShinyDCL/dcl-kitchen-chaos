@@ -3,13 +3,13 @@
 // generation, destroyed on resolution (delivered or expired). No fixed
 // slot count: growQueueSystem just compares live count against target.
 //
-// Target size is 0 with zero active players, else min(count + 1, MAX) —
-// see getTargetQueueSize, so a solo player always has a choice. A timeout
-// resets nothing — only a wrong delivery resets the streak.
+// Target size is min(count + 1, MAX) — see getTargetQueueSize, so a solo
+// player always has a choice. With nobody playing the queue is dropped
+// outright rather than left to expire (see growQueueSystem).
 //
 // evaluateDelivery pays every recently-active player (playerActivity.ts)
-// and broadcasts 'orderDelivered' on a match; a miss resets the streak.
-// Expiry and
+// and broadcasts 'orderDelivered' on a match. Both a miss and a timeout
+// nudge the streak down (see adjustStreak). Expiry and
 // generation get no broadcast — clients derive both locally from
 // OrderState's generatedAt (see ordersUi.tsx's getActiveOrders). A
 // resolved order's replacement is held off for
@@ -27,7 +27,13 @@ import { ORDER_RESULT_DISPLAY_SECONDS } from '../shared/constants'
 import { getRequiredModelForIngredient } from '../shared/ingredients'
 import { room } from '../shared/messages'
 import { sameModels } from '../shared/models'
-import { getDifficultyForStreak, getRecipeById, pickRandomRecipeByDifficulty, Recipe } from '../shared/recipes'
+import {
+  getDifficultyForStreak,
+  getRecipeById,
+  MAX_STREAK,
+  pickRandomRecipeByDifficulty,
+  Recipe
+} from '../shared/recipes'
 import { OrderState } from '../shared/schemas'
 import { recordDelivery } from './deliveryStats'
 import { getRecentlyActivePlayerIds } from './playerActivity'
@@ -37,13 +43,20 @@ import { getGameStateMutable, getPlayerDisplayName } from './playerRoster'
 // Queue size caps at this many by active player count — see getTargetQueueSize.
 const MAX_QUEUE_SIZE = 6
 
-// Payout per delivery = BASE * recipe difficulty * streak multiplier, paid
-// in full to every recently-active player (playerActivity.ts) rather than
-// to the deliverer alone — the game is co-op, and carrying the finished
-// plate is the least of the work that went into it.
-const BASE_ORDER_PAYOUT = 10
-const STREAK_BONUS_PER_DELIVERY = 0.1 // +10% per consecutive success...
-const MAX_STREAK_BONUS = 1 // ...capped at +100%, i.e. 2x from the 11th on
+// Payout is the recipe's own `coins` (see shared/recipes.ts), paid in full
+// to every recently-active player (playerActivity.ts) rather than to the
+// deliverer alone — the game is co-op, and carrying the finished plate is
+// the least of the work that went into it. Streak isn't multiplied in: it
+// already raises pay by unlocking higher-difficulty recipes.
+//
+// Streak moves in both directions rather than resetting: a delivery is worth
+// more than a mistake costs, so a team that mostly keeps up still climbs.
+// Letting an order expire costs the same as delivering the wrong thing —
+// otherwise the streak would only measure caution, since ignoring an order
+// you weren't sure about would be free.
+const STREAK_PER_DELIVERY = 2
+const STREAK_PER_WRONG_DELIVERY = -1
+const STREAK_PER_TIMEOUT = -1
 
 const orderEntities = new Map<number, Entity>() // keyed by orderNumber
 let nextOrderNumber = 1 // session-wide ticket counter — see OrderState.orderNumber
@@ -61,21 +74,17 @@ export function evaluateDelivery(models: string[], delivererId: string): boolean
 
   const matched = findMatchingOrder(models)
   if (!matched) {
-    gameState.streak = 0
+    adjustStreak(gameState, STREAK_PER_WRONG_DELIVERY)
     return false
   }
 
-  // Multiplier comes off the streak *before* this delivery, so the one that
-  // starts a streak pays plain 1x.
-  const streakBefore = gameState.streak
-  gameState.streak = streakBefore + 1
-
+  adjustStreak(gameState, STREAK_PER_DELIVERY)
   recordDelivery()
 
+  // grantCoins ignores a non-positive amount, so an unknown recipe (which
+  // shouldn't happen — recipeId always comes from the shared pool) just pays nothing.
   const recipe = getRecipeById(matched.recipeId)
-  const multiplier = 1 + Math.min(streakBefore * STREAK_BONUS_PER_DELIVERY, MAX_STREAK_BONUS)
-  const payout = Math.round(BASE_ORDER_PAYOUT * (recipe?.difficulty ?? 1) * multiplier)
-  grantCoins(getRecentlyActivePlayerIds(), payout)
+  grantCoins(getRecentlyActivePlayerIds(), recipe?.coins ?? 0)
 
   void room.send('orderDelivered', {
     recipeId: matched.recipeId,
@@ -92,9 +101,19 @@ function growQueueSystem(): void {
   const gameState = getGameStateMutable()
   if (!gameState) return
 
+  // Empty kitchen: drop the queue and stop. Left running, the orders would
+  // expire one by one and drain the streak with nobody there, and any that
+  // outlasted the lull would greet the next player with a spent timer and
+  // expire immediately.
+  if (gameState.activePlayerCount <= 0) {
+    if (orderEntities.size > 0) clearQueue()
+    return
+  }
+
   for (const [orderNumber, entity] of orderEntities) {
     const data = OrderState.getOrNull(entity)
     if (data && isExpired(data.recipeId, Number(data.generatedAt))) {
+      adjustStreak(gameState, STREAK_PER_TIMEOUT)
       removeOrder(entity, orderNumber)
     }
   }
@@ -103,6 +122,11 @@ function growQueueSystem(): void {
 
   const target = getTargetQueueSize(gameState.activePlayerCount)
   while (orderEntities.size < target) generateOrder(gameState.streak)
+}
+
+/** Applies a streak change, held between 0 and MAX_STREAK — see shared/recipes.ts for what each bound buys. */
+function adjustStreak(gameState: { streak: number }, delta: number): void {
+  gameState.streak = Math.max(0, Math.min(gameState.streak + delta, MAX_STREAK))
 }
 
 function isExpired(recipeId: string, generatedAt: number): boolean {
@@ -126,6 +150,13 @@ function generateOrder(streak: number): void {
   OrderState.create(entity, { orderNumber, recipeId: recipe.id, generatedAt })
   syncEntity(entity, [OrderState.componentId]) // no explicit id — auto-allocated, identity lives in orderNumber
   orderEntities.set(orderNumber, entity)
+}
+
+/** Drops every live order at once — no streak penalty and no regeneration cooldown, so whoever arrives next starts on a fresh queue immediately. */
+function clearQueue(): void {
+  for (const [, entity] of orderEntities) engine.removeEntity(entity)
+  orderEntities.clear()
+  nextGenerationAt = 0
 }
 
 /** Removes a resolved order and pushes back its replacement's earliest generation time — see the module comment. */

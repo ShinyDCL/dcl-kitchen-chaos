@@ -17,10 +17,9 @@ import { Storage } from '@dcl/sdk/server'
 import { LEADERBOARD_SIZE } from '../shared/constants'
 import { Leaderboard, LEADERBOARD_SYNC_ID } from '../shared/schemas'
 import { getPlayerName } from './playerRoster'
-import { createDebouncedFlush } from './storageFlush'
+import { persist } from './storageWrite'
 
 const STORAGE_KEY = 'leaderboard'
-const FLUSH_INTERVAL_SECONDS = 10
 
 interface LeaderboardEntry {
   playerId: string // lower-cased
@@ -30,17 +29,13 @@ interface LeaderboardEntry {
 
 const entries: LeaderboardEntry[] = [] // sorted descending, at most LEADERBOARD_SIZE
 let needsPublish = false // changed in memory, not yet written to the synced component
-let dirty = false // changed since last persisted
 let loaded = false // stored board read at least once — never write before that
 let leaderboardEntity: Entity | null = null
-
-const flusher = createDebouncedFlush(FLUSH_INTERVAL_SECONDS, flushBoard)
 
 export function initLeaderboard(): void {
   reconcileLeaderboardEntity()
   void loadStoredBoard()
   engine.addSystem(publishPendingBoard)
-  engine.addSystem(flusher.system)
 }
 
 /** One component write per tick — a delivery pays every recently-active player, so recordCoins calls land in batches. */
@@ -55,6 +50,11 @@ function publishPendingBoard(): void {
   if (!mutable) return
   mutable.version += 1 // lets clients detect the change without diffing contents
   mutable.entries = entries.map((entry) => ({ ...entry }))
+
+  // The whole board, so a dropped write is healed by the next change's.
+  // Several recordCoins calls per delivery collapse into one write here, and
+  // the SDK's per-key queue coalesces whatever still overlaps.
+  if (loaded) persist('leaderboard', () => Storage.set(STORAGE_KEY, JSON.stringify(entries)))
 }
 
 /**
@@ -79,11 +79,13 @@ export function recordCoins(playerId: string, lifetimeCoins: number): void {
   }
 
   needsPublish = true
-  dirty = true
 }
 
 /** Whether a total is good enough to enter a board that isn't full yet, or to displace its last entry. */
 function qualifies(lifetimeCoins: number): boolean {
+  // Connecting alone loads a player at 0 and records it — without this, merely
+  // joining put everyone on the board (and persisted it).
+  if (lifetimeCoins <= 0) return false
   if (entries.length < LEADERBOARD_SIZE) return true
   return lifetimeCoins > entries[entries.length - 1].lifetimeCoins
 }
@@ -102,10 +104,24 @@ async function loadStoredBoard(): Promise<void> {
   try {
     raw = (await Storage.get<string>(STORAGE_KEY)) ?? null
   } catch {
-    return // stay unloaded so flushBoard retries — writing now would overwrite the stored board
+    // Never persist without having read first, or the stored board would be
+    // overwritten by whatever this run happens to accumulate.
+    console.error('[server] leaderboard: could not read the stored board; not persisting this run')
+    return
   }
 
-  loaded = true // an empty or corrupt value is still a successful read; only a failed one retries
+  loaded = true // an empty or corrupt value is still a successful read
+  mergeStoredEntries(raw)
+
+  // Runs on every path above, not just when rows were merged: anything
+  // recorded while the read was in flight is still unpersisted, since
+  // publishPendingBoard suppresses writes until `loaded`. An empty board
+  // publishes nothing, so no synced entity is created for it.
+  if (entries.length > 0) needsPublish = true
+}
+
+/** Folds the stored rows in, keeping this run's value for any player already recorded — that one is fresher. */
+function mergeStoredEntries(raw: string | null): void {
   if (!raw) return
 
   let stored: LeaderboardEntry[]
@@ -118,24 +134,11 @@ async function loadStoredBoard(): Promise<void> {
 
   for (const entry of stored) {
     if (typeof entry?.playerId !== 'string' || typeof entry?.lifetimeCoins !== 'number') continue
+    if (entry.lifetimeCoins <= 0) continue // drops 0-coin rows an older build persisted
     const id = entry.playerId.toLowerCase()
-    if (entries.some((existing) => existing.playerId === id)) continue // this run's value is fresher
+    if (entries.some((existing) => existing.playerId === id)) continue
     entries.push({ playerId: id, name: typeof entry.name === 'string' ? entry.name : 'A player', lifetimeCoins: entry.lifetimeCoins })
   }
-
-  needsPublish = true // deliberately not dirty — nothing to write back
-}
-
-async function flushBoard(): Promise<void> {
-  if (!loaded) {
-    await loadStoredBoard() // boot read failed; this interval is the retry
-    return
-  }
-  if (!dirty) return
-
-  const snapshot = JSON.stringify(entries)
-  const ok = await Storage.set(STORAGE_KEY, snapshot)
-  if (ok && snapshot === JSON.stringify(entries)) dirty = false // still current, so safe to clear
 }
 
 function getOrCreateLeaderboardEntity(): Entity {

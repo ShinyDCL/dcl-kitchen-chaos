@@ -26,6 +26,7 @@ import { applyRole, getLocalPlayerRole, startPlayerRoleSync } from '../playerRol
 import { isServerAlive } from '../serverReadiness'
 import { CoinsPanel } from './coinsUi'
 import { ENTRY_PANEL_TRANSFORM, OVERLAY_WRAPPER_TRANSFORM, PANEL_BACKGROUND } from './entryOverlayStyle'
+import { LevelPanel } from './levelUi'
 import { LoadingPrompt } from './serverLoadingUi'
 
 const BUTTON_BORDER_RADIUS = 8
@@ -131,6 +132,9 @@ function RolePrompt() {
 function RoleSwitcherRenderer() {
   if (showEntryOverlay) return null
   const layout = currentSwitcherLayout
+  // The level panel goes above the coins: the "+N coins" toast hangs off the
+  // bottom of the coin panel, so anything below it would shift on every grant.
+  const panelLayout = { width: layout.width, height: layout.height, fontSize: layout.fontSize }
 
   return (
     <UiEntity
@@ -144,7 +148,8 @@ function RoleSwitcherRenderer() {
       }}
     >
       <RoleSwitcher />
-      <CoinsPanel layout={{ width: layout.width, height: layout.height, fontSize: layout.fontSize }} />
+      <LevelPanel layout={panelLayout} />
+      <CoinsPanel layout={panelLayout} />
     </UiEntity>
   )
 }
