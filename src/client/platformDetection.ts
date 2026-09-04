@@ -1,5 +1,5 @@
 // getPlatform() is null for a moment at startup, so isMobile() reads false
-// too early. Poll until it resolves. Shared by ordersUi.tsx and playerRole.tsx.
+// too early. Poll until it resolves. Shared by ordersUi.tsx and cornerPanels.tsx.
 
 import { engine } from '@dcl/sdk/ecs'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'

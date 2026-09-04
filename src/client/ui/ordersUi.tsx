@@ -29,7 +29,6 @@ import { room } from '../../shared/messages'
 import { getIngredientAtlasUvs, getRecipeById, Recipe } from '../../shared/recipes'
 import { OrderState } from '../../shared/schemas'
 import { onPlatformResolved } from '../platformDetection'
-import { isLocalPlayerPlaying } from '../playerRoleState'
 import {
   ATLAS_TEXTURE_SRC,
   CARD_BACKGROUND,
@@ -248,8 +247,6 @@ function lerpTransitionColor(transition: OverlayColorTransition, now: number): C
 }
 
 function OrdersUI() {
-  if (!isLocalPlayerPlaying()) return null // spectators (and anyone who hasn't chosen Play yet) don't see the queue at all
-
   const layout = currentLayout
   const orders = getActiveOrders()
 

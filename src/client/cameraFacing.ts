@@ -1,7 +1,7 @@
 // Transform for a world-space entity that should face the camera. Desktop
 // gets a dynamic BM_Y billboard, since that camera orbits freely. Mobile's
 // camera (mobileCamera.ts) has a fixed rotation, so it just gets a static
-// facing rotation instead — set once, never re-evaluated on Play/Spectate
+// facing rotation instead — set once, never re-evaluated on camera
 // (those elements are hidden entirely while spectating anyway).
 
 import { Billboard, BillboardMode, Entity, Transform } from '@dcl/sdk/ecs'

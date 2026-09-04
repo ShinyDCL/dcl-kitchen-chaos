@@ -3,8 +3,8 @@
 // against server-synced state (see heldItem.ts's startRenderingHeldItems,
 // preparationCounters.ts's startRenderingPreparationCounters,
 // stoveCooking.ts's startRenderingStoves, and deliveryCounter.ts's
-// startRenderingDeliveryCounter), then the order queue HUD, the
-// Play/Spectate role UI, and mobile-specific input/camera setup.
+// startRenderingDeliveryCounter), then the order queue HUD, the entry
+// overlay and corner panels, and mobile-specific input/camera setup.
 
 import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -20,10 +20,12 @@ import { setupInfoDisplay } from './infoDisplay'
 import { setupLeaderboardDisplay } from './leaderboardDisplay'
 import { startMobileCamera } from './mobileCamera'
 import { setupMobileControls } from './mobileControls'
+import { startPlayArea } from './playArea'
 import { startBackgroundMusic } from './sound'
 import { setupBuildLabel } from './ui/buildLabel'
+import { setupCornerPanels } from './ui/cornerPanels'
+import { setupEntryOverlay } from './ui/entryOverlay'
 import { setupOrdersUi } from './ui/ordersUi'
-import { setupPlayerRoleUi } from './ui/playerRole'
 
 export function initClient(): void {
   const scene = engine.addEntity()
@@ -41,8 +43,10 @@ export function initClient(): void {
   startRenderingStoves()
   startRenderingDeliveryCounter()
   setupOrdersUi()
-  setupPlayerRoleUi()
+  setupEntryOverlay()
+  setupCornerPanels()
   setupBuildLabel()
+  startPlayArea() // before the mobile camera, which reads it
   setupMobileControls()
   startMobileCamera()
   startBackgroundMusic()

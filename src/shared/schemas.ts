@@ -95,28 +95,9 @@ export const DeliveryState = engine.defineComponent('game::DeliveryState', {
 
 lockToServer(DeliveryState)
 
-export enum PlayerRoleValue {
-  Play = 'play',
-  Spectate = 'spectate'
-}
-
 /**
- * One entity per player who has picked a role this session, matched by the
- * `playerId` field — same per-player pattern as HeldItem, and for the same
- * reason (an explicit/hashed sync id is unsafe on a long-running server). A
- * player has no entity at all until they've made a choice; server code
- * treats that as not-yet-decided rather than defaulting to either role.
- */
-export const PlayerRole = engine.defineComponent('game::PlayerRole', {
-  playerId: Schemas.String,
-  role: Schemas.EnumString(PlayerRoleValue, PlayerRoleValue.Spectate)
-})
-
-lockToServer(PlayerRole)
-
-/**
- * Singleton. `activePlayerCount` is currently-connected 'play'-role
- * players, recomputed each tick so a disconnect is reflected for free.
+ * Singleton. `playerCount` is everyone currently connected to the scene,
+ * recomputed each tick so a disconnect is reflected for free.
  * `streak` counts consecutive successful deliveries scene-wide, reset to 0
  * on a miss — see orderQueue.ts. `totalDeliveredOrders` is the all-time
  * count, persisted by server/deliveryStats.ts, so unlike `streak` it
@@ -131,7 +112,7 @@ lockToServer(PlayerRole)
 // end: inserting one shifts every field after it, and a snapshot written by
 // an older build then deserializes misaligned.
 export const GameState = engine.defineComponent('game::GameState', {
-  activePlayerCount: Schemas.Int,
+  playerCount: Schemas.Int,
   streak: Schemas.Int,
   serverHeartbeatAt: Schemas.Int64,
   totalDeliveredOrders: Schemas.Int
@@ -141,7 +122,7 @@ lockToServer(GameState)
 
 /**
  * One entity per connected player's coin total, matched by `playerId` like
- * HeldItem/PlayerRole. Created only once server/playerCoins.ts has loaded
+ * HeldItem. Created only once server/playerCoins.ts has loaded
  * the stored total, so the HUD never shows a 0 that then jumps.
  * `lifetimeCoins` is only ever added to — if coins ever become spendable,
  * add a separate `spentCoins` and derive the balance, or the leaderboard's
@@ -182,7 +163,7 @@ lockToServer(Leaderboard)
  * on resolution (delivered or expired). No fixed slot count; live count vs.
  * target queue size is the whole model (see orderQueue.ts). Matched by
  * `orderNumber` (a session-wide ticket counter, never reused), same
- * per-entity-field-matching reasoning as HeldItem/PlayerRole's playerId.
+ * per-entity-field-matching reasoning as HeldItem's playerId.
  * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock, ms)
  * drives the HUD's countdown. Delivery result display is timed off the
  * orderDelivered broadcast; timing out is detected and timed purely from

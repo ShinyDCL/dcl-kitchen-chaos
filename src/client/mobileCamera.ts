@@ -1,18 +1,18 @@
 // On mobile, replaces the free-look camera with a fixed-angle follow
-// camera while the player is actively playing (Overcooked-style): a locked
+// camera while the player is in the play area (Overcooked-style): a locked
 // tilt/facing that never rotates with input, only translating sideways/
-// up-down to track the player — there's no spare screen space for a
-// touch-drag camera alongside the cooking controls. Spectators keep the
-// normal free camera, same as desktop.
+// up-down to track the player — there is no spare screen space for a
+// touch-drag camera alongside the cooking controls. Leaving the play area
+// hands the normal free camera back, so the rest of the scene still walks
+// and looks around normally. Desktop always keeps the free camera.
 //
-// Platform detection resolves asynchronously — see ui/playerRole.tsx's
-// identical getPlatform() poll-until-resolved pattern.
+// Platform detection resolves asynchronously — poll until it resolves.
 
 import { engine, Entity, MainCamera, Transform, VirtualCamera } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 
-import { isLocalPlayerPlaying } from './playerRoleState'
+import { isPlayerInPlayArea } from './playArea'
 
 const CAMERA_HEIGHT_OFFSET = 6 // meters above the player
 const CAMERA_BACK_OFFSET = -4 // meters behind the player along -Z, so the fixed downward tilt looks across the kitchen toward the front wall (+Z)
@@ -36,9 +36,9 @@ function waitForPlatformSystem(): void {
 }
 
 function mobileCameraSystem(): void {
-  const playing = isLocalPlayerPlaying()
+  const inPlayArea = isPlayerInPlayArea()
 
-  if (playing) {
+  if (inPlayArea) {
     const camera = getOrCreateCameraEntity()
     followPlayer(camera)
     if (!active) MainCamera.createOrReplace(engine.CameraEntity, { virtualCameraEntity: camera })
@@ -47,7 +47,7 @@ function mobileCameraSystem(): void {
     if (mainCamera) mainCamera.virtualCameraEntity = undefined
   }
 
-  active = playing
+  active = inPlayArea
 }
 
 function getOrCreateCameraEntity(): Entity {

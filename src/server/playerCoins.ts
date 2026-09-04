@@ -13,8 +13,7 @@ import { Storage } from '@dcl/sdk/server'
 import { PlayerCoins } from '../shared/schemas'
 import { recordCoins } from './leaderboard'
 import { createPerPlayerStore } from './perPlayerSyncedStore'
-import { forgetPlayerActivity } from './playerActivity'
-import { getConnectedPlayerIds } from './playerRoster'
+import { getConnectedPlayerIds, onPlayerEnter } from './playerRoster'
 import { persist } from './storageWrite'
 
 const STORAGE_KEY = 'lifetimeCoins'
@@ -30,6 +29,9 @@ const loading = new Set<string>()
 
 export function initPlayerCoins(): void {
   store.reconcile()
+  // Load on arrival so the HUD is right immediately, rather than up to a
+  // full check interval late.
+  onPlayerEnter(loadIfNeeded)
   engine.addSystem(trackConnectedPlayers)
 }
 
@@ -67,7 +69,13 @@ function applyTotal(playerId: string, lifetimeCoins: number, persistTotal: boole
   }
 }
 
-/** Loads newly-connected players and prunes departed ones. Throttled — connects don't need frame precision and this rebuilds a Set each run. */
+/**
+ * Prunes departed players, and backstops onPlayerEnter. The two disagree
+ * briefly by design: onEnterScene waits for AvatarBase as well as
+ * PlayerIdentityData, while the connected snapshot needs only the latter, so
+ * this also catches anyone whose avatar data lagged. Throttled — it rebuilds
+ * a Set each run.
+ */
 function trackConnectedPlayers(dt: number): void {
   connectionCheckElapsed += dt
   if (connectionCheckElapsed < CONNECTION_CHECK_INTERVAL_SECONDS) return
@@ -75,16 +83,19 @@ function trackConnectedPlayers(dt: number): void {
 
   const connected = getConnectedPlayerIds()
 
-  for (const playerId of connected) {
-    if (totals.has(playerId) || loading.has(playerId)) continue
-    void loadStoredTotal(playerId)
-  }
+  for (const playerId of connected) loadIfNeeded(playerId)
 
   for (const playerId of [...totals.keys()]) {
     if (connected.has(playerId)) continue
     totals.delete(playerId)
-    forgetPlayerActivity(playerId)
+    pendingGrants.delete(playerId) // nothing in flight can flush these once the total is gone
   }
+}
+
+/** Starts a load unless the total is already there or on its way. */
+function loadIfNeeded(playerId: string): void {
+  if (totals.has(playerId) || loading.has(playerId)) return
+  void loadStoredTotal(playerId)
 }
 
 async function loadStoredTotal(playerId: string): Promise<void> {

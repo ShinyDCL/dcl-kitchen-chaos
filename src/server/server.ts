@@ -14,11 +14,13 @@ import { initStoveCooking } from './fixtures/stoveCooking'
 import { initHeldItems } from './heldItems'
 import { initLeaderboard } from './leaderboard'
 import { initOrderQueue } from './orderQueue'
+import { initPlayerActivity } from './playerActivity'
 import { initPlayerCoins } from './playerCoins'
 import { initPlayerRoster } from './playerRoster'
 
 export function initServer(): void {
-  start('playerRoster', initPlayerRoster) // owns GameState, which deliveryStats writes into
+  start('playerRoster', initPlayerRoster) // owns GameState and the player lifecycle events others hook
+  start('playerActivity', initPlayerActivity)
   start('deliveryStats', initDeliveryStats)
   start('leaderboard', initLeaderboard) // before playerCoins — it records into the board as totals load
   start('playerCoins', initPlayerCoins)

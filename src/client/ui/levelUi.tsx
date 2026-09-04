@@ -1,5 +1,5 @@
 // The kitchen's current difficulty level and how far it is through to the
-// next one, shown between the Play/Spectate switcher and the coin total.
+// next one, shown above the coin total in the top-right column.
 //
 // Sits ABOVE the coin panel deliberately: the "+N coins" toast hangs off the
 // bottom of that panel and comes and goes constantly, so anything below it

@@ -46,7 +46,6 @@ import { StoveState } from '../../shared/schemas'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemPending } from '../heldItem'
 import { createPopState, PopState, tickPopState } from '../popScale'
-import { isLocalPlayerPlaying } from '../playerRoleState'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
 
@@ -251,7 +250,7 @@ function computePhase(elapsedSecondsValue: number, definition: CookableIngredien
  * rendered — never from a fresh (possibly stale) synced read.
  *
  * Also recomputes bar visibility every frame (not just on phase
- * transitions), so switching Spectate -> Play restores it correctly.
+ * transitions), so it restores correctly after an interruption.
  */
 function tickProgress(stove: Entity): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
@@ -285,7 +284,7 @@ function tickProgress(stove: Entity): void {
     }
   }
 
-  VisibilityComponent.getMutable(visuals.progressBar.root).visible = isLocalPlayerPlaying() && phase !== 'burnt'
+  VisibilityComponent.getMutable(visuals.progressBar.root).visible = phase !== 'burnt'
 }
 
 /**
@@ -297,7 +296,7 @@ function tickCheckmarkPop(stove: Entity, dt: number): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
   const { progressBar } = getOrCreateVisuals(stove)
 
-  const showCheckmark = isLocalPlayerPlaying() && rendered.rawModel !== '' && rendered.phase === 'done'
+  const showCheckmark = rendered.rawModel !== '' && rendered.phase === 'done'
 
   const checkmark = tickPopState(progressBar.checkmarkPop, showCheckmark, dt)
   VisibilityComponent.getMutable(progressBar.checkmarkAnchor).visible = checkmark.shown

@@ -1,4 +1,4 @@
-// In-world info panel: players currently cooking, and orders delivered over
+// In-world info panel: players currently in the scene, and orders delivered over
 // the scene's lifetime. Both read straight off the synced GameState (see
 // server/playerRoster.ts and server/deliveryStats.ts), so they update the
 // moment the server changes them, with no messages involved.
@@ -25,7 +25,7 @@ const TEXT_ALIGN = TextAlignMode.TAM_MIDDLE_CENTER
 
 // Same Y, separated on X. No `width` — it only bounds wrapping, which is off.
 const FIELD_X = {
-  activePlayers: 0,
+  playerCount: 0,
   totalDelivered: 1.6
 }
 
@@ -33,9 +33,9 @@ const TEXT_COLOR = Color4.fromHexString('#faf2e6') // warm off-white, matching t
 
 const NOT_RENDERED = -1 // no GameState synced yet, and never a real count
 
-let activePlayersEntity: Entity | null = null
+let playerCountEntity: Entity | null = null
 let totalDeliveredEntity: Entity | null = null
-let renderedActivePlayers = NOT_RENDERED
+let renderedPlayerCount = NOT_RENDERED
 let renderedTotalDelivered = NOT_RENDERED
 
 export function setupInfoDisplay(parent: Entity): void {
@@ -46,7 +46,7 @@ export function setupInfoDisplay(parent: Entity): void {
     parent
   })
 
-  activePlayersEntity = createField(root, FIELD_X.activePlayers)
+  playerCountEntity = createField(root, FIELD_X.playerCount)
   totalDeliveredEntity = createField(root, FIELD_X.totalDelivered)
 
   engine.addSystem(renderInfoDisplay)
@@ -65,12 +65,12 @@ function createField(root: Entity, x: number): Entity {
 }
 
 function renderInfoDisplay(): void {
-  if (activePlayersEntity === null || totalDeliveredEntity === null) return
+  if (playerCountEntity === null || totalDeliveredEntity === null) return
 
   for (const [, data] of engine.getEntitiesWith(GameState)) {
-    if (data.activePlayerCount !== renderedActivePlayers) {
-      renderedActivePlayers = data.activePlayerCount
-      setFieldText(activePlayersEntity, formatNumber(data.activePlayerCount))
+    if (data.playerCount !== renderedPlayerCount) {
+      renderedPlayerCount = data.playerCount
+      setFieldText(playerCountEntity, formatNumber(data.playerCount))
     }
     if (data.totalDeliveredOrders !== renderedTotalDelivered) {
       renderedTotalDelivered = data.totalDeliveredOrders

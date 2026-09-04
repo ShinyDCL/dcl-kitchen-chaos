@@ -6,13 +6,7 @@
 import { Schemas } from '@dcl/sdk/ecs'
 import { registerMessages } from '@dcl/sdk/network'
 
-import { PlayerRoleValue } from './schemas'
-
 export const Messages = {
-  // Sent when a player picks Play/Spectate from the entry menu, or later
-  // switches roles. See server/playerRoster.ts.
-  setPlayerRole: Schemas.Map({ role: Schemas.EnumString(PlayerRoleValue, PlayerRoleValue.Spectate) }),
-
   // The full stack now in the sender's hand, bottom to top; empty means
   // empty-handed. Only for actions with no paired fixture-side legality
   // check (ingredient pickups, trash discard) — actions contested by a

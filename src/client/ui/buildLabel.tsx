@@ -1,9 +1,9 @@
 // Always-on build stamp in the bottom-right corner — see buildInfo.ts for
 // why. Its own renderer rather than a corner of an existing one, so it stays
-// visible through every UI state (entry overlay, play, spectate).
+// visible through every UI state, including the entry overlay.
 //
 // 'interactable' inset keeps it clear of the client's own chrome, same as
-// playerRole.tsx's switcher.
+// the top-right corner panels.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'

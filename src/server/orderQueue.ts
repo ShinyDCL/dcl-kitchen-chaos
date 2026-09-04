@@ -4,8 +4,10 @@
 // slot count: growQueueSystem just compares live count against target.
 //
 // Target size is min(count + 1, MAX) — see getTargetQueueSize, so a solo
-// player always has a choice. With nobody playing the queue is dropped
-// outright rather than left to expire (see growQueueSystem).
+// player always has a choice. Sized by everyone in the scene, not by who
+// has acted recently: sizing on activity deadlocks, since no orders means
+// nothing to act on. With the scene empty the queue is dropped outright
+// rather than left to expire (see growQueueSystem).
 //
 // evaluateDelivery pays every recently-active player (playerActivity.ts)
 // and broadcasts 'orderDelivered' on a match. Both a miss and a timeout
@@ -40,7 +42,7 @@ import { getRecentlyActivePlayerIds } from './playerActivity'
 import { grantCoins } from './playerCoins'
 import { getGameStateMutable, getPlayerDisplayName } from './playerRoster'
 
-// Queue size caps at this many by active player count — see getTargetQueueSize.
+// Queue size caps at this many, however many players are in the scene — see getTargetQueueSize.
 const MAX_QUEUE_SIZE = 6
 
 // Payout is the recipe's own `coins` (see shared/recipes.ts), paid in full
@@ -101,11 +103,11 @@ function growQueueSystem(): void {
   const gameState = getGameStateMutable()
   if (!gameState) return
 
-  // Empty kitchen: drop the queue and stop. Left running, the orders would
+  // Empty scene: drop the queue and stop. Left running, the orders would
   // expire one by one and drain the streak with nobody there, and any that
   // outlasted the lull would greet the next player with a spent timer and
   // expire immediately.
-  if (gameState.activePlayerCount <= 0) {
+  if (gameState.playerCount <= 0) {
     if (orderEntities.size > 0) clearQueue()
     return
   }
@@ -120,7 +122,7 @@ function growQueueSystem(): void {
 
   if (Date.now() < nextGenerationAt) return // still cooling down after a recent resolution
 
-  const target = getTargetQueueSize(gameState.activePlayerCount)
+  const target = getTargetQueueSize(gameState.playerCount)
   while (orderEntities.size < target) generateOrder(gameState.streak)
 }
 
@@ -137,8 +139,8 @@ function isExpired(recipeId: string, generatedAt: number): boolean {
 }
 
 /** No players, no orders. Otherwise one more than the player count, capped at MAX_QUEUE_SIZE — always a choice to make. */
-function getTargetQueueSize(activePlayerCount: number): number {
-  return activePlayerCount <= 0 ? 0 : Math.min(activePlayerCount + 1, MAX_QUEUE_SIZE)
+function getTargetQueueSize(playerCount: number): number {
+  return playerCount <= 0 ? 0 : Math.min(playerCount + 1, MAX_QUEUE_SIZE)
 }
 
 function generateOrder(streak: number): void {

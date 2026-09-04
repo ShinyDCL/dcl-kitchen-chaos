@@ -60,7 +60,7 @@ export const STATUS_BADGE_TEXT_COLOR = Color4.White()
 
 // Session-wide ticket number, overlaid on the card's top-left corner.
 // Width is fixed (per layout) rather than 'auto' — an auto-sized parent
-// around a text child doesn't reliably size itself here (see playerRole.tsx).
+// around a text child doesn't reliably size itself here.
 export const ORDER_BADGE_HEIGHT = 20
 export const ORDER_BADGE_MARGIN = 2
 export const ORDER_BADGE_FONT_SIZE = 12

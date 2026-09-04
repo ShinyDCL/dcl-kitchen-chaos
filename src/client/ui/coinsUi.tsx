@@ -1,5 +1,5 @@
-// The local player's lifetime coin total, shown under the Play/Spectate
-// switcher (playerRole.tsx renders both as one top-right column), plus a
+// The local player's lifetime coin total, shown under the level panel
+// (cornerPanels.tsx renders both as one top-right column), plus a
 // brief "+123 coins" whenever it goes up.
 //
 // The notification needs no message: this client already has its own

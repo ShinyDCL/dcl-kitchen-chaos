@@ -1,8 +1,7 @@
 // "Loading..." prompt shown in the entry overlay's slot while the server
-// isn't alive yet (see serverReadiness.ts) — playerRole.tsx decides when
-// to show this instead of the role prompt; this only owns what it looks
-// like. Shares entryOverlayStyle.ts's panel transforms with
-// playerRole.tsx's RolePrompt so both render at the same size.
+// isn't alive yet (see serverReadiness.ts) — entryOverlay.tsx decides when
+// to show it; this only owns what it looks like. Uses entryOverlayStyle.ts's
+// panel transforms.
 //
 // The dot count is derived from Date.now() each frame rather than ticked
 // by a system — this UI already fully rebuilds every frame, so a plain

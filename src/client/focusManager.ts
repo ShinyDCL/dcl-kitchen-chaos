@@ -9,10 +9,11 @@
 // sound at the fixture's position), otherwise `message` shows via the
 // on-screen message UI.
 //
-// Spectators are gated out here (isLocalPlayerPlaying) rather than
-// per-fixture in interactionRules.ts, so one check covers every kind.
-// Rendering (held items, counter/stove/delivery visuals) reconciles from
-// synced state regardless of role, so it's unaffected.
+// Gated on isServerAlive: a fixture action's optimistic hand change is only
+// undone by the server's actionRejected (see heldItem.ts's
+// takeHeldItemPending), so acting before the server is up leaves the hand
+// showing the wrong thing with nothing to correct it. This is also what
+// keeps the player from flailing at counters behind the "Loading..." overlay.
 
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -20,7 +21,7 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { showMessage } from './fixtureMessage'
 import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight'
 import { InteractionResult } from './interactionRules'
-import { isLocalPlayerPlaying } from './playerRoleState'
+import { isServerAlive } from './serverReadiness'
 import { playInteractionSoundAt } from './sound'
 import { getWorldPosition, getWorldRotation } from './worldPosition'
 
@@ -114,7 +115,7 @@ function pickBestCandidate(candidates: FixtureCandidate[], currentFocusId: numbe
 }
 
 function focusSystem(): void {
-  if (!isLocalPlayerPlaying()) {
+  if (!isServerAlive()) {
     if (focusedFixtureId !== null) {
       focusedFixtureId = null
       hideHighlight()

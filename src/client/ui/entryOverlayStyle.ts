@@ -1,5 +1,5 @@
 // Shared visual chrome for the full-screen entry overlay panel — used by
-// both playerRole.tsx's RolePrompt and serverLoadingUi.tsx's LoadingPrompt
+// entryOverlay.tsx's renderer and serverLoadingUi.tsx's LoadingPrompt
 // so they render at the same position and size regardless of which one is
 // currently shown in that slot.
 

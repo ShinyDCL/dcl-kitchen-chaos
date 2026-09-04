@@ -28,7 +28,6 @@ import { DeliveryState } from '../../shared/schemas'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemModels } from '../heldItem'
 import { getItemHeight } from '../itemHeights'
-import { isLocalPlayerPlaying } from '../playerRoleState'
 import { playAcceptSound, playRejectSound } from '../sound'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixtures'
@@ -225,9 +224,9 @@ let soundPlayed = false // avoids replaying the result sound every frame the mar
 function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): void {
   if (resultMarkWorldPosition === null) return // registerDeliveryCounter wasn't called — shouldn't happen in practice
 
-  // Hidden for spectators. Marks may not be built yet (see
-  // prebuildResultMarksOnceReady) — nothing to hide in that case.
-  if (success === null || !isLocalPlayerPlaying()) {
+  // Marks may not be built yet (see prebuildResultMarksOnceReady) —
+  // nothing to hide in that case.
+  if (success === null) {
     if (checkmarkEntity !== null) VisibilityComponent.getMutable(checkmarkEntity).visible = false
     if (crossmarkEntity !== null) VisibilityComponent.getMutable(crossmarkEntity).visible = false
     return
