@@ -53,7 +53,7 @@
     "portableExperiences": "enabled"
   },
   "worldConfiguration": {
-    "name": "KitchenChaos.dcl.eth"
+    "name": "kitchenchaos.dcl.eth"
   },
   "authoritativeMultiplayer": true
 }
