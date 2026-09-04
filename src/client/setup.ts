@@ -21,6 +21,7 @@ import { setupLeaderboardDisplay } from './leaderboardDisplay'
 import { startMobileCamera } from './mobileCamera'
 import { setupMobileControls } from './mobileControls'
 import { startBackgroundMusic } from './sound'
+import { setupBuildLabel } from './ui/buildLabel'
 import { setupOrdersUi } from './ui/ordersUi'
 import { setupPlayerRoleUi } from './ui/playerRole'
 
@@ -41,6 +42,7 @@ export function initClient(): void {
   startRenderingDeliveryCounter()
   setupOrdersUi()
   setupPlayerRoleUi()
+  setupBuildLabel()
   setupMobileControls()
   startMobileCamera()
   startBackgroundMusic()

@@ -4,6 +4,7 @@
   "description": "SDK7 Template scene",
   "scripts": {
     "start": "sdk-commands start",
+    "predeploy": "node scripts/stamp-build.mjs && npm run build",
     "deploy": "sdk-commands deploy",
     "build": "sdk-commands build",
     "upgrade-sdk": "npm install --save-dev @dcl/sdk@latest",
@@ -11,8 +12,8 @@
     "server-logs": "sdk-commands sdk-server-logs"
   },
   "devDependencies": {
-    "@dcl/js-runtime": "7.26.1-32860802198.commit-dae48fb",
-    "@dcl/sdk": "7.26.1-32860802198.commit-dae48fb"
+    "@dcl/js-runtime": "7.27.1-33533530571.commit-451d001",
+    "@dcl/sdk": "7.27.1-33533530571.commit-451d001"
   },
   "engines": {
     "node": ">=16.0.0",
