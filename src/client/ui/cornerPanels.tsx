@@ -9,7 +9,7 @@
 import { engine } from '@dcl/sdk/ecs'
 import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { onPlatformResolved } from '../platformDetection'
+import { onPlatformResolved } from '../platform/platformDetection'
 import { isServerAlive } from '../serverReadiness'
 import { CoinsPanel } from './coinsUi'
 import { CornerPanelLayout } from './cornerPanelStyle'

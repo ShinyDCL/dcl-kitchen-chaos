@@ -1,5 +1,5 @@
 // Owns the scene's single DeliveryState. A true singleton (see
-// client/fixtures/sceneLayout.ts), so unlike preparationCounters.ts/stoveCooking.ts
+// client/fixtures/layout.ts), so unlike preparationCounter.ts/stove.ts
 // there's no per-fixture Map — one lazily-created entity, keyed by the
 // client's fixture sync id.
 //
@@ -10,9 +10,9 @@ import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { DeliveryState } from '../../shared/schemas'
-import { getHeldItemModels, grantHeldItem } from '../heldItems'
-import { evaluateDelivery } from '../orderQueue'
-import { onPlayerAction } from '../playerActivity'
+import { onPlayerAction } from '../players/activity'
+import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
+import { evaluateDelivery } from '../progression/orderQueue'
 
 let deliveryEntity: Entity | null = null
 

@@ -10,7 +10,7 @@
 import { AudioSource, engine, Entity, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
-import { onPlatformResolved } from './platformDetection'
+import { onPlatformResolved } from './platform/platformDetection'
 
 export const INTERACTION_SOUND = 'assets/scene/sounds/pickup.mp3'
 export const ACCEPT_SOUND = 'assets/scene/sounds/accept.mp3'

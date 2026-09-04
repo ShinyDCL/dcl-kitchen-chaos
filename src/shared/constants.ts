@@ -8,7 +8,7 @@ export const FIXTURE_WIDTH = 1.4
 export const FIXTURE_DEPTH = 1.1
 export const FIXTURE_HEIGHT = 1
 
-// Smoke/fire particle textures — used by both stoveCooking.ts and assetPreload.ts.
+// Smoke/fire particle textures — used by both stove.ts and assetPreload.ts.
 export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
 export const FIRE_TEXTURE = 'assets/scene/textures/SpriteFire.png'
 

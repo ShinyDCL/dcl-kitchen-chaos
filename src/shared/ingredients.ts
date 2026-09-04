@@ -9,12 +9,12 @@
 // this one object, so there's one place to add or edit an ingredient.
 //
 // MODELS.burntCookable classifies as 'cookedCookable' too, even though
-// it's not any ingredient's own cookedModel — server/fixtures/stoveCooking.ts
+// it's not any ingredient's own cookedModel — server/fixtures/stove.ts
 // grants it instead of the real cookedModel once a finished cook sits too
 // long (see BURN_GRACE_SECONDS).
 //
 // Bacon isn't listed here yet — no models exist for it, and it currently
-// has no counter slot at all (see sceneLayout.ts). classifyItem/
+// has no counter slot at all (see layout.ts). classifyItem/
 // getRequiredModelForIngredient just won't resolve it until it's added.
 
 import { MODELS, ModelPath } from './models'

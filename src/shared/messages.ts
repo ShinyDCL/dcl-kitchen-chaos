@@ -24,7 +24,7 @@ export const Messages = {
   // Preparation counter intents. Each names the specific change rather
   // than asserting the counter's whole new contents, so the server can
   // apply it atomically against its own live state — see
-  // server/fixtures/preparationCounters.ts. This is what stops two players placing
+  // server/fixtures/preparationCounter.ts. This is what stops two players placing
   // different ingredients on the same counter at once from clobbering each
   // other: both used to compute their "new full state" from the same
   // stale synced snapshot and push it wholesale, so whichever message the
@@ -42,7 +42,7 @@ export const Messages = {
 
   // Claim a finished stove's cooked item. The server checks the stove is
   // actually done and not already collected before granting the cooked
-  // item to the sender's HeldItem — see server/fixtures/stoveCooking.ts — which is
+  // item to the sender's HeldItem — see server/fixtures/stove.ts — which is
   // what stops two players racing the same finished stove from both
   // walking away with a copy.
   collectFromStove: Schemas.Map({ stoveId: Schemas.Int }),

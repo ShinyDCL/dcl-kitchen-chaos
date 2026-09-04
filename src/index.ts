@@ -10,11 +10,11 @@ import './shared/schemas'
 
 export async function main() {
   if (isServer()) {
-    const { initServer } = await import('./server/server')
+    const { initServer } = await import('./server/init')
     initServer()
     return
   }
 
-  const { initClient } = await import('./client/setup')
+  const { initClient } = await import('./client/init')
   initClient()
 }

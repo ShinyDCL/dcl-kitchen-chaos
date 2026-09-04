@@ -46,7 +46,7 @@ lockToServer(HeldItem)
 /**
  * One entity per preparation counter — the stack of models placed on it,
  * bottom to top. A plate is just another model in this stack now, not a
- * separate precondition (see server/fixtures/preparationCounters.ts).
+ * separate precondition (see server/fixtures/preparationCounter.ts).
  * `counterId` (client/fixtures/fixtures.ts's getFixtureSyncId) doubles as
  * this entity's explicit syncEntity id: counters are a small fixed set for
  * the scene's whole life, unlike per-player entities, so there's no need
@@ -79,7 +79,7 @@ lockToServer(StoveState)
 
 /**
  * Singleton — the scene only ever creates one delivery counter (see
- * client/fixtures/sceneLayout.ts). `models` is what was last delivered
+ * client/fixtures/layout.ts). `models` is what was last delivered
  * (bottom to top), empty meaning nothing to show. Each client animates the
  * item and the checkmark/crossmark on its own local timer, started when it
  * observes a `deliveryId` change. `success` (see orderQueue.ts) picks the
