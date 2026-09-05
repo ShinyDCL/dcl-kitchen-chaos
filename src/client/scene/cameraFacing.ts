@@ -13,7 +13,7 @@ import { isMobile } from '@dcl/sdk/platform'
  * it is really an agreement between the two: the rig adopts this angle, and
  * world-space entities must adopt the same one to face it squarely.
  */
-export const CAMERA_TILT_DEGREES = 60
+export const CAMERA_TILT_DEGREES = 50
 
 interface CameraFacingOptions {
   position: Vector3

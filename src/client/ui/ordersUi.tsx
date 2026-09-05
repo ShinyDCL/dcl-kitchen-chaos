@@ -33,10 +33,9 @@ import {
   MOBILE_LAYOUT,
   OrderCardLayout,
   OVERLAY_NEW_BACKGROUND,
-  OVERLAY_SUCCESS_BACKGROUND,
-  OVERLAY_TIMED_OUT_BACKGROUND,
   OVERLAY_TRANSPARENT
 } from './orderQueueStyle'
+import { DANGER_BACKGROUND, SUCCESS_BACKGROUND } from './uiStyle'
 
 // How long a freshly generated order flashes its "New!" highlight.
 const ORDER_NEW_FLASH_SECONDS = 1
@@ -191,8 +190,8 @@ function pruneOverlayColorTransitions(activeOrders: ActiveOrder[]): void {
 }
 
 function visualStateColor(state: CardVisualState): Color4 {
-  if (state === 'success') return OVERLAY_SUCCESS_BACKGROUND
-  if (state === 'timedOut') return OVERLAY_TIMED_OUT_BACKGROUND
+  if (state === 'success') return SUCCESS_BACKGROUND
+  if (state === 'timedOut') return DANGER_BACKGROUND
   if (state === 'new') return OVERLAY_NEW_BACKGROUND
   return OVERLAY_TRANSPARENT
 }

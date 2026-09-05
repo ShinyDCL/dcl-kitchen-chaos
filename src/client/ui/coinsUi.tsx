@@ -16,16 +16,14 @@ import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 import { PlayerCoins } from '../../shared/schemas'
 import { formatNumber } from '../numberFormat'
 import { getLocalUserId } from '../playerIdentity'
-import { CornerPanelLayout, PANEL_BACKGROUND, PANEL_BORDER_RADIUS, PANEL_MARGIN_TOP } from './cornerPanelStyle'
-import { OVERLAY_SUCCESS_BACKGROUND, SUCCESS_TEXT_COLOR } from './orderQueueStyle'
+import { CornerPanelLayout, PANEL_MARGIN_TOP } from './cornerPanelStyle'
+import { emphasize, getPanelBackground, PANEL_BORDER_RADIUS, TEXT_COLOR, SUCCESS_BACKGROUND, withAlpha } from './uiStyle'
 
 const TOAST_SECONDS = 2
 const TOAST_FADE_FRACTION = 0.4 // last 40% of its life fades out
 
 // Reuses the order card's success overlay, so a coin gain reads as the same
 // kind of event as a successful delivery and the two can't drift apart.
-const TOAST_BACKGROUND = OVERLAY_SUCCESS_BACKGROUND
-const TOAST_TEXT_COLOR = SUCCESS_TEXT_COLOR
 
 const COIN_TEXT_COLOR = Color4.create(1, 0.85, 0.35, 1) // warm gold
 
@@ -35,7 +33,7 @@ let toastEndsAt = 0
 
 export function CoinsPanel({ layout }: { layout: CornerPanelLayout }) {
   const coins = getLocalPlayerCoins()
-  if (coins === null) return null // total hasn't loaded server-side yet
+  if (coins === null) return null // total hasn’t loaded server-side yet
 
   trackCoinChange(coins)
 
@@ -48,9 +46,9 @@ export function CoinsPanel({ layout }: { layout: CornerPanelLayout }) {
           margin: { top: PANEL_MARGIN_TOP },
           borderRadius: PANEL_BORDER_RADIUS
         }}
-        uiBackground={{ color: PANEL_BACKGROUND }}
+        uiBackground={{ color: getPanelBackground() }}
         uiText={{
-          value: `${formatNumber(coins)} coins`,
+          value: emphasize(`${formatNumber(coins)} coins`, layout.bold),
           fontSize: layout.fontSize,
           color: COIN_TEXT_COLOR,
           textAlign: 'middle-center'
@@ -74,11 +72,11 @@ function CoinToast({ layout }: { layout: CornerPanelLayout }) {
         margin: { top: PANEL_MARGIN_TOP },
         borderRadius: PANEL_BORDER_RADIUS
       }}
-      uiBackground={{ color: withAlpha(TOAST_BACKGROUND, TOAST_BACKGROUND.a * fade) }}
+      uiBackground={{ color: withAlpha(SUCCESS_BACKGROUND, SUCCESS_BACKGROUND.a * fade) }}
       uiText={{
-        value: `+${formatNumber(toastAmount)} coins`,
+        value: emphasize(`+${formatNumber(toastAmount)} coins`, layout.bold),
         fontSize: layout.fontSize,
-        color: withAlpha(TOAST_TEXT_COLOR, fade),
+        color: withAlpha(TEXT_COLOR, fade),
         textAlign: 'middle-center'
       }}
     />
@@ -99,9 +97,6 @@ function getToastFade(): number | null {
   return Math.min(remainingFraction / TOAST_FADE_FRACTION, 1)
 }
 
-function withAlpha(color: Color4, alpha: number): Color4 {
-  return Color4.create(color.r, color.g, color.b, alpha)
-}
 
 /** Starts a toast when the total rises. A newer grant replaces the one showing rather than queueing behind it. */
 function trackCoinChange(coins: number): void {

@@ -4,18 +4,13 @@
 import { Color4 } from '@dcl/sdk/math'
 
 import { SAMPLE_RECIPES } from '../../shared/recipes'
+import { PANEL_BORDER_RADIUS } from './uiStyle'
 
 export const ATLAS_TEXTURE_SRC = 'assets/scene/textures/IngredientAtlas.png'
 
-const SUCCESS_GREEN = Color4.create(0.3, 0.72, 0.28, 1) // shared "success" hue — matches the atlas's salad/cucumber green, red pulled down so it reads green not yellow-green
-const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1) // shared "timed out/overdue" hue
-
-export const CARD_BORDER_RADIUS = 12 // no-op on mobile (unsupported there)
-export const CARD_BACKGROUND = Color4.create(0, 0, 0, 0.8) // the card's own constant background — never transitions
+export const CARD_BORDER_RADIUS = PANEL_BORDER_RADIUS // shared with the other panels — see uiStyle.ts
 
 export const OVERLAY_TRANSPARENT = Color4.create(0, 0, 0, 0) // 'normal' state — no tint, ingredients fully visible
-export const OVERLAY_SUCCESS_BACKGROUND = Color4.create(SUCCESS_GREEN.r, SUCCESS_GREEN.g, SUCCESS_GREEN.b, 0.95)
-export const OVERLAY_TIMED_OUT_BACKGROUND = Color4.create(DANGER_RED.r, DANGER_RED.g, DANGER_RED.b, 0.95)
 export const OVERLAY_NEW_BACKGROUND = Color4.create(0.15, 0.4, 0.85, 0.95) // blue — distinct from success green and timed out red
 
 const STATUS_OVERLAY_BG_Z_INDEX = 10 // above the ingredient stack/progress bar, dims them for text legibility
@@ -44,34 +39,64 @@ export const STATUS_OVERLAY_TEXT_TRANSFORM = {
   alignItems: 'center'
 } as const
 
-export const SUCCESS_TITLE_FONT_SIZE = 20
-export const SUCCESS_TITLE_HEIGHT = 24 // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
-export const SUCCESS_SUBTEXT_FONT_SIZE = 11
-export const SUCCESS_SUBTEXT_HEIGHT = 14
-export const SUCCESS_LINE_GAP = 2
-export const SUCCESS_TEXT_COLOR = Color4.White()
 export const DELIVERED_BY_NAME_MAX_LENGTH = 10 // truncated (no ellipsis) so a long display name can't overflow the card
 
-// "Timed out!" wraps to 2 lines at this size on both card widths — sized
-// for that, so middle-center centers the wrapped block, not just line 1.
-export const STATUS_BADGE_FONT_SIZE = 20
-export const STATUS_BADGE_HEIGHT = 52
-export const STATUS_BADGE_TEXT_COLOR = Color4.White()
 
 // Session-wide ticket number, overlaid on the card's top-left corner.
 // Width is fixed (per layout) rather than 'auto' — an auto-sized parent
 // around a text child doesn't reliably size itself here.
-export const ORDER_BADGE_HEIGHT = 20
-export const ORDER_BADGE_MARGIN = 2
-export const ORDER_BADGE_FONT_SIZE = 12
-export const ORDER_BADGE_BORDER_RADIUS = 10
 export const ORDER_BADGE_BACKGROUND = Color4.create(0, 0, 0, 0.85)
-export const ORDER_BADGE_TEXT_COLOR = Color4.White()
 
-export const PROGRESS_TRACK_COLOR = Color4.create(0, 0, 0, 0.92) // empty portion, nearly opaque so the fill edge stays sharp
-export const PROGRESS_FILL_COLOR = SUCCESS_GREEN
 
-export interface OrderCardLayout {
+/**
+ * Text and badge sizing. Separate from the card's box dimensions only
+ * because it all scales together off one factor — see cardText().
+ */
+export interface CardTextLayout {
+  successTitleHeight: number // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
+  successSubtextFontSize: number
+  successSubtextHeight: number
+  successLineGap: number
+  statusFontSize: number
+  statusHeight: number // tall enough for "Timed out!" to wrap to 2 lines, so middle-center centers the wrapped block
+  badgeHeight: number
+  badgeFontSize: number
+  badgeMargin: number
+  badgeRadius: number // half badgeHeight — what makes it a pill rather than a rounded box
+}
+
+/** Every text size in the card, scaled off the desktop baseline. */
+// Desktop keeps the sizes the card was designed at. Mobile is tuned
+// separately rather than scaled from them: it needs a bigger order number
+// and status text than a pure multiple would give, and deriving both from
+// one baseline meant every mobile tweak silently moved desktop too.
+const DESKTOP_CARD_TEXT: CardTextLayout = {
+  successTitleHeight: 24,
+  successSubtextFontSize: 11,
+  successSubtextHeight: 14,
+  successLineGap: 2,
+  statusFontSize: 20,
+  statusHeight: 52,
+  badgeHeight: 20,
+  badgeFontSize: 12,
+  badgeMargin: 2,
+  badgeRadius: 10 // half badgeHeight
+}
+
+const MOBILE_CARD_TEXT: CardTextLayout = {
+  successTitleHeight: 29,
+  successSubtextFontSize: 15,
+  successSubtextHeight: 20,
+  successLineGap: 3,
+  statusFontSize: 24,
+  statusHeight: 73,
+  badgeHeight: 31,
+  badgeFontSize: 22,
+  badgeMargin: 3,
+  badgeRadius: 15.5 // half badgeHeight
+}
+
+export interface OrderCardLayout extends CardTextLayout {
   cardWidth: number
   cardPadding: number
   cardGap: number
@@ -82,6 +107,7 @@ export interface OrderCardLayout {
   barWidth: number
   barGap: number // space between the ingredient stack and the progress bar
   badgeWidth: number // OrderBadge's width — sized generously enough for a 3-digit number without measuring text
+  bold: boolean // mobile only — see uiStyle's emphasize
   verticalAnchor: 'top' | 'bottom' // which screen edge the queue hugs
   edgeOffset: number // distance from that edge
 }
@@ -113,22 +139,27 @@ export const DESKTOP_LAYOUT: OrderCardLayout = {
   barWidth: 10,
   barGap: 10,
   badgeWidth: 44,
+  ...DESKTOP_CARD_TEXT,
+  bold: false,
   verticalAnchor: 'top',
   edgeOffset: 24
 }
 
-// Smaller, tighter-packed cards tuned from on-device testing. Anchored to
-// the bottom, not the top, leaving the player's own (already cramped)
-// central view clear.
+// Anchored to the bottom, not the top, leaving the player’s own (already
+// cramped) central view clear. Sized ~1.25x the original on-device tuning —
+// mobile’s virtual canvas is narrower (1600 vs 1920), so the cards were
+// reading small next to the rest of the HUD.
 export const MOBILE_LAYOUT: OrderCardLayout = {
-  cardWidth: 88,
-  cardPadding: 8,
-  cardGap: 8,
-  ...iconLayout(28, 17),
-  iconWidth: 56,
-  barWidth: 8,
-  barGap: 8,
-  badgeWidth: 36,
+  cardWidth: 110,
+  cardPadding: 10,
+  cardGap: 10,
+  ...iconLayout(35, 21),
+  iconWidth: 70,
+  barWidth: 10,
+  barGap: 10,
+  badgeWidth: 58,
+  ...MOBILE_CARD_TEXT,
+  bold: true,
   verticalAnchor: 'bottom',
   edgeOffset: 12
 }

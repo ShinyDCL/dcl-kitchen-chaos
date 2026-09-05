@@ -12,21 +12,16 @@
 // Scene-wide state, not per-player, so spectators see it too.
 
 import { engine } from '@dcl/sdk/ecs'
-import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 
 import { getDifficultyForStreak, getStreakProgress, MAX_DIFFICULTY_TIER } from '../../shared/recipes'
 import { GameState } from '../../shared/schemas'
-import { CornerPanelLayout, PANEL_BACKGROUND, PANEL_BORDER_RADIUS, PANEL_MARGIN_TOP } from './cornerPanelStyle'
-import { PROGRESS_FILL_COLOR, PROGRESS_TRACK_COLOR } from './orderQueueStyle'
+import { CornerPanelLayout } from './cornerPanelStyle'
+import { emphasize, getPanelBackground, PANEL_BORDER_RADIUS, TEXT_COLOR, PROGRESS_FILL_COLOR, PROGRESS_TRACK_COLOR } from './uiStyle'
 
 const HEIGHT_SCALE = 1.6 // taller than the sibling panels — it stacks a label over a bar
-const LABEL_COLOR = Color4.create(1, 1, 1, 0.9)
 
 const BAR_WIDTH = '80%'
-const BAR_HEIGHT = 6
-const BAR_RADIUS = 3
-const BAR_MARGIN_TOP = 4
 
 export function LevelPanel({ layout }: { layout: CornerPanelLayout }) {
   const streak = getSceneStreak()
@@ -40,36 +35,34 @@ export function LevelPanel({ layout }: { layout: CornerPanelLayout }) {
       uiTransform={{
         width: layout.width,
         height: layout.height * HEIGHT_SCALE,
-        margin: { top: PANEL_MARGIN_TOP },
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
         borderRadius: PANEL_BORDER_RADIUS
       }}
-      uiBackground={{ color: PANEL_BACKGROUND }}
+      uiBackground={{ color: getPanelBackground() }}
     >
       <UiEntity
         uiTransform={{ width: '100%', height: layout.fontSize + 4 }}
         uiText={{
-          value: `Level ${level}/${MAX_DIFFICULTY_TIER}`,
+          value: emphasize(`Level ${level}/${MAX_DIFFICULTY_TIER}`, layout.bold),
           fontSize: layout.fontSize,
-          color: LABEL_COLOR,
+          color: TEXT_COLOR,
           textAlign: 'middle-center'
         }}
       />
       <UiEntity
         uiTransform={{
           width: BAR_WIDTH,
-          height: BAR_HEIGHT,
-          margin: { top: BAR_MARGIN_TOP },
-          borderRadius: BAR_RADIUS
+          height: layout.barThickness,
+          margin: { top: layout.barMarginTop }
         }}
         uiBackground={{ color: PROGRESS_TRACK_COLOR }}
       >
         {/* Plain width percentage — unlike the order card's timer this only moves
             when the streak changes, so there's no per-frame animation to keep smooth. */}
         <UiEntity
-          uiTransform={{ width: `${progress * 100}%`, height: '100%', borderRadius: BAR_RADIUS }}
+          uiTransform={{ width: `${progress * 100}%`, height: '100%' }}
           uiBackground={{ color: PROGRESS_FILL_COLOR }}
         />
       </UiEntity>

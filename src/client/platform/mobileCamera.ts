@@ -7,6 +7,11 @@
 // and looks around normally. Desktop always keeps the free camera.
 //
 // Platform detection resolves asynchronously — poll until it resolves.
+//
+// Entering blends in via defaultTransition; leaving is an instant cut. That
+// asymmetry is the SDK: clearing MainCamera.virtualCameraEntity has no
+// transition setting, and the protocol lists transitionOverrides as a future
+// addition. Easing it by hand was tried and judged not worth the machinery.
 
 import { engine, Entity, MainCamera, Transform, VirtualCamera } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -16,7 +21,7 @@ import { CAMERA_TILT_DEGREES } from '../scene/cameraFacing'
 import { isPlayerInPlayArea } from '../scene/playArea'
 
 const CAMERA_HEIGHT_OFFSET = 6 // meters above the player
-const CAMERA_BACK_OFFSET = -4 // meters behind the player along -Z, so the fixed downward tilt looks across the kitchen toward the front wall (+Z)
+const CAMERA_BACK_OFFSET = -5 // meters behind the player along -Z. Paired with the height so atan(height/|back|) roughly matches CAMERA_TILT_DEGREES, which keeps the player near the middle of frame
 
 const CAMERA_OFFSET = Vector3.create(0, CAMERA_HEIGHT_OFFSET, CAMERA_BACK_OFFSET)
 const CAMERA_ROTATION = Quaternion.fromEulerDegrees(CAMERA_TILT_DEGREES, 0, 0)

@@ -9,16 +9,16 @@
 // more distant camera. Camera-facing itself is handled by cameraFacing.ts.
 
 import { engine, Entity, GltfContainer, TextShape, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
-import { Color4, Vector3 } from '@dcl/sdk/math'
+import { Vector3 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
 
 import { MODELS } from '../../shared/models'
 import { createCameraFacingTransform } from '../scene/cameraFacing'
+import { WORLD_TEXT_COLOR } from '../scene/textStyle'
 
 const MESSAGE_DURATION_SECONDS = 2
 const MESSAGE_POP_SECONDS = 0.15 // quick scale in/out at the start/end of MESSAGE_DURATION_SECONDS
 const MESSAGE_Y_OFFSET = 0.7 // above the fixture's highlight/world position
-const TEXT_COLOR = Color4.White()
 const TEXT_Y_OFFSET = 0.225 // nudges text up to sit centered on the background model — tune to taste
 const BACKGROUND_THICKNESS = 0.019 // z-offset so the text sits slightly in front of the background model
 const FONT_SIZE = 1.1
@@ -69,7 +69,7 @@ function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
   TextShape.create(textEntity, {
     text: '',
     fontSize: FONT_SIZE * scale,
-    textColor: TEXT_COLOR
+    textColor: WORLD_TEXT_COLOR
   })
 
   return { root, textEntity }

@@ -36,6 +36,14 @@ const PROGRESS_BAR_WIDTH = 0.6
 const PROGRESS_BAR_HEIGHT = 0.1
 const PROGRESS_BAR_THICKNESS = 0.02
 const PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.6
+// Higher on mobile: the bar is bigger and the locked camera shallower, so at
+// the desktop height it crowds the pan.
+const MOBILE_PROGRESS_BAR_Y_OFFSET = FIXTURE_HEIGHT + 0.8
+
+// The locked camera sits at -Z and looks along +Z with no yaw, so +Z pushes
+// the bar away from the viewer. Zero on desktop, where the free camera can
+// be at any angle and a fixed offset would be wrong half the time.
+const MOBILE_PROGRESS_BAR_Z_OFFSET = 0.4
 const PROGRESS_BAR_BACKGROUND_COLOR = Color4.create(0.15, 0.15, 0.15, 0.9)
 const PROGRESS_BAR_FILL_COLOR = Color4.create(0.165, 0.596, 0.133, 1) // #2a9822
 const PROGRESS_BAR_DRAIN_START_COLOR = Color4.create(0.9, 0.75, 0.06, 1) // drain starts yellow, not green — a green bar moving backward reads as confusing, not urgent
@@ -190,8 +198,8 @@ function createProgressBar(stove: Entity): ProgressBar {
   const stoveWorldPosition = getWorldPosition(stove)
   const worldPosition = Vector3.create(
     stoveWorldPosition.x,
-    stoveWorldPosition.y + PROGRESS_BAR_Y_OFFSET,
-    stoveWorldPosition.z
+    stoveWorldPosition.y + (isMobile() ? MOBILE_PROGRESS_BAR_Y_OFFSET : PROGRESS_BAR_Y_OFFSET),
+    stoveWorldPosition.z + (isMobile() ? MOBILE_PROGRESS_BAR_Z_OFFSET : 0)
   )
 
   // No parent — createCameraFacingTransform handles facing the camera.

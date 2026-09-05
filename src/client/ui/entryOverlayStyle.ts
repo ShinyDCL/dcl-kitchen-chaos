@@ -3,10 +3,9 @@
 // so they render at the same position and size regardless of which one is
 // currently shown in that slot.
 
-import { Color4 } from '@dcl/sdk/math'
-
-export const PANEL_BACKGROUND = Color4.create(0.1, 0.1, 0.1, 0.95)
-export const PANEL_BORDER_RADIUS = 16
+// Its own radius, not uiStyle’s PANEL_BORDER_RADIUS: this is a full-screen
+// modal, and the smaller panels’ rounding reads too tight at this size.
+const ENTRY_PANEL_BORDER_RADIUS = 24
 
 export const OVERLAY_WRAPPER_TRANSFORM = {
   width: '100%',
@@ -22,6 +21,6 @@ export const ENTRY_PANEL_TRANSFORM = {
   flexDirection: 'column',
   alignItems: 'center',
   padding: { top: 44, bottom: 44, left: 32, right: 32 },
-  borderRadius: PANEL_BORDER_RADIUS,
+  borderRadius: ENTRY_PANEL_BORDER_RADIUS,
   pointerFilter: 'block'
 } as const

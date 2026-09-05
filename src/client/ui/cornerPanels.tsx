@@ -14,11 +14,32 @@ import { isServerAlive } from '../serverReadiness'
 import { CoinsPanel } from './coinsUi'
 import { CornerPanelLayout } from './cornerPanelStyle'
 import { LevelPanel } from './levelUi'
+import { EMPHASIS_FONT_SIZE, MOBILE_TEXT_SCALE } from './uiStyle'
 
-const COLUMN_EDGE_OFFSET = 24 // from the interactable area's top-right corner
-
-const DESKTOP_PANEL_LAYOUT: CornerPanelLayout = { width: 160, height: 44, fontSize: 16 }
-const MOBILE_PANEL_LAYOUT: CornerPanelLayout = { width: 220, height: 64, fontSize: 20 }
+// barThickness matches the order card’s progress bar (orderQueueStyle.ts:
+// barWidth 10 desktop), scaled up on mobile in step with the panel itself
+// — these panels get BIGGER on mobile while the cards get smaller, so
+// reusing the card’s 8px there would read as a hairline.
+// fontSize matches the order card’s status overlay (uiStyle.ts’s
+// EMPHASIS_FONT_SIZE) so the two read as the same kind of text.
+const DESKTOP_PANEL_LAYOUT: CornerPanelLayout = {
+  width: 160,
+  height: 44,
+  fontSize: EMPHASIS_FONT_SIZE,
+  barThickness: 10,
+  barMarginTop: 10,
+  edgeOffset: 24,
+  bold: false
+}
+const MOBILE_PANEL_LAYOUT: CornerPanelLayout = {
+  width: 220,
+  height: 64,
+  fontSize: Math.round(EMPHASIS_FONT_SIZE * MOBILE_TEXT_SCALE),
+  barThickness: 14,
+  barMarginTop: Math.round(10 * MOBILE_TEXT_SCALE),
+  edgeOffset: 0, // flush to the corner; the screen is tighter and the client’s own inset still clears its icons
+  bold: true
+}
 
 let currentLayout: CornerPanelLayout = DESKTOP_PANEL_LAYOUT
 
@@ -43,7 +64,7 @@ function CornerPanelsRenderer() {
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: { top: COLUMN_EDGE_OFFSET, right: COLUMN_EDGE_OFFSET },
+        position: { top: layout.edgeOffset, right: layout.edgeOffset },
         width: layout.width,
         height: 'auto',
         flexDirection: 'column',

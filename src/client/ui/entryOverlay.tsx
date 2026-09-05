@@ -3,15 +3,20 @@
 // room connecting isn't enough, a cold start can take ~15s) the overlay
 // simply goes away and the player is in.
 //
-// Centered on the whole device-safe area so it lands in the true screen
-// center, and the area around the panel stays click-through so it never
-// blocks movement while the server is still waking.
+// Centered on the device-safe area, and the area around the panel stays
+// click-through so it never blocks movement while the server is still waking.
+//
+// Owns the platform lookup and hands the layout down, as cornerPanels.tsx and
+// ordersUi.tsx do for theirs.
 
 import { engine } from '@dcl/sdk/ecs'
 import { ReactEcsRenderer } from '@dcl/sdk/react-ecs'
 
+import { onPlatformResolved } from '../platform/platformDetection'
 import { isServerAlive } from '../serverReadiness'
-import { LoadingPrompt } from './serverLoadingUi'
+import { DESKTOP_LOADING_LAYOUT, LoadingLayout, LoadingPrompt, MOBILE_LOADING_LAYOUT } from './serverLoadingUi'
+
+let currentLayout: LoadingLayout = DESKTOP_LOADING_LAYOUT
 
 export function setupEntryOverlay(): void {
   const owner = engine.addEntity()
@@ -20,8 +25,12 @@ export function setupEntryOverlay(): void {
     virtualHeight: 1080,
     screenInset: 'device'
   })
+
+  onPlatformResolved((mobile) => {
+    currentLayout = mobile ? MOBILE_LOADING_LAYOUT : DESKTOP_LOADING_LAYOUT
+  })
 }
 
 function EntryOverlayRenderer() {
-  return isServerAlive() ? null : LoadingPrompt()
+  return isServerAlive() ? null : LoadingPrompt({ layout: currentLayout })
 }

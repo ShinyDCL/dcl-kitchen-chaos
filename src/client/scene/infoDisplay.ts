@@ -7,10 +7,11 @@
 // here just two integer compares.
 
 import { engine, Entity, TextAlignMode, TextShape, Transform } from '@dcl/sdk/ecs'
-import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { GameState } from '../../shared/schemas'
 import { formatNumber } from '../numberFormat'
+import { WORLD_TEXT_COLOR } from './textStyle'
 
 // Local to the scene root — tune in-world, as with the leaderboard.
 const PANEL_POSITION = Vector3.create(-0.8, 2.64, 6.25)
@@ -28,8 +29,6 @@ const FIELD_X = {
   playerCount: 0,
   totalDelivered: 1.6
 }
-
-const TEXT_COLOR = Color4.fromHexString('#faf2e6') // warm off-white, matching the leaderboard
 
 const NOT_RENDERED = -1 // no GameState synced yet, and never a real count
 
@@ -59,7 +58,7 @@ function createField(root: Entity, x: number): Entity {
     text: '',
     fontSize: FONT_SIZE,
     textAlign: TEXT_ALIGN,
-    textColor: TEXT_COLOR
+    textColor: WORLD_TEXT_COLOR
   })
   return entity
 }

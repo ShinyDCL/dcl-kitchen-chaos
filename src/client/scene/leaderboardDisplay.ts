@@ -19,11 +19,12 @@
 // deliveryId in deliveryCounter.ts.
 
 import { engine, Entity, TextAlignMode, TextShape, Transform } from '@dcl/sdk/ecs'
-import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
+import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { LEADERBOARD_SIZE } from '../../shared/constants'
 import { Leaderboard } from '../../shared/schemas'
 import { formatNumber } from '../numberFormat'
+import { WORLD_TEXT_COLOR } from './textStyle'
 
 // Local to the scene root — well outside the kitchen walls, near the
 // scene's -Z edge, turned to face back toward the room.
@@ -49,8 +50,6 @@ const COLUMNS = {
 }
 
 const NAME_MAX_LENGTH = 14 // exact visible character count — tune against the real board width in-world
-
-const TEXT_COLOR = Color4.fromHexString('#faf2e6') // warm off-white
 
 interface RowCells {
   rank: Entity
@@ -91,7 +90,7 @@ function createCell(root: Entity, column: { x: number; width: number; align: Tex
     fontSize: FONT_SIZE,
     width: column.width,
     textAlign: column.align,
-    textColor: TEXT_COLOR
+    textColor: WORLD_TEXT_COLOR
   })
   return entity
 }

@@ -3,15 +3,16 @@
 // Kept in one place so the two can't drift apart, same reasoning as
 // entryOverlayStyle.ts.
 
-import { Color4 } from '@dcl/sdk/math'
-
-export const PANEL_BACKGROUND = Color4.create(0, 0, 0, 0.6)
-export const PANEL_BORDER_RADIUS = 10
-export const PANEL_MARGIN_TOP = 8 // gap between stacked panels
+export const PANEL_MARGIN_TOP = 8 // gap ABOVE a panel — only on ones with a sibling above, never the first in the column, or it would push the whole column down
 
 /** Shared dimensions for every panel in the column, so they line up. */
 export interface CornerPanelLayout {
   width: number
   height: number
   fontSize: number
+  barThickness: number // level panel's progress bar — matched to the order card's bar, see cornerPanels.tsx
+  barMarginTop: number // gap between the level label and its bar
+  edgeOffset: number // distance from the interactable area’s top-right corner
+  bold: boolean // mobile only — thin text is harder to read at arm’s length
 }
+

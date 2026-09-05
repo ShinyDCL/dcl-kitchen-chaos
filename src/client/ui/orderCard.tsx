@@ -12,31 +12,15 @@ import ReactEcs, { Label, UiEntity } from '@dcl/sdk/react-ecs'
 import { getIngredientAtlasUvs, Recipe } from '../../shared/recipes'
 import {
   ATLAS_TEXTURE_SRC,
-  CARD_BACKGROUND,
   CARD_BORDER_RADIUS,
   DELIVERED_BY_NAME_MAX_LENGTH,
   ORDER_BADGE_BACKGROUND,
-  ORDER_BADGE_BORDER_RADIUS,
-  ORDER_BADGE_FONT_SIZE,
-  ORDER_BADGE_HEIGHT,
-  ORDER_BADGE_MARGIN,
-  ORDER_BADGE_TEXT_COLOR,
   ORDER_BADGE_Z_INDEX,
   OrderCardLayout,
-  PROGRESS_FILL_COLOR,
-  PROGRESS_TRACK_COLOR,
-  STATUS_BADGE_FONT_SIZE,
-  STATUS_BADGE_HEIGHT,
-  STATUS_BADGE_TEXT_COLOR,
   STATUS_OVERLAY_BG_TRANSFORM,
-  STATUS_OVERLAY_TEXT_TRANSFORM,
-  SUCCESS_LINE_GAP,
-  SUCCESS_SUBTEXT_FONT_SIZE,
-  SUCCESS_SUBTEXT_HEIGHT,
-  SUCCESS_TEXT_COLOR,
-  SUCCESS_TITLE_FONT_SIZE,
-  SUCCESS_TITLE_HEIGHT
+  STATUS_OVERLAY_TEXT_TRANSFORM
 } from './orderQueueStyle'
+import { emphasize, getPanelBackground, PROGRESS_FILL_COLOR, PROGRESS_TRACK_COLOR, TEXT_COLOR } from './uiStyle'
 
 export type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
@@ -72,17 +56,17 @@ export function OrderCard({
         borderRadius: CARD_BORDER_RADIUS,
         overflow: 'hidden' // clips the status overlay (and progress bar) to the card's rounded corners
       }}
-      uiBackground={{ color: CARD_BACKGROUND }}
+      uiBackground={{ color: getPanelBackground() }}
     >
       <IngredientStack ingredients={recipe.ingredients} layout={layout} />
       <ProgressBar generatedAt={generatedAt} timerSeconds={recipe.timerSeconds} layout={layout} />
       <StatusOverlayBackground color={overlayColor} />
       {visualState === 'success' ? (
-        <SuccessMessage deliveredByName={deliveredByName} />
+        <SuccessMessage deliveredByName={deliveredByName} layout={layout} />
       ) : visualState === 'timedOut' ? (
-        <StatusText text="Timed out!" />
+        <StatusText text="Timed out!" layout={layout} />
       ) : visualState === 'new' ? (
-        <StatusText text="New!" />
+        <StatusText text="New!" layout={layout} />
       ) : null}
       <OrderBadge orderNumber={orderNumber} layout={layout} />
     </UiEntity>
@@ -101,17 +85,17 @@ function OrderBadge({ orderNumber, layout }: { orderNumber: number; layout: Orde
     <UiEntity
       uiTransform={{
         positionType: 'absolute',
-        position: { top: ORDER_BADGE_MARGIN, left: ORDER_BADGE_MARGIN },
+        position: { top: layout.badgeMargin, left: layout.badgeMargin },
         zIndex: ORDER_BADGE_Z_INDEX,
         width: layout.badgeWidth,
-        height: ORDER_BADGE_HEIGHT,
-        borderRadius: ORDER_BADGE_BORDER_RADIUS
+        height: layout.badgeHeight,
+        borderRadius: layout.badgeRadius
       }}
       uiBackground={{ color: ORDER_BADGE_BACKGROUND }}
       uiText={{
         value: `#${orderNumber}`,
-        fontSize: ORDER_BADGE_FONT_SIZE,
-        color: ORDER_BADGE_TEXT_COLOR,
+        fontSize: layout.badgeFontSize,
+        color: TEXT_COLOR,
         textAlign: 'middle-center'
       }}
     />
@@ -128,37 +112,41 @@ function StatusOverlayBackground({ color }: { color: Color4 }) {
   return <UiEntity uiTransform={STATUS_OVERLAY_BG_TRANSFORM} uiBackground={{ color }} />
 }
 
-/** A one-line status message centered over the whole card — used for "New!"/"Timed out!". */
-function StatusText({ text }: { text: string }) {
+/**
+ * A one-line status message centered over the whole card — used for
+ * "New!"/"Timed out!". Bold via the <b> tag PBUiText supports inline; there
+ * is no font-weight prop and the Font enum has no bold face.
+ */
+function StatusText({ text, layout }: { text: string; layout: OrderCardLayout }) {
   return (
     <UiEntity uiTransform={STATUS_OVERLAY_TEXT_TRANSFORM}>
       <Label
-        value={text}
-        fontSize={STATUS_BADGE_FONT_SIZE}
-        color={STATUS_BADGE_TEXT_COLOR}
+        value={emphasize(text, layout.bold)}
+        fontSize={layout.statusFontSize}
+        color={TEXT_COLOR}
         textAlign="middle-center"
-        uiTransform={{ width: '100%', height: STATUS_BADGE_HEIGHT }}
+        uiTransform={{ width: '100%', height: layout.statusHeight }}
       />
     </UiEntity>
   )
 }
 
-function SuccessMessage({ deliveredByName }: { deliveredByName: string }) {
+function SuccessMessage({ deliveredByName, layout }: { deliveredByName: string; layout: OrderCardLayout }) {
   return (
     <UiEntity uiTransform={{ ...STATUS_OVERLAY_TEXT_TRANSFORM, flexDirection: 'column' }}>
       <Label
-        value="Success!"
-        fontSize={SUCCESS_TITLE_FONT_SIZE}
-        color={SUCCESS_TEXT_COLOR}
+        value={emphasize('Success!', layout.bold)}
+        fontSize={layout.statusFontSize}
+        color={TEXT_COLOR}
         textAlign="middle-center"
-        uiTransform={{ width: '100%', height: SUCCESS_TITLE_HEIGHT }}
+        uiTransform={{ width: '100%', height: layout.successTitleHeight }}
       />
       <Label
         value={`by ${deliveredByName.slice(0, DELIVERED_BY_NAME_MAX_LENGTH)}`}
-        fontSize={SUCCESS_SUBTEXT_FONT_SIZE}
-        color={SUCCESS_TEXT_COLOR}
+        fontSize={layout.successSubtextFontSize}
+        color={TEXT_COLOR}
         textAlign="middle-center"
-        uiTransform={{ width: '100%', height: SUCCESS_SUBTEXT_HEIGHT, margin: { top: SUCCESS_LINE_GAP } }}
+        uiTransform={{ width: '100%', height: layout.successSubtextHeight, margin: { top: layout.successLineGap } }}
       />
     </UiEntity>
   )

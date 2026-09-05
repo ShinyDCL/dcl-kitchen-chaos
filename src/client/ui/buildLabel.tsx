@@ -6,10 +6,10 @@
 // the top-right corner panels.
 
 import { engine } from '@dcl/sdk/ecs'
-import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
 import { BUILD_LABEL } from '../buildInfo'
+import { getPanelBackground, TEXT_COLOR } from './uiStyle'
 
 const EDGE_OFFSET = 12
 const WIDTH = 140
@@ -17,8 +17,6 @@ const HEIGHT = 20
 const FONT_SIZE = 12
 const BORDER_RADIUS = 4
 
-const BACKGROUND = Color4.create(0, 0, 0, 0.4) // faint — readable over any scene without drawing the eye
-const TEXT_COLOR = Color4.create(1, 1, 1, 0.65)
 
 export function setupBuildLabel(): void {
   const owner = engine.addEntity()
@@ -39,7 +37,7 @@ function BuildLabel() {
         height: HEIGHT,
         borderRadius: BORDER_RADIUS
       }}
-      uiBackground={{ color: BACKGROUND }}
+      uiBackground={{ color: getPanelBackground() }}
       uiText={{ value: BUILD_LABEL, fontSize: FONT_SIZE, color: TEXT_COLOR, textAlign: 'middle-center' }}
     />
   )
