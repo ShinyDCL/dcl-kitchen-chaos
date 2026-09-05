@@ -7,16 +7,23 @@
 // the authoritative snapshot of who is here right now: it survives a
 // server restart mid-session and can't drift if an event is ever missed.
 // So events drive side effects, the snapshot drives counts and membership.
+// Both filter NON_PLAYER_ADDRESSES, so a connection that isn't playing
+// can't reach anything downstream.
 //
 // Everyone in the scene can act — there is no role and no permission check.
 // Order queue size follows the plain count (see gameState.ts and
 // orderQueue.ts), while payouts use the narrower activity window in
 // playerActivity.ts.
 
-import { engine, PlayerIdentityData } from '@dcl/sdk/ecs'
+import { AvatarBase, engine, PlayerIdentityData } from '@dcl/sdk/ecs'
 import { getPlayer, onEnterScene, onLeaveScene } from '@dcl/sdk/players'
 
+import { NON_PLAYER_ADDRESSES } from './nonPlayerAddresses'
+
 type PlayerLifecycleHandler = (playerId: string) => void
+
+/** Lower-cased once here, so an entry in the list can be pasted as-is. */
+const nonPlayerIds = new Set<string>(NON_PLAYER_ADDRESSES.map((address) => address.toLowerCase()))
 
 const leaveHandlers: PlayerLifecycleHandler[] = []
 
@@ -25,8 +32,14 @@ export function initPlayers(): void {
   // they run in is this module's business rather than registration timing.
   onLeaveScene((userId) => {
     const playerId = userId.toLowerCase()
+    if (isNonPlayer(playerId)) return
     for (const handler of leaveHandlers) handler(playerId)
   })
+}
+
+/** Whether this address is on the nonPlayerAddresses.ts list — see there for what that means. */
+function isNonPlayer(playerId: string): boolean {
+  return nonPlayerIds.has(playerId)
 }
 
 /**
@@ -40,23 +53,40 @@ export function onPlayerLeave(handler: PlayerLifecycleHandler): void {
 
 /** Registers a callback for when a player enters, lower-cased to match every other id in server code. */
 export function onPlayerEnter(handler: PlayerLifecycleHandler): void {
-  onEnterScene((player) => handler(player.userId.toLowerCase()))
+  onEnterScene((player) => {
+    const playerId = player.userId.toLowerCase()
+    if (!isNonPlayer(playerId)) handler(playerId)
+  })
 }
 
-/** Lower-cased addresses of everyone currently in the scene. */
+/**
+ * Lower-cased addresses of everyone currently in the scene.
+ *
+ * Requires AvatarBase as well as PlayerIdentityData, matching what the SDK
+ * player helper treats as present. An arriving player holds an identity
+ * entity for a frame or two before the avatar resolves (measured at ~65ms
+ * on a deployed World), and counting that window would spike the total on
+ * every single arrival. Returning a Set also means a player who briefly
+ * holds two entities is counted once. NON_PLAYER_ADDRESSES are left out
+ * entirely.
+ */
 export function getConnectedPlayerIds(): Set<string> {
   const connectedIds = new Set<string>()
-  for (const [, identity] of engine.getEntitiesWith(PlayerIdentityData)) {
-    connectedIds.add(identity.address.toLowerCase())
+  for (const [, identity] of engine.getEntitiesWith(PlayerIdentityData, AvatarBase)) {
+    const playerId = identity.address.toLowerCase()
+    if (!isNonPlayer(playerId)) connectedIds.add(playerId)
   }
   return connectedIds
 }
 
-/** Counts without allocating the Set getConnectedPlayerIds builds — gameState.ts calls this every frame. */
+/**
+ * The number behind the chef count. Deliberately the size of the same Set
+ * rather than a cheaper entity tally, so the HUD can't disagree with
+ * membership: a tally counted rows this Set would have deduped or skipped,
+ * and the queue size and payouts read the Set.
+ */
 export function countConnectedPlayers(): number {
-  let count = 0
-  for (const [] of engine.getEntitiesWith(PlayerIdentityData)) count++
-  return count
+  return getConnectedPlayerIds().size
 }
 
 /**
