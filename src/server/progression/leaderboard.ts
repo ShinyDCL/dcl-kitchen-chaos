@@ -87,7 +87,8 @@ function qualifies(lifetimeCoins: number): boolean {
   // joining put everyone on the board (and persisted it).
   if (lifetimeCoins <= 0) return false
   if (entries.length < LEADERBOARD_SIZE) return true
-  return lifetimeCoins > entries[entries.length - 1].lifetimeCoins
+  const last = entries[entries.length - 1]
+  return last !== undefined && lifetimeCoins > last.lifetimeCoins
 }
 
 /** Updates the name if it resolves to something new, returning whether it changed. An unresolvable name leaves the stored one alone. */

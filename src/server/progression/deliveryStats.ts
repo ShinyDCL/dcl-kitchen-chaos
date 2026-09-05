@@ -3,7 +3,6 @@
 // survives restarts. Scene Storage, since it's one scene-wide figure;
 // persisted on change (see storageWrite.ts).
 
-import { engine } from '@dcl/sdk/ecs'
 import { Storage } from '@dcl/sdk/server'
 
 import { getGameStateMutable } from '../gameState'

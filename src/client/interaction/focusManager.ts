@@ -103,6 +103,7 @@ function pickBestCandidate(candidates: FixtureCandidate[], currentFocusId: numbe
   const pool = facedCandidates.length > 0 ? facedCandidates : candidates
 
   let best = pool[0]
+  if (!best) return null // pool is never empty here; this keeps the type honest
   for (const candidate of pool) {
     if (candidate.distance < best.distance) best = candidate
   }

@@ -2,6 +2,13 @@
   "compilerOptions": {
     "allowJs": true,
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "noUncheckedIndexedAccess": true,
     "baseUrl": ".",
     "paths": {
       "@dcl/asset-packs/*": ["node_modules/@dcl/inspector/node_modules/@dcl/asset-packs/*"]

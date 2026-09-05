@@ -103,7 +103,10 @@ function renderLeaderboardDisplay(): void {
   const entries = getLeaderboardEntries()
 
   for (let index = 0; index < rows.length; index++) {
-    const { rank, name, coins } = rows[index]
+    const row = rows[index]
+    if (!row) continue
+
+    const { rank, name, coins } = row
     const entry = entries[index]
 
     if (!entry) {

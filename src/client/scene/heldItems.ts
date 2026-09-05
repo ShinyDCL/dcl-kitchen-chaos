@@ -80,7 +80,7 @@ export function isHoldingAssembledItem(): boolean {
 export function peekHeldItemModel(): string | null {
   const state = localState()
   if (!state || state.models.length !== 1) return null
-  return state.models[0]
+  return state.models[0] ?? null
 }
 
 /** Removes whatever's held (single or assembled) without returning anything. */
@@ -211,7 +211,7 @@ function buildVisual(playerId: string, models: string[]): RenderedHeldItem {
  * individual hand offsets.
  */
 function buildHandStack(parent: Entity, models: string[]): Entity[] {
-  const baseTransform = getHandTransform(models[0])
+  const baseTransform = getHandTransform(models[0] ?? '')
   const stackRoot = engine.addEntity()
   Transform.create(stackRoot, {
     position: baseTransform.position,

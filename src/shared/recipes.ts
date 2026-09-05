@@ -35,7 +35,7 @@ export interface Recipe {
 // raises pay by unlocking higher-difficulty recipes (see
 // getDifficultyForStreak). Keep new recipes on the same scale.
 
-export const SAMPLE_RECIPES: Recipe[] = [
+export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
   // Tier 1 - 3-4 ingredients, at most one cooked, and no repeated ingredient.
   { id: 'cheesemelt', ingredients: ['bunBottom', 'cheese', 'bunTop'], timerSeconds: 30, difficulty: 1, coins: 9 },
   { id: 'simple', ingredients: ['bunBottom', 'patty', 'bunTop'], timerSeconds: 35, difficulty: 1, coins: 16 },
@@ -347,7 +347,7 @@ export function getStreakProgress(streak: number): number {
 export function pickRandomRecipeByDifficulty(difficulty: number): Recipe {
   const pool = SAMPLE_RECIPES.filter((recipe) => recipe.difficulty === difficulty)
   const source = pool.length > 0 ? pool : SAMPLE_RECIPES
-  return source[Math.floor(Math.random() * source.length)]
+  return source[Math.floor(Math.random() * source.length)] ?? SAMPLE_RECIPES[0]
 }
 
 // IngredientAtlas.png: 256x512, 2x8 grid of 128x64 cells. Only column 0
