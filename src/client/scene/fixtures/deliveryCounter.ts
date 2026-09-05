@@ -38,6 +38,7 @@ const DELIVERY_RESULT_MARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale
 const DELIVERY_RESULT_MARK_HOLD_SECONDS = 0.6 // seconds at full scale
 const DELIVERY_RESULT_MARK_MODEL_SCALE = 1.5
 const MOBILE_RESULT_MARK_SCALE = 1.4 // bigger on mobile — see fixtureMessage.ts's MOBILE_SCALE
+const DELIVERY_ITEM_Y_OFFSET = 0.05 // clearance above the counter top so the bottom item does not sit in the surface — same as the stove pan
 const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
 
 let deliveryCounterEntity: Entity | null = null
@@ -183,7 +184,10 @@ function rebuildItemEntities(models: string[]): void {
   if (models.length === 0 || deliveryCounterEntity === null) return
 
   const root = engine.addEntity()
-  Transform.create(root, { position: Vector3.create(0, FIXTURE_HEIGHT, 0), parent: deliveryCounterEntity })
+  Transform.create(root, {
+    position: Vector3.create(0, FIXTURE_HEIGHT + DELIVERY_ITEM_Y_OFFSET, 0),
+    parent: deliveryCounterEntity
+  })
 
   const entities: Entity[] = []
   let cumulativeHeight = 0
