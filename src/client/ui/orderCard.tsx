@@ -10,6 +10,7 @@ import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { Label, UiEntity } from '@dcl/sdk/react-ecs'
 
 import { getIngredientAtlasUvs, Recipe } from '../../shared/recipes'
+import { serverNow } from '../serverReadiness'
 import {
   ATLAS_TEXTURE_SRC,
   CARD_BORDER_RADIUS,
@@ -202,7 +203,7 @@ function ProgressBar({
   timerSeconds: number
   layout: OrderCardLayout
 }) {
-  const elapsedSeconds = (Date.now() - generatedAt) / 1000
+  const elapsedSeconds = (serverNow() - generatedAt) / 1000
   const drainedFraction = Math.min(elapsedSeconds / timerSeconds, 1)
   const fillOffset = drainedFraction * layout.cardContentHeight
 

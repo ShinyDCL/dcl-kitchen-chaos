@@ -5,14 +5,17 @@
 // the synced OrderState entities every frame; no local prediction to
 // protect, so no reconcile step like heldItems.ts's.
 //
-// The server broadcasts 'orderDelivered' once; each client times its
-// result highlight locally from receipt. Timing out and the "New!" flash
-// are derived locally from generatedAt instead — see getActiveOrders. A
-// result card and a live order are
+// The server broadcasts 'orderDelivered' once; each client times that
+// result highlight locally from receipt. Timing out arrives differently
+// and needs no local timing at all — the server stamps OrderState's
+// expiredAt and keeps the entity for the display window, so the card is
+// just synced state (see getLiveVisualState). The "New!" flash is derived
+// locally from generatedAt. A delivery result and a live order are
 // independent entries (getActiveOrders), keyed by orderNumber (never
 // reused) — both can render at once if a fresh order beats an earlier
-// result display ending. The server delays a resolved order's replacement
-// by ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so that's rare.
+// result display ending. The server delays a delivered order's
+// replacement by ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so
+// that's rare.
 //
 // This file owns which cards exist and what state each is in; orderCard.tsx
 // draws them. The overlay color is eased here (getStatusOverlayColor) and
@@ -27,6 +30,7 @@ import { room } from '../../shared/messages'
 import { getRecipeById, Recipe } from '../../shared/recipes'
 import { OrderState } from '../../shared/schemas'
 import { onPlatformResolved } from '../platform/platformDetection'
+import { serverNow } from '../serverReadiness'
 import { CardVisualState, OrderCard } from './orderCard'
 import {
   DESKTOP_LAYOUT,
@@ -56,31 +60,30 @@ export function setupOrdersUi(): void {
   room.onMessage('orderDelivered', (data) => {
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    cardOverrides.set(data.orderNumber, {
-      kind: 'success',
+    deliveryResults.set(data.orderNumber, {
       recipe,
       deliveredByName: data.deliveredByName,
       generatedAt: Number(data.generatedAt),
       orderNumber: data.orderNumber,
-      endsAt: Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000
+      endsAt: serverNow() + ORDER_RESULT_DISPLAY_SECONDS * 1000
     })
   })
 }
 
-interface CardOverride {
-  kind: 'success' | 'timedOut'
+interface DeliveryResult {
   recipe: Recipe
-  deliveredByName: string // '' for a timeout — nobody delivered it
+  deliveredByName: string
   generatedAt: number // the order's own generatedAt, not the result's start time — keeps its row position instead of jumping to the front
   orderNumber: number
   endsAt: number
 }
 
 // Keyed by orderNumber — client-local timing, see the file header comment.
-const cardOverrides = new Map<number, CardOverride>()
+// Deliveries only: a timeout is synced state, so it needs nothing here.
+const deliveryResults = new Map<number, DeliveryResult>()
 
 interface ActiveOrder {
-  cardKey: string // orderNumber as a string — never reused, so unique across both overrides and live orders
+  cardKey: string // orderNumber as a string — never reused, so unique across both delivery results and live orders
   recipe: Recipe
   generatedAt: number
   orderNumber: number
@@ -89,77 +92,52 @@ interface ActiveOrder {
 }
 
 /**
- * Newest first by generatedAt. A result override and a *different*
+ * Newest first by generatedAt. A delivery result and a *different*
  * order's live entry can render at once (e.g. a fresh order beating an
- * earlier result display ending). But the *same* order's override and
- * live entry are mutually exclusive: a delivered order's override and its
+ * earlier result display ending). But the *same* order's result and live
+ * entry are mutually exclusive: a delivered order's broadcast and its
  * entity's CRDT removal propagate on separate channels with no ordering
  * guarantee, so a brief window can show both — without deduping that's a
  * duplicate cardKey, confusing the keyed reconciler and thrashing
- * getStatusOverlayColor. So once an order has an override, its live entry
- * is skipped.
+ * getStatusOverlayColor. So once an order has a delivery result, its live
+ * entry is skipped.
  *
- * Timing out and the "New!" flash are both derived locally from
- * generatedAt, unlike delivery (unpredictable player action) — no
- * broadcast, no race against CRDT removal/creation.
+ * A timed-out order needs none of that: it's still a live entity, just one
+ * carrying expiredAt.
  */
 function getActiveOrders(): ActiveOrder[] {
-  const now = Date.now()
+  const now = serverNow()
   const active: ActiveOrder[] = []
 
-  for (const [orderNumber, override] of cardOverrides) {
-    if (now >= override.endsAt) {
-      cardOverrides.delete(orderNumber)
+  for (const [orderNumber, result] of deliveryResults) {
+    if (now >= result.endsAt) {
+      deliveryResults.delete(orderNumber)
       continue
     }
     active.push({
       cardKey: String(orderNumber),
-      recipe: override.recipe,
-      generatedAt: override.generatedAt,
+      recipe: result.recipe,
+      generatedAt: result.generatedAt,
       orderNumber,
-      visualState: override.kind,
-      deliveredByName: override.deliveredByName
+      visualState: 'success',
+      deliveredByName: result.deliveredByName
     })
   }
 
   for (const [, data] of engine.getEntitiesWith(OrderState)) {
-    if (cardOverrides.has(data.orderNumber)) continue // already represented by its override above — see this function's comment
+    if (deliveryResults.has(data.orderNumber)) continue // already represented by its result above — see this function's comment
 
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
     const generatedAt = Number(data.generatedAt)
     const elapsedSeconds = (now - generatedAt) / 1000
 
-    if (elapsedSeconds >= recipe.timerSeconds) {
-      // Detected locally the moment this client's clock crosses the
-      // deadline — see this function's comment. The skip above dedupes
-      // against this once the server's own removal catches up.
-      const override: CardOverride = {
-        kind: 'timedOut',
-        recipe,
-        deliveredByName: '',
-        generatedAt,
-        orderNumber: data.orderNumber,
-        endsAt: now + ORDER_RESULT_DISPLAY_SECONDS * 1000
-      }
-      cardOverrides.set(data.orderNumber, override)
-      active.push({
-        cardKey: String(data.orderNumber),
-        recipe,
-        generatedAt,
-        orderNumber: data.orderNumber,
-        visualState: 'timedOut',
-        deliveredByName: ''
-      })
-      continue
-    }
-
     active.push({
       cardKey: String(data.orderNumber),
       recipe,
       generatedAt,
       orderNumber: data.orderNumber,
-      visualState: elapsedSeconds <= ORDER_NEW_FLASH_SECONDS ? 'new' : 'normal',
+      visualState: getLiveVisualState(Number(data.expiredAt), elapsedSeconds),
       deliveredByName: ''
     })
   }
@@ -170,6 +148,19 @@ function getActiveOrders(): ActiveOrder[] {
   // (e.g. filling the queue at session start) can share a generatedAt
   // millisecond; orderNumber is always a correct stand-in for creation order.
   return active.sort((a, b) => b.generatedAt - a.generatedAt || b.orderNumber - a.orderNumber)
+}
+
+/**
+ * Timing out is read off expiredAt rather than compared against the
+ * deadline locally: the server stamps the field and holds the entity open
+ * for the result display (see orderQueue.ts), so the card can't be missed
+ * by a client whose clock disagrees about when the timer ran out. The
+ * "New!" flash stays local — it's cosmetic, and being a moment early or
+ * late costs nothing.
+ */
+function getLiveVisualState(expiredAt: number, elapsedSeconds: number): CardVisualState {
+  if (expiredAt !== 0) return 'timedOut'
+  return elapsedSeconds <= ORDER_NEW_FLASH_SECONDS ? 'new' : 'normal'
 }
 
 // Keyed by cardKey — an in-progress overlay color ease; see getStatusOverlayColor.

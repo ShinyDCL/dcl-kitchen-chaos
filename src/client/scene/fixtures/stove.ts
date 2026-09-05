@@ -32,6 +32,7 @@ import { CookableIngredientDefinition, getCookableItemDefinition } from '../../.
 import { room } from '../../../shared/messages'
 import { MODELS } from '../../../shared/models'
 import { StoveState } from '../../../shared/schemas'
+import { serverNow } from '../../serverReadiness'
 import { takeHeldItemPending } from '../heldItems'
 import { getFixtureSyncId } from './fixture'
 import {
@@ -98,7 +99,7 @@ export function getStoveStatus(stove: Entity): StoveStatus {
 export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
   takeHeldItemPending()
   void room.send('startCookingOnStove', { stoveId: getFixtureSyncId(stove), rawModel: definition.heldModel })
-  applySyncedState(stove, { rawModel: definition.heldModel, startTimestamp: Date.now() })
+  applySyncedState(stove, { rawModel: definition.heldModel, startTimestamp: serverNow() })
 }
 
 /** Sends the collect intent to the server. Deliberately renders nothing optimistically — see the module comment. */
@@ -120,7 +121,7 @@ function getSyncedStates(): Map<Entity, SyncedCook> {
 }
 
 function elapsedSeconds(startTimestamp: number): number {
-  return (Date.now() - startTimestamp) / 1000
+  return (serverNow() - startTimestamp) / 1000
 }
 
 // --- Rendering, reconciled against the synced StoveState component ---

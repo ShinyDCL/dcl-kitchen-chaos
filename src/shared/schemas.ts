@@ -166,13 +166,18 @@ lockToServer(Leaderboard)
  * per-entity-field-matching reasoning as HeldItem's playerId.
  * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock, ms)
  * drives the HUD's countdown. Delivery result display is timed off the
- * orderDelivered broadcast; timing out is detected and timed purely from
- * generatedAt/timerSeconds, no broadcast — see ordersUi.tsx's getActiveOrders.
+ * orderDelivered broadcast.
+ *
+ * `expiredAt` (server clock, ms; 0 while the order is live) is set when the
+ * timer runs out, and the entity is kept for the result display before being
+ * destroyed — so the timed-out card comes from state the client is handed,
+ * not from a deadline it has to detect before the entity disappears.
  */
 export const OrderState = engine.defineComponent('game::OrderState', {
   orderNumber: Schemas.Int,
   recipeId: Schemas.String,
-  generatedAt: Schemas.Int64
+  generatedAt: Schemas.Int64,
+  expiredAt: Schemas.Int64
 })
 
 lockToServer(OrderState)
