@@ -52,7 +52,7 @@ const MAX_QUEUE_SIZE = 6
 
 // Payout is the recipe's own `coins` (see shared/recipes.ts), paid in full
 // to every recently-active player (playerActivity.ts) rather than to the
-// deliverer alone — the game is co-op, and carrying the finished plate is
+// deliverer alone — the game is co-op, and carrying the finished dish is
 // the least of the work that went into it. Streak isn't multiplied in: it
 // already raises pay by unlocking higher-difficulty recipes.
 //

@@ -1,6 +1,5 @@
 // Assembles the full kitchen layout: ingredient counters along the left and
-// right walls (the right wall's first slot is a plate counter, ahead of its
-// ingredients; both walls are bookended by a preparation counter), a front
+// right walls (both bookended by a preparation counter), a front
 // row alternating preparation counters and stoves, a 2x2 preparation-counter
 // island in the middle, a back/entrance wall with a discard counter and the
 // delivery counter (each inset from its corner, open walkway between), and
@@ -16,7 +15,6 @@ import { MODELS } from '../../shared/models'
 import {
   evaluateDeliveryCounterInteraction,
   evaluateDiscardCounterInteraction,
-  evaluatePlateCounterInteraction,
   evaluatePreparationCounterInteraction,
   evaluateStoveInteraction
 } from '../interaction/interactionRules'
@@ -76,7 +74,7 @@ function createDecorativeModel(model: string, position: Vector3, rotation: Quate
 }
 
 export function createSceneLayout(parent: Entity): void {
-  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X, true)
+  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X)
   createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
   createFrontRow(parent)
   createBackWall(parent)
@@ -87,39 +85,22 @@ export function createSceneLayout(parent: Entity): void {
 /**
  * Places a row of ingredient counters along one wall (fixed X), spaced
  * edge-to-edge along Z and centered on Z=0, all facing toward the room's
- * center, bookended by a preparation counter at each end. When
- * includePlateCounter is set, a plate counter takes the next slot ahead of
- * the ingredients.
+ * center, bookended by a preparation counter at each end.
  */
 function createSideWall(
   parent: Entity,
   x: number,
   ingredients: IngredientDefinition[],
-  facingDegrees: number,
-  includePlateCounter = false
+  facingDegrees: number
 ): void {
-  const slotCount = ingredients.length + (includePlateCounter ? 1 : 0) + 2 // +2 for the bookending preparation counters
+  const slotCount = ingredients.length + 2 // +2 for the bookending preparation counters
   const rotation = rotationDegrees(facingDegrees)
   const slotPosition = (slotIndex: number) => Vector3.create(x, 0, slotOffset(slotCount, slotIndex))
 
   createPreparationCounterFixture(slotPosition(0), rotation, parent)
 
-  let nextSlot = 1
-  if (includePlateCounter) {
-    createFixture({
-      model: MODELS.counter,
-      position: slotPosition(nextSlot),
-      rotation,
-      parent,
-      height: FIXTURE_HEIGHT,
-      displayModel: MODELS.plateDisplay,
-      evaluateInteraction: evaluatePlateCounterInteraction
-    })
-    nextSlot += 1
-  }
-
   ingredients.forEach((definition, index) => {
-    createIngredientCounter(slotPosition(nextSlot + index), rotation, parent, definition)
+    createIngredientCounter(slotPosition(index + 1), rotation, parent, definition)
   })
 
   createPreparationCounterFixture(slotPosition(slotCount - 1), rotation, parent)

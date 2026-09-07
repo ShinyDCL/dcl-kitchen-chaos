@@ -45,9 +45,7 @@ lockToServer(HeldItem)
 
 /**
  * One entity per preparation counter — the stack of models placed on it,
- * bottom to top. A plate is just another model in this stack now, not a
- * separate precondition (see server/fixtures/preparationCounter.ts).
- * `counterId` (client/fixtures/fixtures.ts's getFixtureSyncId) doubles as
+ * bottom to top. `counterId` (client/fixtures/fixtures.ts's getFixtureSyncId) doubles as
  * this entity's explicit syncEntity id: counters are a small fixed set for
  * the scene's whole life, unlike per-player entities, so there's no need
  * for HeldItem's auto-allocate-and-match-by-field pattern.

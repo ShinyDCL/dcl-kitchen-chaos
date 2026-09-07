@@ -13,22 +13,23 @@ import { createFixture } from './fixture'
 
 export interface IngredientDefinition {
   displayModel: ModelPath
-  sliceModel: ModelPath
+  itemModel: ModelPath
 }
 
 export const RIGHT_SIDE_INGREDIENTS: IngredientDefinition[] = [
-  { displayModel: MODELS.bunBottomDisplay, sliceModel: MODELS.bunBottom },
-  { displayModel: MODELS.bunTopDisplay, sliceModel: MODELS.bunTop },
-  { displayModel: MODELS.eggDisplay, sliceModel: MODELS.egg },
-  { displayModel: MODELS.pattyDisplay, sliceModel: MODELS.pattyRaw }
+  { displayModel: MODELS.plateDisplay, itemModel: MODELS.plate },
+  { displayModel: MODELS.bunBottomDisplay, itemModel: MODELS.bunBottom },
+  { displayModel: MODELS.bunTopDisplay, itemModel: MODELS.bunTop },
+  { displayModel: MODELS.eggDisplay, itemModel: MODELS.egg },
+  { displayModel: MODELS.pattyDisplay, itemModel: MODELS.pattyRaw }
 ]
 
 export const LEFT_SIDE_INGREDIENTS: IngredientDefinition[] = [
-  { displayModel: MODELS.cheeseDisplay, sliceModel: MODELS.cheeseSlice },
-  { displayModel: MODELS.onionDisplay, sliceModel: MODELS.onionSlice },
-  { displayModel: MODELS.cucumberDisplay, sliceModel: MODELS.cucumberSlice },
-  { displayModel: MODELS.saladDisplay, sliceModel: MODELS.saladLeaf },
-  { displayModel: MODELS.tomatoDisplay, sliceModel: MODELS.tomatoSlice }
+  { displayModel: MODELS.cheeseDisplay, itemModel: MODELS.cheeseSlice },
+  { displayModel: MODELS.onionDisplay, itemModel: MODELS.onionSlice },
+  { displayModel: MODELS.cucumberDisplay, itemModel: MODELS.cucumberSlice },
+  { displayModel: MODELS.saladDisplay, itemModel: MODELS.saladLeaf },
+  { displayModel: MODELS.tomatoDisplay, itemModel: MODELS.tomatoSlice }
 ]
 
 export function createIngredientCounter(
@@ -44,6 +45,6 @@ export function createIngredientCounter(
     parent,
     height: FIXTURE_HEIGHT,
     displayModel: definition.displayModel,
-    evaluateInteraction: () => evaluateIngredientCounterInteraction(definition.sliceModel)
+    evaluateInteraction: () => evaluateIngredientCounterInteraction(definition.itemModel)
   })
 }

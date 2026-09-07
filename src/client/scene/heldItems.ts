@@ -4,7 +4,7 @@
 // Uses the parent+child AvatarAttach pattern: an invisible parent tracks
 // the hand anchor, one or more visible model entities sit under it.
 //
-// Most pickups are a single model; picking everything off a plate is an
+// Most pickups are a single model; taking a whole counter stack is an
 // "assembled" stack (attachAssembledItemToPlayerHand) — the first model's
 // hand transform (itemPlacement.ts) anchors the stack, later ones
 // stack above it via the same file’s item heights.
@@ -12,7 +12,7 @@
 // Local mutators render the hand immediately for zero-latency feedback AND
 // send setHeldItem so the server updates the synced component — unless the
 // new models already match what's held, in which case applyLocally skips
-// both (e.g. re-grabbing the same ingredient/plate already in hand). The
+// both (e.g. re-grabbing an ingredient already in hand). The
 // reconciliation system (startRenderingHeldItems) compares every player's
 // synced state against what's rendered and corrects mismatches — this is
 // what makes the item visible to other players, and what corrects this
@@ -52,7 +52,7 @@ export function attachItemToPlayerHand(model: string): void {
   applyLocally([model])
 }
 
-/** Attaches a vertical stack of models as one assembled item — e.g. everything picked up off a plate. */
+/** Attaches a vertical stack of models as one assembled item — e.g. a whole counter stack picked up at once. */
 export function attachAssembledItemToPlayerHand(models: string[]): void {
   applyLocally(models)
 }

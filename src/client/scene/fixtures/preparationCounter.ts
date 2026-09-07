@@ -104,7 +104,7 @@ function getRenderedContents(counter: Entity): CounterContents {
 // it here would broadcast an unconditional setHeldItem regardless of
 // success, which is how a losing player used to end up with a duplicate.
 
-/** Picks up the whole stack (as a single item or an assembled item) — a plate underneath comes along with it. */
+/** Picks up the whole stack, as a single item or an assembled item. */
 export function pickUpFromCounter(counter: Entity): void {
   void room.send('pickUpFromCounter', { counterId: getFixtureSyncId(counter) })
   renderCounter(counter, { ingredientModels: [] })

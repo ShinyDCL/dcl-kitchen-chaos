@@ -9,7 +9,6 @@
 import { Entity } from '@dcl/sdk/ecs'
 
 import { classifyItem, getCookableItemDefinition } from '../../shared/ingredients'
-import { MODELS } from '../../shared/models'
 import { deliverHeldItem } from '../scene/fixtures/deliveryCounter'
 import { getPreparationCounterSnapshot, pickUpFromCounter, placeOnCounter } from '../scene/fixtures/preparationCounter'
 import { collectFromStove, getStoveStatus, startCookingOnStove } from '../scene/fixtures/stove'
@@ -31,27 +30,16 @@ export interface InteractionResult {
 // Allowed except while holding an assembled item — grabbing fresh would
 // silently discard it.
 
-export function evaluateIngredientCounterInteraction(sliceModel: string): InteractionResult {
+export function evaluateIngredientCounterInteraction(itemModel: string): InteractionResult {
   if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
-  return { allowed: true, perform: () => attachItemToPlayerHand(sliceModel) }
-}
-
-// --- Plate counters ---
-// Allowed except while holding an assembled item — same reasoning as
-// ingredient counters, including re-grabbing a fresh plate while already
-// holding one.
-
-export function evaluatePlateCounterInteraction(): InteractionResult {
-  if (isHoldingAssembledItem()) return { allowed: false, message: 'Hands full' }
-  return { allowed: true, perform: () => attachItemToPlayerHand(MODELS.plate) }
+  return { allowed: true, perform: () => attachItemToPlayerHand(itemModel) }
 }
 
 // --- Preparation counters ---
-// Empty-handed: pick up whatever's on the counter (a plate underneath
-// comes along with it) — blocked if there's nothing there.
+// Empty-handed: pick up the whole stack — blocked if there's nothing there.
 // Holding a raw cookable: always blocked, cook it first.
-// Holding anything else (plate included) or an assembled item: stacks on
-// top of whatever's already on the counter.
+// Holding anything else, or an assembled item: stacks on top of whatever's
+// already on the counter.
 
 export function evaluatePreparationCounterInteraction(counter: Entity): InteractionResult {
   const { ingredientCount } = getPreparationCounterSnapshot(counter)
@@ -67,7 +55,7 @@ export function evaluatePreparationCounterInteraction(counter: Entity): Interact
   const model = peekHeldItemModel()!
   if (classifyItem(model) === 'rawCookable') return { allowed: false, message: 'Cook this first' }
 
-  // plate, nonCookable, or cookedCookable — all placeable directly on the counter
+  // nonCookable or cookedCookable — both placeable directly on the counter
   return { allowed: true, perform: () => placeOnCounter(counter) }
 }
 

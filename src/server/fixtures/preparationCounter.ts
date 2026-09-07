@@ -10,9 +10,8 @@
 // Every handler grants/clears the held item itself via grantHeldItem,
 // never trusting the client's own setHeldItem broadcast:
 // - Pickups grant only on success, so two players racing the same stack
-//   leaves the second with nothing left to take. Picking up the stack
-//   takes everything on it, plate included — a plate is just whichever
-//   model the player placed first, not a tracked precondition.
+//   leaves the second with nothing left to take, and take the whole stack
+//   rather than the top item.
 // - placeOnCounter places the player's real held item (heldItems.ts's
 //   getHeldItemModels), not a client-claimed stack.
 //
