@@ -13,11 +13,21 @@ import { DeliveryState } from '../../shared/schemas'
 import { onPlayerAction } from '../players/activity'
 import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
 import { evaluateDelivery } from '../progression/orderQueue'
+import { onSessionStart } from '../session'
 
 let deliveryEntity: Entity | null = null
 
 export function initDeliveryCounter(): void {
   reconcileDeliveryEntity()
+
+  // Clears the last delivery still on show. deliveryId is deliberately left
+  // alone — it's a monotonic change detector, and rewinding it would read as
+  // a fresh delivery to every client.
+  onSessionStart(() => {
+    if (deliveryEntity === null) return
+    const mutable = DeliveryState.getMutableOrNull(deliveryEntity)
+    if (mutable) mutable.models = []
+  })
 
   onPlayerAction('deliverHeldItem', (data, playerId, address) => {
     const heldModels = getHeldItemModels(playerId)

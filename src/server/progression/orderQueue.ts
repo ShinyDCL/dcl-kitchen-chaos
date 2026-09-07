@@ -7,8 +7,9 @@
 // Target size is min(count + 1, MAX) — see getTargetQueueSize, so a solo
 // player always has a choice. Sized by everyone in the scene, not by who
 // has acted recently: sizing on activity deadlocks, since no orders means
-// nothing to act on. With the scene empty the queue is dropped outright
-// rather than left to expire (see growQueueSystem).
+// nothing to act on. An empty scene targets 0, so the queue drains on its
+// own and nothing regenerates until someone arrives; session.ts is what
+// actually clears it, on the next session's first frame.
 //
 // evaluateDelivery pays every recently-active player (playerActivity.ts)
 // and broadcasts 'orderDelivered' on a match. Both a miss and a timeout
@@ -43,6 +44,7 @@ import { getGameStateMutable } from '../gameState'
 import { getRecentlyActivePlayerIds } from '../players/activity'
 import { grantCoins } from '../players/coins'
 import { getPlayerDisplayName } from '../players/presence'
+import { onSessionStart } from '../session'
 import { recordDelivery } from './deliveryStats'
 
 // Queue size caps at this many, however many players are in the scene — see getTargetQueueSize.
@@ -69,6 +71,15 @@ let nextGenerationAt = 0 // server timestamp — no new order before this
 
 export function initOrderQueue(): void {
   reconcileOrderEntities()
+
+  // A session starts on an empty pass and at level 1 — inheriting the last
+  // group's difficulty tier is what made arriving alone read as broken.
+  onSessionStart(() => {
+    clearQueue()
+    const gameState = getGameStateMutable()
+    if (gameState) gameState.streak = 0
+  })
+
   engine.addSystem(growQueueSystem)
 }
 
@@ -105,15 +116,6 @@ export function evaluateDelivery(models: string[], delivererId: string): boolean
 function growQueueSystem(): void {
   const gameState = getGameStateMutable()
   if (!gameState) return
-
-  // Empty scene: drop the queue and stop. Left running, the orders would
-  // expire one by one and drain the streak with nobody there, and any that
-  // outlasted the lull would greet the next player with a spent timer and
-  // expire immediately.
-  if (gameState.playerCount <= 0) {
-    if (orderEntities.size > 0) clearQueue()
-    return
-  }
 
   for (const [orderNumber, entity] of orderEntities) {
     const data = OrderState.getOrNull(entity)

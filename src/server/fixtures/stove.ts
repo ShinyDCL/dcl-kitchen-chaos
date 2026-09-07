@@ -26,11 +26,23 @@ import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
 import { onPlayerAction } from '../players/activity'
 import { grantHeldItem } from '../players/heldItems'
+import { onSessionStart } from '../session'
 
 const stoveEntities = new Map<number, Entity>()
 
 export function initStoves(): void {
   reconcileStoveEntities()
+
+  // Back to idle — a new session doesn't inherit the last one's cooking,
+  // which after any real gap would be burnt anyway.
+  onSessionStart(() => {
+    for (const [, entity] of stoveEntities) {
+      const state = StoveState.getMutableOrNull(entity)
+      if (!state) continue
+      state.rawModel = ''
+      state.startTimestamp = 0
+    }
+  })
 
   onPlayerAction('startCookingOnStove', (data, playerId, address) => {
     const definition = getCookableItemDefinition(data.rawModel)

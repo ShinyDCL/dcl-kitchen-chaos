@@ -63,7 +63,7 @@ function getOrCreateGameStateEntity(): Entity {
   const entity = engine.addEntity()
   // Publish the first heartbeat immediately so a client connecting right
   // after a cold start doesn't have to wait a full interval to see one.
-  GameState.create(entity, { playerCount: 0, streak: 0, totalDeliveredOrders: 0, serverHeartbeatAt: Date.now() })
+  GameState.create(entity, { playerCount: 0, streak: 0, deliveries: 0, serverHeartbeatAt: Date.now() })
   syncEntity(entity, [GameState.componentId], GAME_STATE_SYNC_ID)
   gameStateEntity = entity
   return entity

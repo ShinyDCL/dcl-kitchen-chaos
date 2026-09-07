@@ -27,11 +27,20 @@ import { syncEntity } from '@dcl/sdk/network'
 import { PreparationCounterState } from '../../shared/schemas'
 import { onPlayerAction } from '../players/activity'
 import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
+import { onSessionStart } from '../session'
 
 const counterEntities = new Map<number, Entity>()
 
 export function initPreparationCounters(): void {
   reconcileCounterEntities()
+
+  // Wipe the boards — a new session starts on empty counters.
+  onSessionStart(() => {
+    for (const [, entity] of counterEntities) {
+      const state = PreparationCounterState.getMutableOrNull(entity)
+      if (state) state.ingredientModels = []
+    }
+  })
 
   onPlayerAction('pickUpFromCounter', (data, playerId) => {
     const state = getMutableState(data.counterId)

@@ -99,11 +99,12 @@ lockToServer(DeliveryState)
  * Singleton. `playerCount` is everyone currently connected to the scene,
  * recomputed each tick so a disconnect is reflected for free.
  * `streak` counts consecutive successful deliveries scene-wide, reset to 0
- * on a miss — see orderQueue.ts. `totalDeliveredOrders` is the all-time
- * count, persisted by server/deliveryStats.ts, so unlike `streak` it
- * survives restarts. `serverHeartbeatAt` (server clock, ms) is pulsed
- * periodically so clients can tell the server is actually alive, not just
- * that the CRDT room is connected — see
+ * on a miss — see orderQueue.ts. `deliveries` is how many orders the team
+ * has served (server/deliveryStats.ts). Both are session-scoped and cleared
+ * by server/session.ts; the figures that outlive a session live in
+ * PlayerCoins and Leaderboard instead. `serverHeartbeatAt` (server clock,
+ * ms) is pulsed periodically so clients can tell the server is actually
+ * alive, not just that the CRDT room is connected — see
  * client/serverReadiness.ts and the authoritative-server skill's Server
  * Lifecycle section.
  */
@@ -115,7 +116,7 @@ export const GameState = engine.defineComponent('game::GameState', {
   playerCount: Schemas.Int,
   streak: Schemas.Int,
   serverHeartbeatAt: Schemas.Int64,
-  totalDeliveredOrders: Schemas.Int
+  deliveries: Schemas.Int
 })
 
 lockToServer(GameState)

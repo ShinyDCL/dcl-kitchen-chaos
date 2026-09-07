@@ -18,6 +18,7 @@ import { initPlayers } from './players/presence'
 import { initDeliveryStats } from './progression/deliveryStats'
 import { initLeaderboard } from './progression/leaderboard'
 import { initOrderQueue } from './progression/orderQueue'
+import { initSession } from './session'
 
 export function initServer(): void {
   start('players', initPlayers) // registers the lifecycle events others hook
@@ -31,6 +32,7 @@ export function initServer(): void {
   start('preparationCounters', initPreparationCounters)
   start('stoves', initStoves)
   start('deliveryCounter', initDeliveryCounter)
+  start('session', initSession) // last — everything above registers its reset with it
 }
 
 /** Needs logsPermissions in scene.json to be readable in production — see the authoritative-server skill. */

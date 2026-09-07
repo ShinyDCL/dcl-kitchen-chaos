@@ -12,6 +12,7 @@ import { Storage } from '@dcl/sdk/server'
 
 import { PlayerCoins } from '../../shared/schemas'
 import { recordCoins } from '../progression/leaderboard'
+import { onSessionEnd } from '../session'
 import { persist } from '../storageWrite'
 import { getConnectedPlayerIds, onPlayerEnter } from './presence'
 import { createPerPlayerStore } from './syncedStore'
@@ -32,6 +33,12 @@ export function initPlayerCoins(): void {
   // Load on arrival so the HUD is right immediately, rather than up to a
   // full check interval late.
   onPlayerEnter(loadIfNeeded)
+
+  // Nothing is lost — the totals live in Player Storage, and a returning
+  // player's entity is rebuilt from there on arrival. This just stops one
+  // entity per visitor riding in the CRDT snapshot forever.
+  onSessionEnd(() => store.clear())
+
   engine.addSystem(trackConnectedPlayers)
 }
 

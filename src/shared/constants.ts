@@ -25,6 +25,11 @@ export const ORDER_RESULT_DISPLAY_SECONDS = 2
 // payouts — see server/playerActivity.ts.
 export const ACTIVITY_WINDOW_MS = 3 * 60 * 1000
 
+// How long the scene must stay empty before the session ends and the next
+// arrival gets a clean kitchen — see server/session.ts. Long enough that
+// stepping outside the scene for a moment doesn't wipe a run.
+export const SESSION_GRACE_SECONDS = 30
+
 // The server truncates the board to this and the client builds this many
 // rows — they must agree, or the board silently shows fewer.
 export const LEADERBOARD_SIZE = 10

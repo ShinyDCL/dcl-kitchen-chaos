@@ -1,7 +1,8 @@
-// In-world info panel: players currently in the scene, and orders delivered over
-// the scene's lifetime. Both read straight off the synced GameState (see
+// In-world info panel: players currently in the scene, and orders delivered
+// this session. Both read straight off the synced GameState (see
 // server/gameState.ts and server/deliveryStats.ts), so they update the
-// moment the server changes them, with no messages involved.
+// moment the server changes them, with no messages involved. The delivered
+// count drops back to 0 when a new session starts — see server/session.ts.
 //
 // Same construction as leaderboardDisplay.ts, and rebuilt only on change —
 // here just two integer compares.
@@ -27,15 +28,15 @@ const TEXT_ALIGN = TextAlignMode.TAM_MIDDLE_CENTER
 // Same Y, separated on X. No `width` — it only bounds wrapping, which is off.
 const FIELD_X = {
   playerCount: 0,
-  totalDelivered: 1.6
+  deliveries: 1.6
 }
 
 const NOT_RENDERED = -1 // no GameState synced yet, and never a real count
 
 let playerCountEntity: Entity | null = null
-let totalDeliveredEntity: Entity | null = null
+let deliveriesEntity: Entity | null = null
 let renderedPlayerCount = NOT_RENDERED
-let renderedTotalDelivered = NOT_RENDERED
+let renderedDeliveries = NOT_RENDERED
 
 export function setupInfoDisplay(parent: Entity): void {
   const root = engine.addEntity()
@@ -46,7 +47,7 @@ export function setupInfoDisplay(parent: Entity): void {
   })
 
   playerCountEntity = createField(root, FIELD_X.playerCount)
-  totalDeliveredEntity = createField(root, FIELD_X.totalDelivered)
+  deliveriesEntity = createField(root, FIELD_X.deliveries)
 
   engine.addSystem(renderInfoDisplay)
 }
@@ -64,16 +65,16 @@ function createField(root: Entity, x: number): Entity {
 }
 
 function renderInfoDisplay(): void {
-  if (playerCountEntity === null || totalDeliveredEntity === null) return
+  if (playerCountEntity === null || deliveriesEntity === null) return
 
   for (const [, data] of engine.getEntitiesWith(GameState)) {
     if (data.playerCount !== renderedPlayerCount) {
       renderedPlayerCount = data.playerCount
       setFieldText(playerCountEntity, formatNumber(data.playerCount))
     }
-    if (data.totalDeliveredOrders !== renderedTotalDelivered) {
-      renderedTotalDelivered = data.totalDeliveredOrders
-      setFieldText(totalDeliveredEntity, formatNumber(data.totalDeliveredOrders))
+    if (data.deliveries !== renderedDeliveries) {
+      renderedDeliveries = data.deliveries
+      setFieldText(deliveriesEntity, formatNumber(data.deliveries))
     }
     break // singleton — only one GameState entity ever exists
   }

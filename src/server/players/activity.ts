@@ -19,6 +19,7 @@ import { ISchema } from '@dcl/sdk/ecs'
 
 import { ACTIVITY_WINDOW_MS } from '../../shared/constants'
 import { Messages, room } from '../../shared/messages'
+import { onSessionStart } from '../session'
 import { getConnectedPlayerIds, onPlayerLeave } from './presence'
 
 const lastActionAt = new Map<string, number>() // keyed by lower-cased playerId
@@ -29,6 +30,9 @@ export function initPlayerActivity(): void {
   // Bounds the map by who is present rather than by everyone who ever
   // visited this server run.
   onPlayerLeave((playerId) => lastActionAt.delete(playerId))
+
+  // Belt and braces — a leave should already have cleared each entry.
+  onSessionStart(() => lastActionAt.clear())
 }
 
 /**
