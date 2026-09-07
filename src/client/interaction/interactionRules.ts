@@ -15,10 +15,16 @@ import { collectFromStove, getStoveStatus, startCookingOnStove } from '../scene/
 import {
   attachItemToPlayerHand,
   discardHeldItem,
+  getHeldItemCount,
   hasHeldItem,
   isHoldingAssembledItem,
   peekHeldItemModel
 } from '../scene/heldItems'
+
+// How many models one preparation counter will hold. Placing an assembled
+// stack counts every model in it, so a stack that would overflow is refused
+// whole rather than part-placed.
+const MAX_COUNTER_STACK = 10
 
 export interface InteractionResult {
   allowed: boolean
@@ -37,6 +43,7 @@ export function evaluateIngredientCounterInteraction(itemModel: string): Interac
 
 // --- Preparation counters ---
 // Empty-handed: pick up the whole stack — blocked if there's nothing there.
+// Would overflow MAX_COUNTER_STACK: blocked, whatever is held.
 // Holding a raw cookable: always blocked, cook it first.
 // Holding anything else, or an assembled item: stacks on top of whatever's
 // already on the counter.
@@ -48,6 +55,9 @@ export function evaluatePreparationCounterInteraction(counter: Entity): Interact
     if (ingredientCount === 0) return { allowed: false, message: 'Nothing to pick up' }
     return { allowed: true, perform: () => pickUpFromCounter(counter) }
   }
+
+  // Ahead of the assembled-item branch, so an oversized stack is caught too.
+  if (ingredientCount + getHeldItemCount() > MAX_COUNTER_STACK) return { allowed: false, message: 'Counter full' }
 
   if (isHoldingAssembledItem()) return { allowed: true, perform: () => placeOnCounter(counter) }
 

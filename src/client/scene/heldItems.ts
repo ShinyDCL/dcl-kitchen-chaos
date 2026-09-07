@@ -71,6 +71,11 @@ export function hasHeldItem(): boolean {
   return (localState()?.models.length ?? 0) > 0
 }
 
+/** How many models are in hand: 0 empty, 1 for a single item, more for an assembled stack. */
+export function getHeldItemCount(): number {
+  return localState()?.models.length ?? 0
+}
+
 /** True if the held item is a multi-model assembled stack rather than a single item. */
 export function isHoldingAssembledItem(): boolean {
   return (localState()?.models.length ?? 0) > 1
