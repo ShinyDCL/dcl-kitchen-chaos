@@ -1,6 +1,9 @@
-// Tracks all interactable fixtures and, every frame, focuses the single
-// nearest one within INTERACTION_RANGE, preferring one the player is
-// roughly facing (FACING_THRESHOLD) when several are in range.
+// Tracks all interactable fixtures and, every frame, focuses the best one
+// within INTERACTION_RANGE, scored as distance minus a bonus for facing it
+// (see FACING_BONUS). Distance dominates, so the fixture you walked up to is
+// normally the one you get; facing only decides it between two that are
+// close to equidistant — standing in a corner with one counter ahead and
+// another to the side.
 //
 // A focused fixture's `evaluate` callback re-runs every frame, not just on
 // focus change — its InteractionResult can change while still looking at
@@ -26,12 +29,17 @@ import { hideHighlight, setHighlightAllowed, showHighlightAt } from './highlight
 import { InteractionResult } from './interactionRules'
 
 const INTERACTION_RANGE = 2.5 // meters
-const FACING_THRESHOLD = 0.1 // dot product; ~0.1 ≈ wide ±84° cone
+
+// What facing a fixture head-on is worth, in metres of distance. Big enough
+// to settle a corner (two counters within a arm's reach of each other), small
+// enough that one you are standing at still wins over one across the aisle.
+// Clamped at 0, so facing away is never a penalty — it just earns nothing.
+const FACING_BONUS = 0.6 // meters
 
 // Without this, focus flickers between near-tied fixtures (e.g. the 2x2
-// island) as per-frame noise (avatar bob, mouse-look drift) flips which is
-// a hair closer. Keeps the current focus unless something is clearly
-// nearer, not just marginally.
+// island) as per-frame noise — the avatar bob, small look adjustments —
+// nudges the score. Keeps the current focus unless something clearly beats
+// it, not just marginally.
 const FOCUS_SWITCH_MARGIN = 0.3 // meters
 
 interface FocusableFixture {
@@ -43,8 +51,7 @@ interface FocusableFixture {
 
 interface FixtureCandidate {
   fixture: FocusableFixture
-  distance: number
-  facingScore: number
+  score: number // lower wins; see FACING_BONUS
 }
 
 const fixtures: FocusableFixture[] = []
@@ -87,30 +94,26 @@ function getCandidatesInRange(playerPosition: Vector3, playerForward: Vector3): 
     const distance = Vector3.distance(playerPosition, fixture.worldPosition)
     if (distance > INTERACTION_RANGE) continue
 
-    const directionToFixture = Vector3.normalize(Vector3.subtract(fixture.worldPosition, playerPosition))
-    const facingScore = Vector3.dot(playerForward, directionToFixture)
+    const towardFixture = Vector3.normalize(Vector3.subtract(fixture.worldPosition, playerPosition))
+    const facing = Math.max(0, Vector3.dot(playerForward, towardFixture))
 
-    candidates.push({ fixture, distance, facingScore })
+    candidates.push({ fixture, score: distance - FACING_BONUS * facing })
   }
 
   return candidates
 }
 
 function pickBestCandidate(candidates: FixtureCandidate[], currentFocusId: number | null): FocusableFixture | null {
-  if (candidates.length === 0) return null
+  let best = candidates[0]
+  if (!best) return null // nothing in range
 
-  const facedCandidates = candidates.filter((c) => c.facingScore >= FACING_THRESHOLD)
-  const pool = facedCandidates.length > 0 ? facedCandidates : candidates
-
-  let best = pool[0]
-  if (!best) return null // pool is never empty here; this keeps the type honest
-  for (const candidate of pool) {
-    if (candidate.distance < best.distance) best = candidate
+  for (const candidate of candidates) {
+    if (candidate.score < best.score) best = candidate
   }
 
   // Stick with the current focus unless something beats it by more than FOCUS_SWITCH_MARGIN.
-  const current = pool.find((c) => c.fixture.id === currentFocusId)
-  if (current && current.distance <= best.distance + FOCUS_SWITCH_MARGIN) return current.fixture
+  const current = candidates.find((c) => c.fixture.id === currentFocusId)
+  if (current && current.score <= best.score + FOCUS_SWITCH_MARGIN) return current.fixture
 
   return best.fixture
 }
