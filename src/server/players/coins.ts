@@ -36,8 +36,14 @@ export function initPlayerCoins(): void {
 
   // Nothing is lost — the totals live in Player Storage, and a returning
   // player's entity is rebuilt from there on arrival. This just stops one
-  // entity per visitor riding in the CRDT snapshot forever.
-  onSessionEnd(() => store.clear())
+  // entity per visitor riding in the CRDT snapshot forever. The caches go
+  // with it, so grants banked against a read that never succeeded cannot
+  // outlive the session that earned them.
+  onSessionEnd(() => {
+    store.clear()
+    totals.clear()
+    pendingGrants.clear()
+  })
 
   engine.addSystem(trackConnectedPlayers)
 }
@@ -93,9 +99,7 @@ function trackConnectedPlayers(dt: number): void {
   for (const playerId of connected) loadIfNeeded(playerId)
 
   for (const playerId of [...totals.keys()]) {
-    if (connected.has(playerId)) continue
-    totals.delete(playerId)
-    pendingGrants.delete(playerId) // nothing in flight can flush these once the total is gone
+    if (!connected.has(playerId)) totals.delete(playerId)
   }
 }
 
