@@ -68,7 +68,7 @@ const lastSyncedStates = new Map<Entity, SyncedCook>()
 const registeredStoves: Entity[] = []
 const stovesById = new Map<number, Entity>() // avoids an O(stoves × synced entities) scan every frame
 
-export type StoveStatus = 'idle' | 'cooking' | 'done'
+type StoveStatus = 'idle' | 'cooking' | 'done'
 
 /** Registers a stove fixture so its state gets rendered and reconciled. Call once per stove during scene setup. */
 export function registerStove(stove: Entity): void {

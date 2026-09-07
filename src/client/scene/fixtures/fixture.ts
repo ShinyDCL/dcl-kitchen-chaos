@@ -14,7 +14,7 @@ import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { registerFocusableFixture } from '../../interaction/focusManager'
 import { InteractionResult } from '../../interaction/interactionRules'
 
-export interface FixtureOptions {
+interface FixtureOptions {
   model: string
   position: Vector3
   rotation?: Quaternion

@@ -5,10 +5,9 @@
 // camera while the player is inside), so there is nothing worth cheating
 // here and nothing to tell the server.
 //
-// ADJUST THESE — the defaults just cover the kitchen interior, which the
-// walls put at roughly SCENE_CENTER +/- 5.45m (see fixtures/layout.ts).
-// The volume is the entity's Transform: scale is the box's full extents,
-// position its center.
+// The box covers the kitchen interior, which the walls put at roughly
+// SCENE_CENTER +/- 5.45m (see layout.ts). Its volume is the entity's
+// Transform: scale is the full extents, position the center.
 
 import { ColliderLayer, engine, Transform, TriggerArea, triggerAreaEventsSystem } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -16,10 +15,10 @@ import { Vector3 } from '@dcl/sdk/math'
 import { SCENE_CENTER } from '../../shared/constants'
 
 /** Full extents of the play area box, in meters. */
-export const PLAY_AREA_SIZE = Vector3.create(12, 6, 12)
+const PLAY_AREA_SIZE = Vector3.create(12, 6, 12)
 
 /** Center of the box in scene coordinates — y is half the height, so the box sits on the floor rather than half-buried. */
-export const PLAY_AREA_CENTER = Vector3.create(SCENE_CENTER, PLAY_AREA_SIZE.y / 2, SCENE_CENTER)
+const PLAY_AREA_CENTER = Vector3.create(SCENE_CENTER, PLAY_AREA_SIZE.y / 2, SCENE_CENTER)
 
 let playerInside = false
 

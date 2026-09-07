@@ -51,14 +51,14 @@ export function registerPreparationCounter(counter: Entity): void {
   countersById.set(getFixtureSyncId(counter), counter)
 }
 
+let systemRegistered = false
+
 /** Reconciles every registered counter's synced state against what's currently rendered. Call once during client setup. */
 export function startRenderingPreparationCounters(): void {
-  if (reconcileSystemRegistered) return
+  if (systemRegistered) return
   engine.addSystem(reconcileCountersSystem)
-  reconcileSystemRegistered = true
+  systemRegistered = true
 }
-
-let reconcileSystemRegistered = false
 
 function reconcileCountersSystem(): void {
   for (const [, data] of engine.getEntitiesWith(PreparationCounterState)) {
@@ -76,7 +76,7 @@ function reconcileCountersSystem(): void {
   }
 }
 
-export interface PreparationCounterSnapshot {
+interface PreparationCounterSnapshot {
   ingredientCount: number
 }
 

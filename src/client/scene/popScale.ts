@@ -4,7 +4,7 @@
 // fixtureMessage.ts's pop (which knows its whole shown duration up front),
 // this just reacts to a "should this be visible" boolean each frame.
 
-export const POP_SCALE_SECONDS = 0.15
+const POP_SCALE_SECONDS = 0.15
 
 export interface PopState {
   visible: boolean // last target visibility fed into tickPopState
@@ -16,7 +16,7 @@ export function createPopState(): PopState {
   return { visible: false, elapsedSinceChange: POP_SCALE_SECONDS }
 }
 
-export interface PopResult {
+interface PopResult {
   scale: number // 0..1 — apply to the entity's Transform.scale
   shown: boolean // whether VisibilityComponent.visible should still be true (stays true briefly while easing out)
 }

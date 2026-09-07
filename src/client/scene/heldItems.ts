@@ -5,9 +5,10 @@
 // the hand anchor, one or more visible model entities sit under it.
 //
 // Most pickups are a single model; taking a whole counter stack is an
-// "assembled" stack (attachAssembledItemToPlayerHand) — the first model's
-// hand transform (itemPlacement.ts) anchors the stack, later ones
-// stack above it via the same file’s item heights.
+// "assembled" stack — the first model's hand transform (itemPlacement.ts)
+// anchors the stack, later ones stack above it via the same file's item
+// heights. Assembled hands arrive through reconciliation rather than a
+// local call, since pickups deliberately render nothing optimistically.
 //
 // Local mutators render the hand immediately for zero-latency feedback AND
 // send setHeldItem so the server updates the synced component — unless the
@@ -50,11 +51,6 @@ function localState(): RenderedHeldItem | undefined {
 
 export function attachItemToPlayerHand(model: string): void {
   applyLocally([model])
-}
-
-/** Attaches a vertical stack of models as one assembled item — e.g. a whole counter stack picked up at once. */
-export function attachAssembledItemToPlayerHand(models: string[]): void {
-  applyLocally(models)
 }
 
 /** Sends the local player's new hand contents to the server and renders it immediately, ahead of the round trip. */

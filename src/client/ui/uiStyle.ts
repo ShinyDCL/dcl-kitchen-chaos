@@ -47,10 +47,10 @@ export function emphasize(text: string, bold: boolean): string {
 // --- Semantic hues ---
 
 /** Matches the ingredient atlas's salad/cucumber green, red pulled down so it reads green not yellow-green. */
-export const SUCCESS_GREEN = Color4.create(0.3, 0.72, 0.28, 1)
+const SUCCESS_GREEN = Color4.create(0.3, 0.72, 0.28, 1)
 
 /** Timed out / overdue. */
-export const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1)
+const DANGER_RED = Color4.create(0.9, 0.2, 0.2, 1)
 
 // Slightly translucent so a hint of what's beneath reads through.
 const STATE_OVERLAY_ALPHA = 0.95

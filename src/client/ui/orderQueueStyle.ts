@@ -52,7 +52,7 @@ export const ORDER_BADGE_BACKGROUND = Color4.create(0, 0, 0, 0.85)
  * Text and badge sizing. Separate from the card's box dimensions only
  * because it all scales together off one factor — see cardText().
  */
-export interface CardTextLayout {
+interface CardTextLayout {
   successTitleHeight: number // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
   successSubtextFontSize: number
   successSubtextHeight: number

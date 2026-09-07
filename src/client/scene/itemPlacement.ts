@@ -10,13 +10,13 @@ import { MODELS } from '../../shared/models'
 // --- Stacking height ---
 //
 // Height (in meters) of each item's model, used to stack items on
-// preparation counters without them clipping into each other. Values are
-// placeholders until the real models are measured — edit individual entries
-// as accurate heights become available.
+// preparation counters without them clipping into each other. Tuned by eye
+// against the models — adjust an entry if an item sits into or floats above
+// the one below it.
 
-export const DEFAULT_ITEM_HEIGHT = 0.1
+const DEFAULT_ITEM_HEIGHT = 0.1
 
-export const ITEM_HEIGHTS: Record<string, number> = {
+const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.cucumberSlice]: 0.06,
   [MODELS.onionSlice]: 0.07,
   [MODELS.tomatoSlice]: 0.07,
@@ -47,7 +47,7 @@ export function getItemHeight(model: string): number {
 // explicitly-present `rotation: undefined` overwrites the default instead
 // of falling back to it, which crashes when the engine reads it.
 
-export interface HandTransform {
+interface HandTransform {
   position: Vector3
   rotation: Quaternion
   scale: Vector3
@@ -63,7 +63,7 @@ function handTransform(
 
 const DEFAULT_HAND_TRANSFORM: HandTransform = handTransform(Vector3.create(0, 0, 0))
 
-export const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
+const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
   [MODELS.cucumberSlice]: handTransform(Vector3.create(0.05, 0.32, 0), Quaternion.fromEulerDegrees(40, 0, 90)),
   [MODELS.onionSlice]: handTransform(Vector3.create(0.06, 0.25, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
   [MODELS.tomatoSlice]: handTransform(Vector3.create(0.03, 0.33, 0), Quaternion.fromEulerDegrees(60, 0, 90)),

@@ -15,7 +15,7 @@ import { onPlatformResolved } from './platform/platformDetection'
 export const INTERACTION_SOUND = 'assets/scene/sounds/pickup.mp3'
 export const ACCEPT_SOUND = 'assets/scene/sounds/accept.mp3'
 export const REJECT_SOUND = 'assets/scene/sounds/reject.mp3'
-export const BACKGROUND_MUSIC = 'assets/scene/sounds/background.mp3'
+const BACKGROUND_MUSIC = 'assets/scene/sounds/background.mp3'
 
 const BACKGROUND_MUSIC_VOLUME = 0.05 // quieter than the sound effects so it sits behind them
 

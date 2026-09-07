@@ -88,7 +88,7 @@ interface ProgressBar {
   checkmarkPop: PopState // see tickCheckmark — the bar itself just snaps visible/hidden, no pop
 }
 
-export interface StoveVisuals {
+interface StoveVisuals {
   stove: Entity
   progressBar: ProgressBar
   smokeEmitter: Entity
