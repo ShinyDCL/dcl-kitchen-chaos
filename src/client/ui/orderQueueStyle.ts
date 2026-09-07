@@ -161,5 +161,5 @@ export const MOBILE_LAYOUT: OrderCardLayout = {
   ...MOBILE_CARD_TEXT,
   bold: true,
   verticalAnchor: 'bottom',
-  edgeOffset: 12
+  edgeOffset: 0 // flush to the safe area — the renderer's 'device' inset already clears the hardware margins
 }
