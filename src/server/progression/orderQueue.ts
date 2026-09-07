@@ -25,7 +25,7 @@
 // generateOrder also hands out the next orderNumber — see
 // reconcileOrderEntities for why it's recovered, not restarted at 1.
 
-import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
+import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
@@ -40,6 +40,7 @@ import {
   Recipe
 } from '../../shared/recipes'
 import { OrderState } from '../../shared/schemas'
+import { isAdoptableEntity } from '../entityAdoption'
 import { getGameStateMutable } from '../gameState'
 import { getRecentlyActivePlayerIds } from '../players/activity'
 import { grantCoins } from '../players/coins'
@@ -227,8 +228,7 @@ function getRequiredModels(recipe: Recipe): string[] {
  */
 function reconcileOrderEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(OrderState)) {
-    const [entityNumber] = EntityUtils.fromEntityId(entity)
-    if (entityNumber < RESERVED_STATIC_ENTITIES) continue
+    if (!isAdoptableEntity(entity)) continue
     orderEntities.set(data.orderNumber, entity)
     if (data.orderNumber >= nextOrderNumber) nextOrderNumber = data.orderNumber + 1
     OrderState.getMutable(entity).expiredAt = 0

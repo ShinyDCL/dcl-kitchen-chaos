@@ -12,10 +12,12 @@
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
+
 import { Storage } from '@dcl/sdk/server'
 
 import { LEADERBOARD_SIZE } from '../../shared/constants'
 import { Leaderboard, LEADERBOARD_SYNC_ID } from '../../shared/schemas'
+import { isAdoptableEntity } from '../entityAdoption'
 import { getPlayerName } from '../players/presence'
 import { persist } from '../storageWrite'
 
@@ -155,6 +157,7 @@ function getOrCreateLeaderboardEntity(): Entity {
 /** Re-adopts the leaderboard entity if it already exists in the CRDT snapshot from a previous server run. */
 function reconcileLeaderboardEntity(): void {
   for (const [entity] of engine.getEntitiesWith(Leaderboard)) {
+    if (!isAdoptableEntity(entity)) continue
     leaderboardEntity = entity
     return
   }

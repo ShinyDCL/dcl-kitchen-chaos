@@ -11,6 +11,7 @@ import { syncEntity } from '@dcl/sdk/network'
 
 import { SERVER_HEARTBEAT_INTERVAL_MS } from '../shared/constants'
 import { GAME_STATE_SYNC_ID, GameState } from '../shared/schemas'
+import { isAdoptableEntity } from './entityAdoption'
 import { countConnectedPlayers } from './players/presence'
 
 let gameStateEntity: Entity | null = null
@@ -72,6 +73,7 @@ function getOrCreateGameStateEntity(): Entity {
 /** Re-adopts the GameState entity if it already exists in the CRDT snapshot from a previous server run. */
 function reconcileGameStateEntity(): void {
   for (const [entity] of engine.getEntitiesWith(GameState)) {
+    if (!isAdoptableEntity(entity)) continue
     gameStateEntity = entity
     return
   }

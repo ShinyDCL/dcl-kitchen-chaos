@@ -3,8 +3,10 @@
 // explicit/hashed ids are unsafe on a long-running server). Used by
 // heldItems.ts, playerCoins.ts.
 
-import { Entity, EntityUtils, LastWriteWinElementSetComponentDefinition, RESERVED_STATIC_ENTITIES, engine } from '@dcl/sdk/ecs'
+import { Entity, LastWriteWinElementSetComponentDefinition, engine } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
+
+import { isAdoptableEntity } from '../entityAdoption'
 
 /** Call reconcile() once at init; look up/create entities by playerId (caller lower-cases it). */
 export function createPerPlayerStore<T extends { playerId: string }>(
@@ -39,8 +41,7 @@ export function createPerPlayerStore<T extends { playerId: string }>(
   /** Re-adopts entities that may exist in the CRDT snapshot from a prior server run. */
   function reconcile(): void {
     for (const [entity, data] of engine.getEntitiesWith(component)) {
-      const [entityNumber] = EntityUtils.fromEntityId(entity)
-      if (entityNumber < RESERVED_STATIC_ENTITIES) continue // runtime/avatar-owned — never adopt or remove these
+      if (!isAdoptableEntity(entity)) continue
       const playerId = data.playerId.toLowerCase()
       const existing = playerEntities.get(playerId)
       if (existing === undefined) {

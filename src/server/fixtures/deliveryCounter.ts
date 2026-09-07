@@ -10,6 +10,7 @@ import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { DeliveryState } from '../../shared/schemas'
+import { isAdoptableEntity } from '../entityAdoption'
 import { onPlayerAction } from '../players/activity'
 import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
 import { evaluateDelivery } from '../progression/orderQueue'
@@ -57,6 +58,7 @@ function getOrCreateDeliveryEntity(deliveryCounterId: number): Entity {
 /** Re-adopts the delivery entity if it already exists in the CRDT snapshot from a previous server run. */
 function reconcileDeliveryEntity(): void {
   for (const [entity] of engine.getEntitiesWith(DeliveryState)) {
+    if (!isAdoptableEntity(entity)) continue
     deliveryEntity = entity
     return
   }

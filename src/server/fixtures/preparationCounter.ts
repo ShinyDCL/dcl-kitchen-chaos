@@ -20,10 +20,11 @@
 // assigned deterministically by client/fixtures/fixtures.ts's getFixtureSyncId —
 // rather than the per-player auto-allocate-and-match-by-field pattern.
 
-import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
+import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { PreparationCounterState } from '../../shared/schemas'
+import { isAdoptableEntity } from '../entityAdoption'
 import { onPlayerAction } from '../players/activity'
 import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
 import { onSessionStart } from '../session'
@@ -76,8 +77,7 @@ function getOrCreateCounterEntity(counterId: number): Entity {
 /** Re-adopts counter entities that may already exist in the CRDT snapshot from a previous server run. */
 function reconcileCounterEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(PreparationCounterState)) {
-    const [entityNumber] = EntityUtils.fromEntityId(entity)
-    if (entityNumber < RESERVED_STATIC_ENTITIES) continue
+    if (!isAdoptableEntity(entity)) continue
     counterEntities.set(data.counterId, entity)
   }
 }

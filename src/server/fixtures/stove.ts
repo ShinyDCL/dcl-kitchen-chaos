@@ -16,7 +16,7 @@
 // stoves are a small fixed set for the scene's whole life, so no
 // per-connection auto-alloc/match-by-field is needed.
 
-import { engine, Entity, EntityUtils, RESERVED_STATIC_ENTITIES } from '@dcl/sdk/ecs'
+import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { BURN_GRACE_SECONDS } from '../../shared/constants'
@@ -24,6 +24,7 @@ import { getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
+import { isAdoptableEntity } from '../entityAdoption'
 import { onPlayerAction } from '../players/activity'
 import { grantHeldItem } from '../players/heldItems'
 import { onSessionStart } from '../session'
@@ -96,8 +97,7 @@ function getOrCreateStoveEntity(stoveId: number): Entity {
 /** Re-adopts stove entities that may already exist in the CRDT snapshot from a previous server run. */
 function reconcileStoveEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(StoveState)) {
-    const [entityNumber] = EntityUtils.fromEntityId(entity)
-    if (entityNumber < RESERVED_STATIC_ENTITIES) continue
+    if (!isAdoptableEntity(entity)) continue
     stoveEntities.set(data.stoveId, entity)
   }
 }
