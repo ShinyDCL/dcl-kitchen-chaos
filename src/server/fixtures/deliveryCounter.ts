@@ -1,5 +1,5 @@
 // Owns the scene's single DeliveryState. A true singleton (see
-// client/fixtures/layout.ts), so unlike preparationCounter.ts/stove.ts
+// client/scene/layout.ts), so unlike preparationCounter.ts/stove.ts
 // there's no per-fixture Map — one lazily-created entity, keyed by the
 // client's fixture sync id.
 //

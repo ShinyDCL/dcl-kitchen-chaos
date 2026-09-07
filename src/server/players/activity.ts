@@ -1,19 +1,15 @@
-// Tracks when each player last did something, so order payouts can go to
-// everyone who actually helped rather than everyone standing in the room.
-// Delivery pays the full amount to every recently-active player (see
-// orderQueue.ts) — paying only the deliverer would reward the least
-// skilled step of the chain and turn a co-op game competitive.
+// Tracks when each player last did something, so a delivery pays everyone who
+// actually helped rather than everyone standing in the room — paying only the
+// deliverer would reward the least skilled step of the chain.
 //
-// This is the only place the activity window still matters. Order queue
-// size follows the plain connected count instead (gameState.ts's
-// playerCount), because sizing on activity deadlocks: no active players
-// means no orders, which means nothing to act on, which means nobody
-// becomes active.
+// The only place the activity window still matters. Queue size follows the
+// plain connected count instead (gameState.ts), because sizing on activity
+// deadlocks: no active players means no orders, so nothing to act on, so
+// nobody becomes active.
 //
-// onPlayerAction is how every contested fixture handler registers, so the
-// activity stamp can't be forgotten by a handler added later. Stamping
-// happens before the action's own validation, so a rejected attempt still
-// counts as being active.
+// Every contested fixture handler registers through onPlayerAction, so the
+// stamp cannot be forgotten by a handler added later. It lands before the
+// action's own validation, so a rejected attempt still counts as active.
 
 import { ISchema } from '@dcl/sdk/ecs'
 

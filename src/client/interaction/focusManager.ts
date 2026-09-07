@@ -1,22 +1,16 @@
-// Tracks all interactable fixtures and, every frame, focuses the best one
-// within INTERACTION_RANGE, scored as distance minus a bonus for facing it
-// (see FACING_BONUS). Distance dominates, so the fixture you walked up to is
-// normally the one you get; facing only decides it between two that are
-// close to equidistant — standing in a corner with one counter ahead and
-// another to the side.
+// Focuses the best fixture within INTERACTION_RANGE every frame, scored as
+// distance minus a bonus for facing it (FACING_BONUS). Distance dominates;
+// facing only decides between two near-equidistant fixtures, such as a corner
+// with one counter ahead and another to the side.
 //
-// A focused fixture's `evaluate` callback re-runs every frame, not just on
-// focus change — its InteractionResult can change while still looking at
-// it (e.g. picking something up changes whether cooking is now allowed).
-// On interact: `perform` runs if allowed (also playing the interaction
-// sound at the fixture's position), otherwise `message` shows via the
-// on-screen message UI.
+// The focused fixture's `evaluate` re-runs every frame, since its result can
+// change while focus is held — picking something up changes whether cooking is
+// allowed.
 //
-// Gated on isServerAlive: a fixture action's optimistic hand change is only
-// undone by the server's actionRejected (see heldItem.ts's
-// takeHeldItemPending), so acting before the server is up leaves the hand
-// showing the wrong thing with nothing to correct it. This is also what
-// keeps the player from flailing at counters behind the "Loading..." overlay.
+// Gated on isServerAlive: most actions render their result immediately, and
+// every reconciler reacts only when the synced state changes. With no server
+// nothing changes, so those predictions are never corrected and a phantom item
+// is left in hand or on a counter.
 
 import { engine, Entity, InputAction, inputSystem, PointerEventType, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -62,10 +56,9 @@ let systemRegistered = false
 const ALWAYS_ALLOWED: InteractionResult = { allowed: true }
 
 /**
- * Registers a fixture as focusable. Resolves the anchor's world position
- * once, immediately — fixtures don't move after scene setup.
- * @param evaluate optional — omit for a fixture that should highlight
- *   (always green) but has no interaction logic at all.
+ * Registers a fixture as focusable. Resolves the anchor's world position once —
+ * fixtures don't move after scene setup.
+ * @param evaluate omit for a fixture that highlights but has no interaction.
  */
 export function registerFocusableFixture(anchor: Entity, evaluate?: () => InteractionResult): void {
   fixtures.push({

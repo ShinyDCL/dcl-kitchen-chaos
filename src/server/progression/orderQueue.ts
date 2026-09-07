@@ -1,29 +1,15 @@
-// Owns the order queue and mutates the streak field on gameState.ts's
-// GameState. Active orders are ephemeral OrderState entities — created on
-// generation, destroyed when delivered, or stamped expired and destroyed
-// once that card has shown. No fixed slot count: growQueueSystem just
-// compares live count against target.
+// Owns the order queue and GameState's streak. Orders are ephemeral
+// OrderState entities; growQueueSystem compares live count against a target
+// of min(players + 1, MAX), so a solo player always has a choice. An empty
+// scene targets 0, so the queue drains and nothing regenerates until someone
+// arrives — session.ts is what clears it.
 //
-// Target size is min(count + 1, MAX) — see getTargetQueueSize, so a solo
-// player always has a choice. Sized by everyone in the scene, not by who
-// has acted recently: sizing on activity deadlocks, since no orders means
-// nothing to act on. An empty scene targets 0, so the queue drains on its
-// own and nothing regenerates until someone arrives; session.ts is what
-// actually clears it, on the next session's first frame.
-//
-// evaluateDelivery pays every recently-active player (playerActivity.ts)
-// and broadcasts 'orderDelivered' on a match. Both a miss and a timeout
-// nudge the streak down (see adjustStreak). Expiry and generation get no
-// broadcast: an expiring order is stamped with expiredAt and left in place
-// for ORDER_RESULT_DISPLAY_SECONDS, so its timed-out card is just synced
-// state the client renders, and the slot it holds is itself the gap before
-// a replacement. Delivery can't do the same (the entity has to go the
-// moment it's delivered), so it holds off the next order with
-// nextGenerationAt instead — one shared cooldown, not per-order, so
-// overlapping deliveries just extend it.
-//
-// generateOrder also hands out the next orderNumber — see
-// reconcileOrderEntities for why it's recovered, not restarted at 1.
+// evaluateDelivery pays every recently-active player (players/activity.ts) and
+// broadcasts 'orderDelivered' on a match. Expiry and generation get no
+// broadcast: an expiring order is stamped with expiredAt and left in place for
+// ORDER_RESULT_DISPLAY_SECONDS, so its card is synced state and the slot it
+// holds is itself the gap before a replacement. A delivered entity has to go
+// immediately, so delivery holds the next order off with nextGenerationAt.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
@@ -52,7 +38,7 @@ import { recordDelivery } from './deliveryStats'
 const MAX_QUEUE_SIZE = 6
 
 // Payout is the recipe's own `coins` (see shared/recipes.ts), paid in full
-// to every recently-active player (playerActivity.ts) rather than to the
+// to every recently-active player (activity.ts) rather than to the
 // deliverer alone — the game is co-op, and carrying the finished dish is
 // the least of the work that went into it. Streak isn't multiplied in: it
 // already raises pay by unlocking higher-difficulty recipes.
@@ -214,17 +200,13 @@ function getRequiredModels(recipe: Recipe): string[] {
 }
 
 /**
- * Re-adopts order entities already in the CRDT snapshot from a previous
- * server run, and recovers nextOrderNumber from the highest orderNumber
- * handed out — otherwise a restart would reset the ticket counter to 1 and
- * duplicate numbers. An already-expired order is caught by the first
- * growQueueSystem tick same as any other; no special-casing needed here.
+ * Re-adopts order entities from a previous server run and recovers
+ * nextOrderNumber from the highest one handed out, so a restart cannot reissue
+ * numbers.
  *
- * expiredAt is rewritten rather than trusted: a snapshot left by a build
- * that predates the field would otherwise hand growQueueSystem a stamp it
- * never wrote, and a nonsense one in the future never satisfies the
- * discard check — the order would hold a queue slot as a timed-out card
- * indefinitely. Zeroing it puts every adopted order back on the path above.
+ * expiredAt is rewritten rather than trusted: a snapshot from a build predating
+ * the field carries a stamp it never wrote, and one in the future never
+ * satisfies the discard check, holding a queue slot indefinitely.
  */
 function reconcileOrderEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(OrderState)) {

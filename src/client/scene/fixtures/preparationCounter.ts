@@ -1,25 +1,13 @@
-// Owns the visuals for each preparation counter, reconciled against the
-// server-synced PreparationCounterState rather than held as local truth —
-// see the authoritative-server skill. Doesn't decide what's allowed — see
-// interactionRules.ts. Every action function assumes the caller already
-// checked it's allowed.
+// Visuals for each preparation counter, reconciled against the synced
+// PreparationCounterState rather than held as local truth. Decides nothing —
+// see interactionRules.ts; every action here assumes it is already allowed.
 //
-// Each action function sends a narrow intent (place an item, pick up the
-// stack, ...), not the counter's whole computed new state — the
-// server applies each atomically against its own live state (see
-// server/fixtures/preparationCounter.ts), which is what lets two players place
-// different ingredients on the same counter at once and have both stick,
-// instead of whichever client's full-state push lands last discarding the
-// other's. The reconciliation system (startRenderingPreparationCounters)
-// is what makes a counter visible to other players, and what folds in
-// concurrent changes this client's own prediction couldn't have known
-// about.
+// Actions send a narrow intent, not the whole computed state, so the server
+// can apply each atomically and two players can place on one counter at once.
 //
-// It only reacts when the synced state has actually changed since last
-// observed (lastSyncedStates) — not whenever it merely differs from what's
-// rendered. Right after this client's own optimistic render, a synced read
-// is briefly stale; gating on an actual change makes that a no-op instead
-// of a spurious revert-then-reapply flicker.
+// Reconciliation reacts only when the synced value actually changed, not
+// whenever it differs from what is rendered: a read right after this client's
+// own optimistic render is briefly stale, and reacting would flicker.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -100,7 +88,7 @@ function getRenderedContents(counter: Entity): CounterContents {
 
 // Pickups below deliberately don't render the hand optimistically — the
 // server's grantHeldItem only fires if the pickup is legal, and
-// heldItem.ts's reconciliation fills the hand once confirmed. Predicting
+// heldItems.ts's reconciliation fills the hand once confirmed. Predicting
 // it here would broadcast an unconditional setHeldItem regardless of
 // success, which is how a losing player used to end up with a duplicate.
 

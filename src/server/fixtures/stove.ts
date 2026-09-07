@@ -10,7 +10,7 @@
 //
 // startCookingOnStove grants the empty hand only once the cook actually
 // starts, replying actionRejected otherwise so the client restores what it
-// took out — see heldItem.ts's takeHeldItemPending.
+// took out — see heldItems.ts's takeHeldItemPending.
 //
 // Explicit sync id per stove, same reasoning as preparationCounter.ts:
 // stoves are a small fixed set for the scene's whole life, so no

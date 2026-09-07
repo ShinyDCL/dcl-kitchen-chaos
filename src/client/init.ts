@@ -1,6 +1,6 @@
 // Client bootstrap — called once from index.ts's main() on the client
 // branch. Builds the scene, then starts the systems that reconcile visuals
-// against server-synced state (see heldItem.ts's startRenderingHeldItems,
+// against server-synced state (see heldItems.ts's startRenderingHeldItems,
 // preparationCounter.ts's startRenderingPreparationCounters,
 // stove.ts's startRenderingStoves, and deliveryCounter.ts's
 // startRenderingDeliveryCounter), then the order queue HUD, the entry

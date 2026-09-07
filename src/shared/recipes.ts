@@ -1,7 +1,5 @@
-// Recipe definitions for the order queue — orderQueue.ts picks from
-// these by difficulty tier to fill queue slots; ordersUi.tsx resolves a
-// slot's recipeId back to one to render it. Ingredient keys match
-// shared/ingredients.ts's INGREDIENTS.
+// Recipe definitions for the order queue, picked by difficulty tier.
+// Ingredient keys match shared/ingredients.ts's INGREDIENTS.
 
 // Difficulty tier = 1 + floor(streak / STREAK_DIFFICULTY_STEP), capped at
 // MAX_DIFFICULTY_TIER. At +2 a delivery, top tier lands after 14 clean ones,

@@ -1,10 +1,7 @@
-// Single place defining what's allowed when the player interacts with each
-// kind of fixture, given what they're currently holding and (for stateful
-// fixtures) the fixture's own state. Read top-to-bottom per fixture kind —
-// each function is a flat set of cases, message wording included inline.
-// The counter/stove modules this file calls into only expose state
-// queries and actions ("what's on this counter", "start cooking") — they
-// don't make allow/disallow decisions themselves.
+// What each kind of fixture allows, given what the player holds and the
+// fixture's own state. Read top to bottom per kind — each function is a flat
+// set of cases, message wording included. The modules called into expose only
+// state queries and actions; they make no allow/disallow decisions.
 
 import { Entity } from '@dcl/sdk/ecs'
 

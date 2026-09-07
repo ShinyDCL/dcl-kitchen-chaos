@@ -4,7 +4,7 @@
 // sends becomes their held item. No anti-cheat around this — small fun
 // game, not worth the complexity.
 //
-// Per-player entity management is perPlayerSyncedStore.ts's shared pattern.
+// Per-player entity management is syncedStore.ts's shared pattern.
 
 import { HeldItem } from '../../shared/schemas'
 import { onSessionEnd, onSessionStart } from '../session'

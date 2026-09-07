@@ -1,25 +1,13 @@
-// Order queue HUD — cards centered horizontally, newest first, top on
-// desktop and bottom on mobile (see orderQueueStyle.ts's DESKTOP_LAYOUT/
-// MOBILE_LAYOUT — mobile is short on vertical room, so this stays clear of
-// the top where the player's own view is centered). Reads straight from
-// the synced OrderState entities every frame; no local prediction to
-// protect, so no reconcile step like heldItems.ts's.
+// Order queue HUD — cards centered, newest first, top on desktop and bottom
+// on mobile (orderQueueStyle.ts). Reads the synced OrderState entities every
+// frame; no local prediction to protect, so no reconcile step.
 //
-// The server broadcasts 'orderDelivered' once; each client times that
-// result highlight locally from receipt. Timing out arrives differently
-// and needs no local timing at all — the server stamps OrderState's
-// expiredAt and keeps the entity for the display window, so the card is
-// just synced state (see getLiveVisualState). The "New!" flash is derived
-// locally from generatedAt. A delivery result and a live order are
-// independent entries (getActiveOrders), keyed by orderNumber (never
-// reused) — both can render at once if a fresh order beats an earlier
-// result display ending. The server delays a delivered order's
-// replacement by ORDER_RESULT_DISPLAY_SECONDS (see orderQueue.ts) so
-// that's rare.
+// A delivery is timed locally from the 'orderDelivered' broadcast; timing out
+// needs no local timing at all, since the server stamps expiredAt and keeps
+// the entity for the display window. A delivery result and a live order are
+// independent entries keyed by orderNumber, so both can render at once.
 //
-// This file owns which cards exist and what state each is in; orderCard.tsx
-// draws them. The overlay color is eased here (getStatusOverlayColor) and
-// passed down, so the card component stays stateless.
+// This file owns which cards exist and their state; orderCard.tsx draws them.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
@@ -41,7 +29,7 @@ import {
 } from './orderQueueStyle'
 import { DANGER_BACKGROUND, SUCCESS_BACKGROUND } from './uiStyle'
 
-// How long a freshly generated order flashes its "New!" highlight.
+// How long a freshly generated order shows its new-order highlight.
 const ORDER_NEW_FLASH_SECONDS = 1
 
 const OVERLAY_COLOR_TRANSITION_SECONDS = 0.3
@@ -155,7 +143,7 @@ function getActiveOrders(): ActiveOrder[] {
  * deadline locally: the server stamps the field and holds the entity open
  * for the result display (see orderQueue.ts), so the card can't be missed
  * by a client whose clock disagrees about when the timer ran out. The
- * "New!" flash stays local — it's cosmetic, and being a moment early or
+ * new-order flash stays local — it's cosmetic, and being a moment early or
  * late costs nothing.
  */
 function getLiveVisualState(expiredAt: number, elapsedSeconds: number): CardVisualState {

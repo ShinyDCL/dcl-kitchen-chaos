@@ -1,22 +1,13 @@
-// In-world top-10 board, rendered from the synced Leaderboard component
-// (server/leaderboard.ts owns the ranking; this only draws it).
+// Draws the synced Leaderboard component; server/progression/leaderboard.ts
+// owns the ranking.
 //
-// One single-line TextShape per cell (MAX_ROWS x 3), each positioned by its
-// own Transform under a shared root: column X from COLUMNS, row Y from
-// ROW_HEIGHT. Both axes are therefore plain distances you can tune.
+// One single-line TextShape per cell, positioned by its own Transform under a
+// shared root: column X from COLUMNS, row Y from ROW_HEIGHT. Rows are spaced
+// with Transforms because this renderer ignores TextShape's lineSpacing — the
+// SDK encodes and sends it, but it has no visible effect. textWrapping stays
+// off too, so an over-long name cannot wrap and shove its row out of line.
 //
-// Row spacing is done with Transforms rather than TextShape's own
-// lineSpacing because this renderer ignores that field — the SDK encodes
-// and sends it, but changing it has no visible effect. Multi-line columns
-// would have to rely on it, which is why each row is its own entity.
-//
-// textWrapping stays off (the default), so an over-long name can't wrap and
-// shove its own row out of line with the rest — names are truncated for
-// tidiness rather than for alignment.
-//
-// Rebuilt only when the server-bumped Leaderboard.version moves — one
-// integer compare per frame, no allocation. Same trick as DeliveryState's
-// deliveryId in deliveryCounter.ts.
+// Rebuilt only when Leaderboard.version moves — one integer compare a frame.
 
 import { engine, Entity, TextAlignMode, TextShape, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'

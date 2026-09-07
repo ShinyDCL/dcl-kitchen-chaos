@@ -1,10 +1,9 @@
-// One order card and the pieces inside it. Pure presentation: every value
-// it draws arrives as a prop, so it holds no state and imports nothing from
-// ordersUi.tsx — that file owns which cards exist and what state each is in.
+// One order card and its pieces. Pure presentation: every value arrives as a
+// prop, so it holds no state and imports nothing from ordersUi.tsx.
 //
-// New/success/timedOut render as a colorful overlay drawn ON TOP of the
-// ingredient stack and progress bar, not a background color change — the
-// ingredients are opaque textures, so a color behind them wouldn't show.
+// Status renders as a colored overlay drawn ON TOP of the ingredient stack
+// and bar rather than a background change — the ingredients are opaque, so a
+// color behind them would not show.
 
 import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { Label, UiEntity } from '@dcl/sdk/react-ecs'
@@ -75,11 +74,9 @@ export function OrderCard({
 }
 
 /**
- * A pill, not a circle — a circle only fits 1-2 digits before clipping; a
- * pill can grow with the ticket number. Uses uiText directly rather than a
- * nested Label, so there's one centering mechanism, not two stacked. Still
- * reads slightly off-center vertically — no line-height/baseline control
- * available, and padding nudges didn't help — left as-is.
+ * A pill, not a circle — a circle clips past two digits. Uses uiText directly
+ * rather than a nested Label, so there is one centering mechanism, not two.
+ * Still reads slightly off-center vertically; no baseline control is available.
  */
 function OrderBadge({ orderNumber, layout }: { orderNumber: number; layout: OrderCardLayout }) {
   return (
@@ -104,20 +101,15 @@ function OrderBadge({ orderNumber, layout }: { orderNumber: number; layout: Orde
 }
 
 /**
- * Dims the ingredient stack/progress bar for text legibility — drawn above
- * them, below the status text. Rounds itself explicitly rather than
- * relying on the card's `overflow: 'hidden'`, which clips to a rectangle,
- * not the card's rounded shape (most visible on mobile).
+ * Dims the ingredient stack and bar for text legibility — above them, below the
+ * status text. Rounds itself rather than relying on the card's overflow:
+ * 'hidden', which clips to a rectangle, not the rounded shape.
  */
 function StatusOverlayBackground({ color }: { color: Color4 }) {
   return <UiEntity uiTransform={STATUS_OVERLAY_BG_TRANSFORM} uiBackground={{ color }} />
 }
 
-/**
- * A one-line status message centered over the whole card — used for
- * "New!"/"Timed out!". Bold via the <b> tag PBUiText supports inline; there
- * is no font-weight prop and the Font enum has no bold face.
- */
+/** A one-line status message centered over the card. Bold via the <b> tag PBUiText supports inline; there is no font-weight prop. */
 function StatusText({ text, layout }: { text: string; layout: OrderCardLayout }) {
   return (
     <UiEntity uiTransform={STATUS_OVERLAY_TEXT_TRANSFORM}>
@@ -153,11 +145,7 @@ function SuccessMessage({ deliveredByName, layout }: { deliveredByName: string; 
   )
 }
 
-/**
- * Stacks ingredients bottom-up, each one overlapping higher, last on top
- * in z-order. Container height is fixed to fit the longest recipe, so a
- * shorter stack just leaves empty space above it.
- */
+/** Stacks ingredients bottom-up, each overlapping the one below and later ones on top. Height is fixed to the longest recipe, so a shorter stack leaves space above. */
 function IngredientStack({ ingredients, layout }: { ingredients: string[]; layout: OrderCardLayout }) {
   const iconStep = layout.iconHeight - layout.iconOverlap
 
@@ -185,14 +173,12 @@ function IngredientStack({ ingredients, layout }: { ingredients: string[]; layou
 }
 
 /**
- * Vertical fill draining top-to-bottom — one color, square corners (this
- * renderer's overflow:'hidden' clips to a rectangle regardless of radius,
- * so rounding was never reliably achievable; see git history).
+ * Vertical fill draining top-to-bottom, square-cornered — this renderer clips
+ * to a rectangle regardless of radius.
  *
- * The fill is a constant cardContentHeight tall, never resized — it
- * slides downward out of the track (position.bottom going negative) as
- * time passes, clipped by overflow:'hidden'. Animating height instead of
- * position was the root cause of a real jumpiness bug this once had.
+ * The fill stays a constant cardContentHeight tall and slides down out of the
+ * track (position.bottom going negative), clipped by overflow: 'hidden'.
+ * Animating height instead caused a real jumpiness bug.
  */
 function ProgressBar({
   generatedAt,

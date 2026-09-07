@@ -1,27 +1,14 @@
-// Renders every player's held item, including the local player's own hand,
-// reconciled against the server-synced HeldItem component rather than held
-// as local truth — same pattern as preparationCounter.ts/stove.ts.
-// Uses the parent+child AvatarAttach pattern: an invisible parent tracks
-// the hand anchor, one or more visible model entities sit under it.
+// Renders every player's held item, the local hand included, reconciled
+// against the synced HeldItem component rather than held as local truth.
+// Parent+child AvatarAttach: an invisible parent tracks the hand anchor,
+// visible models sit under it, stacked by itemPlacement.ts's heights from the
+// first model's hand transform.
 //
-// Most pickups are a single model; taking a whole counter stack is an
-// "assembled" stack — the first model's hand transform (itemPlacement.ts)
-// anchors the stack, later ones stack above it via the same file's item
-// heights. Assembled hands arrive through reconciliation rather than a
-// local call, since pickups deliberately render nothing optimistically.
-//
-// Local mutators render the hand immediately for zero-latency feedback AND
-// send setHeldItem so the server updates the synced component — unless the
-// new models already match what's held, in which case applyLocally skips
-// both (e.g. re-grabbing an ingredient already in hand). The
-// reconciliation system (startRenderingHeldItems) compares every player's
-// synced state against what's rendered and corrects mismatches — this is
-// what makes the item visible to other players, and what corrects this
-// client's own guess when the server disagrees (e.g. stove.ts's
-// collectFromStove, which renders nothing optimistically to avoid
-// duplicating a scarce item). setHeldItem itself still isn't validated —
-// see server/heldItems.ts — so outside the stove flow this remains a
-// visibility fix, not anti-cheat.
+// Local mutators render immediately and send setHeldItem, skipping both when
+// the models already match what is held. Reconciliation is what makes an item
+// visible to other players and what corrects this client when the server
+// disagrees. setHeldItem is unvalidated (see server/players/heldItems.ts), so
+// outside the stove flow this is a visibility fix, not anti-cheat.
 
 import { AvatarAnchorPointType, AvatarAttach, engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
@@ -90,12 +77,11 @@ export function discardHeldItem(): void {
 }
 
 /**
- * Removes the held item and returns its models, clearing the hand locally
- * WITHOUT broadcasting setHeldItem — for actions whose paired fixture
- * message carries no models of its own and reads the player's current
- * HeldItem server-side instead (placeOnCounter, deliverHeldItem).
- * Broadcasting here first would race ahead of that message and clear the
- * server's copy before its handler reads it, delivering/placing nothing.
+ * Clears the hand locally and returns its models WITHOUT broadcasting
+ * setHeldItem — for actions whose paired message carries no models and reads
+ * the HeldItem server-side instead (placeOnCounter, deliverHeldItem).
+ * Broadcasting would race ahead and clear the server's copy before its handler
+ * reads it, delivering or placing nothing.
  */
 export function takeHeldItemModels(): string[] {
   const models = localState()?.models ?? []
@@ -106,16 +92,13 @@ export function takeHeldItemModels(): string[] {
 let pendingRestoreModels: string[] | null = null
 
 /**
- * For a fixture action whose server outcome isn't known yet. Clears the
- * hand prediction immediately WITHOUT broadcasting setHeldItem — the
- * paired intent's own server handler grants the empty hand on success or
- * sends actionRejected on failure, which restorePendingHeldItem uses to
- * put the item back. Broadcasting unconditionally is how items used to
- * vanish or duplicate in a race.
+ * For a fixture action whose outcome isn't known yet. Clears the prediction
+ * WITHOUT broadcasting: the paired handler grants the empty hand on success or
+ * sends actionRejected on failure, which restorePendingHeldItem acts on.
+ * Broadcasting unconditionally is how items used to vanish or duplicate.
  *
- * pendingRestoreModels is a single slot: applyLocally and heldItemsSystem
- * null it out on an unrelated hand change, so a stale rejection can't
- * restore it over a hand that's since moved on.
+ * A single slot — applyLocally and heldItemsSystem null it out on an unrelated
+ * hand change, so a stale rejection can't restore over a hand that moved on.
  */
 export function takeHeldItemPending(): string | null {
   const model = peekHeldItemModel()
@@ -147,13 +130,10 @@ export function startRenderingHeldItems(): void {
 const lastSyncedHeldItems = new Map<string, string[]>() // last models actually observed from the synced component, per playerId
 
 /**
- * Renders each player's held item, but only reacts when a player's synced
- * state has actually changed since last observed — not whenever it merely
- * differs from what's rendered. Right after this client's own optimistic
- * applyLocally, a live read is briefly stale; gating on an actual change
- * makes that a no-op instead of a spurious revert-then-reapply flicker.
- * Compares the synced array directly before copying it — copying every
- * player every frame just to discard most was needless churn.
+ * Reacts only when a player's synced state has actually changed since last
+ * observed, not whenever it differs from what is rendered: right after this
+ * client's own applyLocally a live read is briefly stale, and reacting would
+ * flicker. Compares before copying, so unchanged players cost no allocation.
  */
 function heldItemsSystem(): void {
   const localId = localPlayerId()
@@ -205,11 +185,10 @@ function buildVisual(playerId: string, models: string[]): RenderedHeldItem {
 }
 
 /**
- * Builds the visible model stack under a hand-anchor parent (already
- * AvatarAttach'd) and returns its child entities, stackRoot first. The
- * bottom item's configured hand transform anchors the whole stack; items
- * above it are positioned purely by cumulative height, not their own
- * individual hand offsets.
+ * Builds the visible model stack under an already-attached hand anchor and
+ * returns its children, stackRoot first. The bottom item's configured hand
+ * transform anchors the whole stack; items above it are placed by cumulative
+ * height alone, not their own hand offsets.
  */
 function buildHandStack(parent: Entity, models: string[]): Entity[] {
   const baseTransform = getHandTransform(models[0] ?? '')

@@ -1,6 +1,6 @@
 // In-world info panel: players currently in the scene, and orders delivered
 // this session. Both read straight off the synced GameState (see
-// server/gameState.ts and server/deliveryStats.ts), so they update the
+// server/gameState.ts and server/progression/deliveryStats.ts), so they update the
 // moment the server changes them, with no messages involved. The delivered
 // count drops back to 0 when a new session starts — see server/session.ts.
 //

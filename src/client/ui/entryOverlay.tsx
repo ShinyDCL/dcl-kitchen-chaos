@@ -1,7 +1,6 @@
-// The entry overlay, now only ever a "Loading..." state: there is no role
-// to choose, so once the server is alive (serverReadiness.ts — the CRDT
-// room connecting isn't enough, a cold start can take ~15s) the overlay
-// simply goes away and the player is in.
+// The entry overlay: a loading panel held up until the server is alive
+// (serverReadiness.ts — the CRDT room connecting isn't enough, a cold start
+// can take ~15s), then dismissed and the player is in.
 //
 // Centered on the device-safe area, and the area around the panel stays
 // click-through so it never blocks movement while the server is still waking.

@@ -17,7 +17,7 @@
 //
 // Unlike per-player entities, counters are a small fixed set for the
 // scene's whole life, so each uses an EXPLICIT sync id — its counterId,
-// assigned deterministically by client/fixtures/fixtures.ts's getFixtureSyncId —
+// assigned deterministically by client/scene/fixtures/fixture.ts's getFixtureSyncId —
 // rather than the per-player auto-allocate-and-match-by-field pattern.
 
 import { engine, Entity } from '@dcl/sdk/ecs'

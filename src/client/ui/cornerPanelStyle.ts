@@ -15,4 +15,3 @@ export interface CornerPanelLayout {
   edgeOffset: number // distance from the interactable area’s top-right corner
   bold: boolean // mobile only — thin text is harder to read at arm’s length
 }
-

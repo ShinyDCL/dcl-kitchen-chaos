@@ -1,4 +1,4 @@
-// "Loading..." prompt shown in the entry overlay's slot while the server
+// Loading panel shown in the entry overlay's slot while the server
 // isn't alive yet (see serverReadiness.ts) — entryOverlay.tsx decides when
 // to show it and which layout to pass; this only owns what it looks like.
 // Uses entryOverlayStyle.ts's panel transforms.
@@ -24,7 +24,7 @@ const LOADING_DOT_INTERVAL_SECONDS = 0.5 // cycles 0→1→2→3 dots, ~2s per l
 
 export interface LoadingLayout {
   fontSize: number
-  wordWidth: number // fixed box for “Loading”, right-aligned so the word ends at the seam
+  wordWidth: number // fixed box for the word, right-aligned so the word ends at the seam
   dotsSlotWidth: number // must fit three BOLD dots at fontSize, or the third one clips
   bold: boolean // mobile only — see uiStyle's emphasize
 }

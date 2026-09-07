@@ -1,11 +1,8 @@
-// Assembles the full kitchen layout: ingredient counters along the left and
-// right walls (both bookended by a preparation counter), a front
-// row alternating preparation counters and stoves, a 2x2 preparation-counter
-// island in the middle, a back/entrance wall with a discard counter and the
-// delivery counter (each inset from its corner, open walkway between), and
-// a decorative counter in each of the room's four corners. All
-// positions/rotations are local to `parent` (the scene root), matching
-// the existing world-placement pattern.
+// Assembles the kitchen: ingredient counters along the left and right walls
+// (both bookended by a preparation counter), a front row alternating
+// preparation counters and stoves, a 2x2 preparation-counter island, a back
+// wall carrying the discard and delivery counters, and a decorative counter in
+// each corner. All positions are local to `parent`, the scene root.
 
 import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
@@ -66,7 +63,7 @@ function createPreparationCounterFixture(position: Vector3, rotation: Quaternion
   registerPreparationCounter(fixture)
 }
 
-/** Static model with no focus highlight or interaction — unlike createFixture's, see fixtures.ts. */
+/** Static model with no focus highlight or interaction — unlike createFixture's, see fixture.ts. */
 function createDecorativeModel(model: string, position: Vector3, rotation: Quaternion, parent: Entity): void {
   const entity = engine.addEntity()
   Transform.create(entity, { position, rotation, parent })
@@ -82,17 +79,8 @@ export function createSceneLayout(parent: Entity): void {
   createCorners(parent)
 }
 
-/**
- * Places a row of ingredient counters along one wall (fixed X), spaced
- * edge-to-edge along Z and centered on Z=0, all facing toward the room's
- * center, bookended by a preparation counter at each end.
- */
-function createSideWall(
-  parent: Entity,
-  x: number,
-  ingredients: IngredientDefinition[],
-  facingDegrees: number
-): void {
+/** A wall row at a fixed X: ingredient counters edge-to-edge along Z, centered on 0, bookended by a preparation counter at each end. */
+function createSideWall(parent: Entity, x: number, ingredients: IngredientDefinition[], facingDegrees: number): void {
   const slotCount = ingredients.length + 2 // +2 for the bookending preparation counters
   const rotation = rotationDegrees(facingDegrees)
   const slotPosition = (slotIndex: number) => Vector3.create(x, 0, slotOffset(slotCount, slotIndex))
@@ -106,11 +94,7 @@ function createSideWall(
   createPreparationCounterFixture(slotPosition(slotCount - 1), rotation, parent)
 }
 
-/**
- * Places the front row: counter, stove, counter, stove, counter, stove,
- * counter — 7 fixtures side-by-side, all facing toward the room's center.
- * The counters are preparation counters.
- */
+/** The front row: seven fixtures alternating preparation counter and stove, all facing the room. */
 function createFrontRow(parent: Entity): void {
   const sequence: Array<'counter' | 'stove'> = ['counter', 'stove', 'counter', 'stove', 'counter', 'stove', 'counter']
   const rotation = rotationDegrees(FACE_NEGATIVE_Z)
@@ -135,12 +119,7 @@ function createFrontRow(parent: Entity): void {
   })
 }
 
-/**
- * Fills the room's four corners — each sits at a side wall's X and the
- * front row's/back wall's Z, so it reads as belonging to both. Placed
- * separately from createSideWall/createFrontRow/createBackWall rather than
- * bundled into any one of them, since no single wall owns a corner.
- */
+/** The four corners — each at a side wall's X and the front row's or back wall's Z, so it belongs to both and to neither wall's builder. */
 function createCorners(parent: Entity): void {
   const frontRotation = rotationDegrees(FACE_NEGATIVE_Z)
   const backRotation = rotationDegrees(FACE_POSITIVE_Z)
@@ -151,12 +130,7 @@ function createCorners(parent: Entity): void {
   }
 }
 
-/**
- * Places a 2x2 counter island in the middle: two counters facing -Z, two
- * facing +Z, backs touching at Z=0 so the whole block reads as one island
- * with fronts facing outward on both sides. All four are preparation
- * counters.
- */
+/** The 2x2 island: two counters facing -Z, two facing +Z, backs touching at Z=0 so fronts face outward on both sides. */
 function createIsland(parent: Entity): void {
   const halfWidth = FIXTURE_WIDTH / 2
   const halfDepth = FIXTURE_DEPTH / 2
@@ -174,12 +148,7 @@ function createIsland(parent: Entity): void {
   }
 }
 
-/**
- * Places the back wall (the entrance wall): a discard counter and the
- * delivery counter, mirrored around X and each kept half a gap clear of the
- * corner beside it — accounting for BACK_WALL_COUNTER_WIDTH, since these
- * two are wider than a standard fixture — with an open walkway between them.
- */
+/** The entrance wall: the discard and delivery counters, mirrored around X with a walkway between, each kept half a gap clear of its corner. */
 function createBackWall(parent: Entity): void {
   const rotation = rotationDegrees(FACE_POSITIVE_Z)
   const halfGap = FIXTURE_DEPTH / 2

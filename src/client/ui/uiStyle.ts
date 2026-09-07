@@ -1,9 +1,6 @@
 // Shared vocabulary for screen-space UI: panel chrome, semantic hues and
-// progress-bar colours. Anything used by more than one UI module belongs
-// here; anything specific to one stays with it (the order queue's blue
-// "New!" tint, its card sizing).
-//
-// In-world 3D text is deliberately not covered — see scene/textStyle.ts.
+// progress-bar colours. Anything used by more than one UI module belongs here.
+// In-world 3D text is covered by scene/textStyle.ts instead.
 
 import { Color4 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'

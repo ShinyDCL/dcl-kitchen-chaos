@@ -41,16 +41,14 @@ export const STATUS_OVERLAY_TEXT_TRANSFORM = {
 
 export const DELIVERED_BY_NAME_MAX_LENGTH = 10 // truncated (no ellipsis) so a long display name can't overflow the card
 
-
 // Session-wide ticket number, overlaid on the card's top-left corner.
 // Width is fixed (per layout) rather than 'auto' — an auto-sized parent
 // around a text child doesn't reliably size itself here.
 export const ORDER_BADGE_BACKGROUND = Color4.create(0, 0, 0, 0.85)
 
-
 /**
- * Text and badge sizing. Separate from the card's box dimensions only
- * because it all scales together off one factor — see cardText().
+ * Text and badge sizing, kept apart from the card's box dimensions. Each
+ * platform has its own table below rather than one scaled off the other.
  */
 interface CardTextLayout {
   successTitleHeight: number // explicit, not 'auto' — a Label's intrinsic height doesn't reliably stack siblings in a column
@@ -58,7 +56,7 @@ interface CardTextLayout {
   successSubtextHeight: number
   successLineGap: number
   statusFontSize: number
-  statusHeight: number // tall enough for "Timed out!" to wrap to 2 lines, so middle-center centers the wrapped block
+  statusHeight: number // tall enough for the longest status label to wrap to 2 lines, so middle-center centers the wrapped block
   badgeHeight: number
   badgeFontSize: number
   badgeMargin: number

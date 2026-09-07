@@ -4,8 +4,8 @@
 // Each subsystem starts in isolation: without this, one throw (a Storage
 // hiccup, a bad stored value) skips every later init AND rejects main(),
 // taking down the whole scene — including gameState's heartbeat, which
-// leaves every client stuck on serverLoadingUi's "Loading...". A failed
-// subsystem is logged and the rest still runs.
+// leaves every client stuck on the loading panel. A failed subsystem is
+// logged and the rest still runs.
 
 import { initDeliveryCounter } from './fixtures/deliveryCounter'
 import { initPreparationCounters } from './fixtures/preparationCounter'

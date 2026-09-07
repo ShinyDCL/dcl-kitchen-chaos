@@ -1,21 +1,10 @@
-// Delivery counter: placing a held item makes it sit, then shrink away,
-// while a result mark scales up/holds/down alongside it — checkmark if it
-// matched an active order (server-decided, see orderQueue.ts), crossmark
-// otherwise. renderedSuccess stays null (neither mark shown) until the
-// server responds, since guessing here used to flash the wrong mark first.
+// Delivery counter visuals: the delivered item sits, then shrinks away, while
+// a result mark scales up, holds and drops. renderedSuccess stays null until
+// the server responds, since guessing flashed the wrong mark first.
 //
-// Reconciled against the server-synced DeliveryState — see the
-// authoritative-server skill. Single fixture, so module-level state is
-// fine here unlike stove.ts's per-stove Map.
-//
-// Both animations run on a local per-client timer, started fresh the
-// moment this client first sees a new `models` value — not a shared
-// network timestamp, since nothing here needs cross-client lockstep, just
-// the right duration once seen.
-//
-// The hand-clear (takeHeldItemModels) doesn't broadcast setHeldItem —
-// deliverHeldItem reads the real HeldItem server-side, and broadcasting
-// here first would race ahead and clear it before that.
+// Reconciled against the synced DeliveryState. Single fixture, so module-level
+// state is fine here unlike stove.ts's per-stove Map. Both animations run on a
+// local timer started when this client first sees a new `models` value.
 
 import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'

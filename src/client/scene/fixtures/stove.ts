@@ -1,28 +1,16 @@
-// Stove cooking state: holding a cookable and interacting starts a timed
-// cook — raw model appears, a progress bar fills, smoke runs. When done,
-// the model swaps to cooked, a checkmark appears, and smoke stops. Left too
-// long, the bar drains back down while shifting toward red; once it empties
-// (BURN_GRACE_SECONDS after done) the model swaps to the burnt cookable,
-// the checkmark hides, and fire particles start. Collecting works the same
-// way in either state — server/fixtures/stove.ts decides which
-// model that actually grants — and resets the stove, stopping the fire.
+// Stove cooking state: what should be shown and when. What it looks like
+// lives in stoveVisuals.ts.
 //
-// What any of that looks like lives in stoveVisuals.ts; this file decides
-// what should be shown and when.
+// Reconciled against the synced StoveState rather than held as local truth.
+// startCookingOnStove renders optimistically — nothing scarce is at stake if
+// it gets corrected. collectFromStove renders nothing: it hands out a scarce
+// item and the server decides who wins a race for a finished stove, so this
+// waits for the real outcome.
 //
-// Reconciled against the server-synced StoveState rather than held as
-// local truth — see the authoritative-server skill. startCookingOnStove
-// renders optimistically (nothing scarce at stake if corrected later).
-// collectFromStove renders nothing optimistically: collecting hands out a
-// scarce item, and server/fixtures/stove.ts decides who wins a race
-// for a finished stove, so this waits for the real outcome via
-// reconciliation, same as for every other player's stove.
-//
-// Progress is derived every frame from `Date.now() - startTimestamp`
-// (server clock), so only the start/reset of a cook is ever sent over the
-// network, never continuous progress. The done/burnt phase is likewise
-// recomputed from elapsed time, not stored, so a late observer (or a
-// reconciliation correction) can jump straight to the right one.
+// Progress derives every frame from `Date.now() - startTimestamp` (server
+// clock), so only a cook's start and reset cross the network. Done and burnt
+// are recomputed from elapsed time too, so a late observer jumps straight to
+// the right phase.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { getPlatform } from '@dcl/sdk/platform'
@@ -78,16 +66,7 @@ export function registerStove(stove: Entity): void {
   stovesById.set(getFixtureSyncId(stove), stove)
 }
 
-/**
- * Reads from renderedCooks — this client's current belief, kept correct
- * every frame by tickProgress — rather than a raw live poll of the synced
- * component. interactionRules.ts calls this to decide whether cooking is
- * allowed (drives the focus highlight's color/message); right after this
- * client's own optimistic startCookingOnStove call, a raw poll is briefly
- * stale (the server hasn't processed the intent yet), which would flip the
- * highlight back to "idle" rules for a moment until the real update caught
- * up.
- */
+/** Reads renderedCooks — this client's belief, kept current by tickProgress — rather than a live poll, which is briefly stale right after an optimistic start and would flip the highlight back to idle rules. */
 export function getStoveStatus(stove: Entity): StoveStatus {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
   if (rendered.rawModel === '') return 'idle'
@@ -156,18 +135,12 @@ function stoveCookingSystem(dt: number): void {
 }
 
 /**
- * Applies a rawModel/startTimestamp transition, but only when it has
- * actually changed since last observed — not whenever it merely differs
- * from what's rendered. Right after this client's own optimistic
- * startCookingOnStove, a live read is briefly stale; gating on an actual
- * change makes that a no-op instead of a spurious revert-then-reapply
- * flicker.
+ * Applies a transition only when the synced value has actually changed since
+ * last observed — a live read is briefly stale right after an optimistic
+ * start, and reacting to that would flicker.
  *
- * If only startTimestamp changes for the same rawModel, that's this
- * client's optimistic guess being corrected to the server's authoritative
- * value — adopted without tearing down/rebuilding the item entity or bar,
- * since rebuilding caused a visible pop/rewind (most noticeable on
- * mobile's higher latency).
+ * A startTimestamp change alone is this client's guess being corrected, so it
+ * is adopted as a target for slideTowardTarget rather than applied outright.
  */
 function reconcileTransition(stove: Entity, synced: SyncedCook): void {
   const lastSynced = lastSyncedStates.get(stove) ?? { rawModel: '', startTimestamp: 0 }
@@ -196,11 +169,9 @@ function computePhase(elapsedSecondsValue: number, definition: CookableIngredien
 }
 
 /**
- * Continuous per-frame progress, derived purely from what's currently
- * rendered — never from a fresh (possibly stale) synced read.
- *
- * Also recomputes bar visibility every frame (not just on phase
- * transitions), so it restores correctly after an interruption.
+ * Per-frame progress from what is currently rendered, never a fresh synced
+ * read. Bar visibility is recomputed every frame so it restores after an
+ * interruption.
  */
 function tickProgress(stove: Entity, dt: number): void {
   const stored = renderedCooks.get(stove) ?? emptyRenderedCook()
@@ -235,18 +206,15 @@ function tickProgress(stove: Entity, dt: number): void {
 }
 
 /**
- * Walks the rendered start toward the server's authoritative one, spread
- * across however much of the cook is left. The client's optimistic guess is
- * always early — the server stamps the start when the message lands, and
- * serverNow() itself trails true server time by the heartbeat's own trip —
- * so adopting it outright rewinds the bar by that much (measured at ~240ms
- * locally, a twentieth of a five-second cook, which reads as a reset).
+ * Walks the rendered start toward the server's, spread across the rest of the
+ * cook. The optimistic guess is always early (the server stamps on arrival,
+ * and serverNow() trails by the heartbeat's own trip), so adopting it outright
+ * rewinds the bar — ~240ms locally, which reads as a reset.
  *
  * Stepping by drift × dt / remaining holds drift/remaining constant, so the
- * slide runs at a steady rate and lands exactly at completion. That is what
- * keeps the phase honest: elapsed grows slightly slower than real time and
- * reaches cookDurationSeconds precisely when the server says it does, never
- * before — which matters, since the server ignores a collect sent early.
+ * slide lands exactly at completion. That keeps elapsed reaching
+ * cookDurationSeconds precisely when the server says it does, never before —
+ * the server ignores a collect sent early.
  */
 function slideTowardTarget(rendered: RenderedCook, definition: CookableIngredientDefinition, dt: number): number {
   const drift = rendered.targetStartTimestamp - rendered.startTimestamp
@@ -262,11 +230,7 @@ function slideTowardTarget(rendered: RenderedCook, definition: CookableIngredien
   return rendered.startTimestamp + stepMs
 }
 
-/**
- * Runs every frame regardless of idle state (unlike tickProgress) so the
- * checkmark still eases out when a stove goes idle, instead of being cut
- * off by tickProgress's early return.
- */
+/** Runs even while idle (unlike tickProgress) so the checkmark still eases out after a stove goes idle. */
 function tickCheckmarkPop(stove: Entity, dt: number): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
   const visuals = getOrCreateVisuals(stove)

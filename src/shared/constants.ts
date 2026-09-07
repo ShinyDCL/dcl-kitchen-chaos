@@ -22,7 +22,7 @@ export const BURN_GRACE_SECONDS = 10
 export const ORDER_RESULT_DISPLAY_SECONDS = 2
 
 // How long after their last action a player still counts toward order
-// payouts — see server/playerActivity.ts.
+// payouts — see server/players/activity.ts.
 export const ACTIVITY_WINDOW_MS = 3 * 60 * 1000
 
 // How long the scene must stay empty before the session ends and the next

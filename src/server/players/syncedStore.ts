@@ -1,7 +1,6 @@
 // Shared per-player entity boilerplate: matched by the component's own
-// playerId field, not network/sync id (see authoritative-server skill —
-// explicit/hashed ids are unsafe on a long-running server). Used by
-// heldItems.ts, playerCoins.ts.
+// playerId field, not network id (see the authoritative-server skill —
+// explicit or hashed ids are unsafe on a long-running server).
 
 import { Entity, LastWriteWinElementSetComponentDefinition, engine } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
@@ -56,11 +55,10 @@ export function createPerPlayerStore<T extends { playerId: string }>(
    * Writes makeDefault back over every tracked entity — heldItems.ts empties
    * hands with this at the start of a session.
    *
-   * Deliberately a rewrite rather than removing the entities: client
-   * reconciliation ignores its own player's entity going missing (an
-   * unsynced local prediction looks the same), so a removal would leave that
-   * player rendering an item the server no longer thinks they hold. A
-   * changed value is the update path clients already act on.
+   * A rewrite rather than a removal: client reconciliation ignores its own
+   * player's entity going missing (an unsynced local prediction looks the same),
+   * so a removal would leave that player rendering what the server no longer
+   * thinks they hold.
    */
   function resetAll(): void {
     for (const [playerId, entity] of playerEntities) {
@@ -71,15 +69,12 @@ export function createPerPlayerStore<T extends { playerId: string }>(
 
   /**
    * Removes every tracked entity. Only safe with the scene empty (session.ts
-   * calls it on session end): client reconciliation ignores its own player's
-   * entity going missing, since an unsynced local prediction looks the same,
-   * so a present player would keep rendering what the removed entity held.
-   * resetAll is the one to use while anyone is watching.
+   * calls it on session end) — see resetAll for why a present player must not
+   * have theirs removed.
    *
-   * Entities are otherwise never removed, and reconcile() re-adopts them from
-   * the CRDT snapshot across restarts — so without this they accumulate one
-   * per visitor for the life of the room, and every joining client downloads
-   * the lot.
+   * Entities are otherwise never removed and reconcile() re-adopts them across
+   * restarts, so without this they accumulate one per visitor for the life of
+   * the room, and every joining client downloads the lot.
    */
   function clear(): void {
     for (const [, entity] of playerEntities) {

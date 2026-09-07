@@ -83,11 +83,9 @@ function applyTotal(playerId: string, lifetimeCoins: number, persistTotal: boole
 }
 
 /**
- * Prunes departed players, and backstops onPlayerEnter. The two disagree
- * briefly by design: onEnterScene waits for AvatarBase as well as
- * PlayerIdentityData, while the connected snapshot needs only the latter, so
- * this also catches anyone whose avatar data lagged. Throttled — it rebuilds
- * a Set each run.
+ * Drops the cached total of anyone who has left — no event does that — and
+ * backstops onPlayerEnter should an arrival ever be missed. Throttled: it
+ * rebuilds a Set each run.
  */
 function trackConnectedPlayers(dt: number): void {
   connectionCheckElapsed += dt

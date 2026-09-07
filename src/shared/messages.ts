@@ -7,31 +7,21 @@ import { Schemas } from '@dcl/sdk/ecs'
 import { registerMessages } from '@dcl/sdk/network'
 
 export const Messages = {
-  // The full stack now in the sender's hand, bottom to top; empty means
-  // empty-handed. Only for actions with no paired fixture-side legality
-  // check (ingredient pickups, trash discard) — actions contested by a
-  // counter/stove instead grant/clear the hand from that fixture message's
-  // own handler, with actionRejected as the rollback (see heldItem.ts's
-  // takeHeldItemPending).
+  // The stack now in the sender's hand, bottom to top. Only for actions with
+  // no paired fixture-side check (ingredient pickups, discard) — contested
+  // actions grant or clear the hand from the fixture handler instead.
   setHeldItem: Schemas.Map({ models: Schemas.Array(Schemas.String) }),
 
-  // Server -> sender only: their fixture intent (placing, starting a cook)
-  // was rejected because someone else's action landed first. Restores
-  // whatever was optimistically taken out of hand — see heldItem.ts's
-  // takeHeldItemPending/restorePendingHeldItem.
+  // Server -> sender only: their intent lost a race. Restores whatever was
+  // optimistically taken out of hand — see heldItems.ts's takeHeldItemPending.
   actionRejected: Schemas.Map({}),
 
-  // Preparation counter intents. Each names the specific change rather
-  // than asserting the counter's whole new contents, so the server can
-  // apply it atomically against its own live state — see
-  // server/fixtures/preparationCounter.ts. This is what stops two players placing
-  // different ingredients on the same counter at once from clobbering each
-  // other: both used to compute their "new full state" from the same
-  // stale synced snapshot and push it wholesale, so whichever message the
-  // server processed last silently discarded the other's addition.
+  // Preparation counter intents name the specific change rather than the
+  // counter's whole new contents, so the server applies each atomically
+  // against its own live state. Two players pushing a computed "full state"
+  // from the same stale snapshot would silently discard each other's.
   pickUpFromCounter: Schemas.Map({ counterId: Schemas.Int }),
-  // The server places whatever the sender's real HeldItem holds — no
-  // separate message for a single ingredient vs. a stack.
+  // The server places whatever the sender's real HeldItem holds.
   placeOnCounter: Schemas.Map({ counterId: Schemas.Int }),
 
   // Start cooking a raw cookable at this stove. rawModel identifies which

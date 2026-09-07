@@ -1,4 +1,4 @@
-// One-liner used by the modules that persist to Storage (playerCoins.ts,
+// One-liner used by the modules that persist to Storage (coins.ts,
 // leaderboard.ts, deliveryStats.ts).
 //
 // Fire-and-forget on purpose. There's no retry: all three write cumulative

@@ -1,14 +1,11 @@
-// Everything a stove looks like: the item sitting on the pan, the progress
-// bar and its checkmark, and the smoke/fire emitters. stove.ts owns
-// the state and decides what should be shown; this owns how.
+// Everything a stove looks like: the item on the pan, the progress bar and its
+// checkmark, and the smoke and fire emitters. stove.ts decides what to show;
+// this owns how it looks.
 //
-// The entities are built once per stove and then only toggled — the two
-// particle emitters are persistent ParticleSystems switched via `active`
-// rather than recreated per cook, and the bar's fill is rescaled rather
-// than rebuilt.
-//
-// Callers never touch the entities directly, so the tuning constants below
-// stay private to this file.
+// Entities are built once per stove and then only toggled — the emitters are
+// persistent ParticleSystems switched via `active`, and the bar is rescaled
+// rather than rebuilt. Callers never touch them, so the tuning constants stay
+// private to this file.
 
 import {
   engine,

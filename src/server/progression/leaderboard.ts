@@ -1,13 +1,12 @@
 // Owns the all-time top-LEADERBOARD_SIZE board: the in-memory ranking, the
 // synced Leaderboard clients render from, and its Scene Storage backing.
 //
-// It needs its own stored key rather than being recomputed at startup:
-// Storage.player only reads keys for an address you already have (no
-// enumeration API), so there'd be nothing to recompute from. Player storage
-// stays the source of truth per balance; this is a cache of the top slice,
-// which is what lets it include offline players.
+// It needs its own stored key rather than being recomputed at startup, since
+// Storage.player only reads keys for an address you already have (there is no
+// enumeration API). Player storage stays the source of truth per balance; this
+// is a cache of the top slice, which is what lets it include offline players.
 //
-// Synced component, not a broadcast — a joining client gets the board from
+// A synced component, not a broadcast — a joining client gets the board from
 // the CRDT snapshot with no message.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
@@ -60,7 +59,7 @@ function publishPendingBoard(): void {
 }
 
 /**
- * Called by playerCoins.ts on every total change. Refreshes the name too —
+ * Called by coins.ts on every total change. Refreshes the name too —
  * coins only change while a player is connected, which is exactly when
  * their name resolves, so this is where a rename gets picked up.
  */
@@ -140,7 +139,11 @@ function mergeStoredEntries(raw: string | null): void {
     if (entry.lifetimeCoins <= 0) continue // drops 0-coin rows an older build persisted
     const id = entry.playerId.toLowerCase()
     if (entries.some((existing) => existing.playerId === id)) continue
-    entries.push({ playerId: id, name: typeof entry.name === 'string' ? entry.name : 'A player', lifetimeCoins: entry.lifetimeCoins })
+    entries.push({
+      playerId: id,
+      name: typeof entry.name === 'string' ? entry.name : 'A player',
+      lifetimeCoins: entry.lifetimeCoins
+    })
   }
 }
 

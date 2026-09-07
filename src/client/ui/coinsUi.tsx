@@ -1,13 +1,14 @@
 // The local player's lifetime coin total, shown under the level panel
 // (cornerPanels.tsx renders both as one top-right column), plus a
-// brief "+123 coins" whenever it goes up.
+// brief gain toast whenever it goes up.
 //
 // The notification needs no message: this client already has its own
 // PlayerCoins synced, so a frame-to-frame increase *is* the notification.
 // The first observation only seeds the baseline, or a returning player
 // would see their whole restored balance flash as a grant.
 //
-// Spectators see this too — it's a lifetime total, not a session one.
+// A lifetime total, so it survives the session reset that clears the
+// level and the delivery count.
 
 import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
@@ -17,7 +18,14 @@ import { PlayerCoins } from '../../shared/schemas'
 import { formatNumber } from '../numberFormat'
 import { getLocalUserId } from '../playerIdentity'
 import { CornerPanelLayout, PANEL_MARGIN_TOP } from './cornerPanelStyle'
-import { emphasize, getPanelBackground, PANEL_BORDER_RADIUS, TEXT_COLOR, SUCCESS_BACKGROUND, withAlpha } from './uiStyle'
+import {
+  emphasize,
+  getPanelBackground,
+  PANEL_BORDER_RADIUS,
+  SUCCESS_BACKGROUND,
+  TEXT_COLOR,
+  withAlpha
+} from './uiStyle'
 
 const TOAST_SECONDS = 2
 const TOAST_FADE_FRACTION = 0.4 // last 40% of its life fades out
@@ -59,7 +67,7 @@ export function CoinsPanel({ layout }: { layout: CornerPanelLayout }) {
   )
 }
 
-/** The "+123 coins" panel under the counter — nothing rendered when no grant is in flight. */
+/** The gain toast under the counter — nothing rendered when no grant is in flight. */
 function CoinToast({ layout }: { layout: CornerPanelLayout }) {
   const fade = getToastFade()
   if (fade === null) return null
@@ -96,7 +104,6 @@ function getToastFade(): number | null {
   const remainingFraction = remainingSeconds / TOAST_SECONDS
   return Math.min(remainingFraction / TOAST_FADE_FRACTION, 1)
 }
-
 
 /** Starts a toast when the total rises. A newer grant replaces the one showing rather than queueing behind it. */
 function trackCoinChange(coins: number): void {

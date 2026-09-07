@@ -21,20 +21,16 @@ function lockToServer(component: ServerOnlyComponent): void {
   }
 }
 
-// Reserved explicit sync ids for the scene's non-fixture singletons — clear
-// of fixtures.ts's separate 0-based fixture id space so neither can ever
-// collide. Every other component below either derives its id from a
-// fixture, or needs no explicit id at all (matched by a field instead —
-// playerId, orderNumber).
+// Explicit sync ids for the non-fixture singletons, clear of fixture.ts's
+// separate 0-based id space. Everything else derives its id from a fixture
+// or needs none, matching on a field instead.
 export const GAME_STATE_SYNC_ID = 100000
 export const LEADERBOARD_SYNC_ID = 100001
 
 /**
- * One entity per player who has held something this session. `models` is
- * the full stack in hand, bottom to top — empty means empty-handed.
- * Matched by the `playerId` field (a lower-cased wallet address), never by
- * network/sync id — see the authoritative-server skill's per-player
- * synced entity pattern.
+ * One entity per player who has held something this session; `models` is the
+ * stack in hand, bottom to top. Matched by `playerId`, never by network id —
+ * see the authoritative-server skill's per-player synced entity pattern.
  */
 export const HeldItem = engine.defineComponent('game::HeldItem', {
   playerId: Schemas.String,
@@ -44,11 +40,9 @@ export const HeldItem = engine.defineComponent('game::HeldItem', {
 lockToServer(HeldItem)
 
 /**
- * One entity per preparation counter — the stack of models placed on it,
- * bottom to top. `counterId` (client/fixtures/fixtures.ts's getFixtureSyncId) doubles as
- * this entity's explicit syncEntity id: counters are a small fixed set for
- * the scene's whole life, unlike per-player entities, so there's no need
- * for HeldItem's auto-allocate-and-match-by-field pattern.
+ * One entity per preparation counter — the stack placed on it, bottom to top.
+ * `counterId` (fixture.ts's getFixtureSyncId) doubles as the explicit sync id:
+ * counters are a fixed set for the scene's life, so no match-by-field needed.
  */
 export const PreparationCounterState = engine.defineComponent('game::PreparationCounterState', {
   counterId: Schemas.Int,
@@ -58,14 +52,11 @@ export const PreparationCounterState = engine.defineComponent('game::Preparation
 lockToServer(PreparationCounterState)
 
 /**
- * One entity per stove. `rawModel` is '' while idle, otherwise the
- * CookableIngredientDefinition.heldModel key (shared/ingredients.ts) for
- * whatever's cooking — cookedModel/cookDurationSeconds are looked up from
- * that, never sent over the wire. `startTimestamp` (server clock, ms) is
- * when the cook began; every client derives progress/done-ness from
- * `Date.now() - startTimestamp` locally instead of a per-tick synced
- * counter. `stoveId` doubles as this entity's explicit syncEntity id, same
- * reasoning as PreparationCounterState's counterId.
+ * One entity per stove. `rawModel` is '' while idle, else the cookable's
+ * heldModel key (shared/ingredients.ts) — cookedModel and duration are looked
+ * up from it, never sent. `startTimestamp` (server clock) is the cook start;
+ * clients derive progress from it rather than a per-tick synced counter.
+ * `stoveId` doubles as the explicit sync id.
  */
 export const StoveState = engine.defineComponent('game::StoveState', {
   stoveId: Schemas.Int,
@@ -76,14 +67,11 @@ export const StoveState = engine.defineComponent('game::StoveState', {
 lockToServer(StoveState)
 
 /**
- * Singleton — the scene only ever creates one delivery counter (see
- * client/fixtures/layout.ts). `models` is what was last delivered
- * (bottom to top), empty meaning nothing to show. Each client animates the
- * item and the checkmark/crossmark on its own local timer, started when it
- * observes a `deliveryId` change. `success` (see orderQueue.ts) picks the
- * mark. `deliveryId` is bumped by the server on every resolved delivery —
- * needed because two deliveries in a row can have identical `models`/
- * `success`, which content-diffing alone can't tell apart from a stale read.
+ * Singleton — one delivery counter exists (see client/scene/layout.ts).
+ * `models` is what was last delivered, `success` picks the mark, and each
+ * client animates on its own timer when `deliveryId` changes. That counter is
+ * bumped per delivery because two in a row can carry identical models and
+ * success, which content-diffing cannot tell from a stale read.
  */
 export const DeliveryState = engine.defineComponent('game::DeliveryState', {
   models: Schemas.Array(Schemas.String),
@@ -94,17 +82,11 @@ export const DeliveryState = engine.defineComponent('game::DeliveryState', {
 lockToServer(DeliveryState)
 
 /**
- * Singleton. `playerCount` is everyone currently connected to the scene,
- * recomputed each tick so a disconnect is reflected for free.
- * `streak` counts consecutive successful deliveries scene-wide, reset to 0
- * on a miss — see orderQueue.ts. `deliveries` is how many orders the team
- * has served (server/deliveryStats.ts). Both are session-scoped and cleared
- * by server/session.ts; the figures that outlive a session live in
- * PlayerCoins and Leaderboard instead. `serverHeartbeatAt` (server clock,
- * ms) is pulsed periodically so clients can tell the server is actually
- * alive, not just that the CRDT room is connected — see
- * client/serverReadiness.ts and the authoritative-server skill's Server
- * Lifecycle section.
+ * Singleton. `playerCount` and `deliveries` are session-scoped and cleared by
+ * server/session.ts; the figures that outlive a session live in PlayerCoins
+ * and Leaderboard. `streak` resets to 0 on a miss (orderQueue.ts).
+ * `serverHeartbeatAt` is pulsed so clients can tell the server is alive, not
+ * merely that the room is connected — see the skill's Server Lifecycle section.
  */
 // Schemas.Map serializes positionally — no field names, no length prefixes
 // — so field ORDER is the wire format. Only ever append new fields at the
@@ -120,12 +102,10 @@ export const GameState = engine.defineComponent('game::GameState', {
 lockToServer(GameState)
 
 /**
- * One entity per connected player's coin total, matched by `playerId` like
- * HeldItem. Created only once server/playerCoins.ts has loaded
- * the stored total, so the HUD never shows a 0 that then jumps.
- * `lifetimeCoins` is only ever added to — if coins ever become spendable,
- * add a separate `spentCoins` and derive the balance, or the leaderboard's
- * lifetime ranking breaks.
+ * One entity per connected player, matched by `playerId` like HeldItem. Not
+ * created until the stored total loads, so the HUD never shows a 0 that jumps.
+ * `lifetimeCoins` only grows — if coins become spendable, add `spentCoins` and
+ * derive the balance, or the leaderboard's ranking breaks.
  */
 export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
   playerId: Schemas.String,
@@ -135,14 +115,11 @@ export const PlayerCoins = engine.defineComponent('game::PlayerCoins', {
 lockToServer(PlayerCoins)
 
 /**
- * Singleton — the top LEADERBOARD_SIZE players by lifetime coins, sorted
- * descending by the server (see server/leaderboard.ts). Includes offline
- * players, which is why it can't be derived from the PlayerCoins entities
- * above (those exist only for connected players). `name` is captured
- * whenever an entry is written, since coins only change while a player is
- * connected and resolvable. `version` is bumped on every publish so a
- * client can detect a change with one integer compare instead of diffing —
- * same trick as DeliveryState's deliveryId.
+ * Singleton — the top LEADERBOARD_SIZE by lifetime coins, sorted by the server.
+ * Includes offline players, which is why it cannot be derived from PlayerCoins
+ * above. `name` is captured on write, since coins only change while a player is
+ * connected and resolvable. `version` is bumped per publish so a client detects
+ * a change with one integer compare.
  */
 export const Leaderboard = engine.defineComponent('game::Leaderboard', {
   version: Schemas.Int,
@@ -158,19 +135,11 @@ export const Leaderboard = engine.defineComponent('game::Leaderboard', {
 lockToServer(Leaderboard)
 
 /**
- * One entity per currently-active order — created on generation, destroyed
- * on resolution (delivered or expired). No fixed slot count; live count vs.
- * target queue size is the whole model (see orderQueue.ts). Matched by
- * `orderNumber` (a session-wide ticket counter, never reused), same
- * per-entity-field-matching reasoning as HeldItem's playerId.
- * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock, ms)
- * drives the HUD's countdown. Delivery result display is timed off the
- * orderDelivered broadcast.
- *
- * `expiredAt` (server clock, ms; 0 while the order is live) is set when the
- * timer runs out, and the entity is kept for the result display before being
- * destroyed — so the timed-out card comes from state the client is handed,
- * not from a deadline it has to detect before the entity disappears.
+ * One entity per active order, matched by `orderNumber` (never reused).
+ * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock) drives
+ * the HUD countdown. `expiredAt` (0 while live) is stamped when the timer runs
+ * out and the entity kept for the result display, so the timed-out card is
+ * state the client is handed rather than a deadline it must catch.
  */
 export const OrderState = engine.defineComponent('game::OrderState', {
   orderNumber: Schemas.Int,

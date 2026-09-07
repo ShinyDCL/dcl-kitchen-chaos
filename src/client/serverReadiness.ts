@@ -1,18 +1,15 @@
-// Detects whether the auth server is actually alive, not just whether the
-// CRDT room is connected — see the authoritative-server skill's Server
-// Lifecycle section. isStateSyncronized() alone isn't enough: the room's
-// CRDT snapshot can hold state left over from a previous server run, so a
-// fresh client can see "valid" GameState while the real server is still
-// cold-booting (up to ~15s in production) or hasn't started at all.
+// Whether the server is actually alive, not merely whether the CRDT room is
+// connected — see the authoritative-server skill's Server Lifecycle section.
+// isStateSyncronized() is not enough: the room's snapshot can hold state from a
+// previous server run, so a fresh client sees valid-looking GameState while the
+// real server is still cold-booting (~15s in production) or absent.
 //
 // Tracks the CLIENT-observed time the heartbeat last changed, not the
-// heartbeat's own value — a stale snapshot from a long-gone server run
-// then reads as dead (never observed changing).
+// heartbeat's own value, so a stale snapshot reads as dead rather than live.
 //
-// The same two numbers also give the clock offset, which serverNow() needs:
-// every timestamp the server syncs (an order's generatedAt) is on the
-// server's clock, so anything comparing one against Date.now() is wrong by
-// however far this machine's clock has drifted.
+// Those two numbers also give the clock offset serverNow() needs: every synced
+// timestamp is on the server's clock, so comparing one against a raw Date.now()
+// is wrong by however far this machine's clock has drifted.
 
 import { engine } from '@dcl/sdk/ecs'
 import { isStateSyncronized } from '@dcl/sdk/network'

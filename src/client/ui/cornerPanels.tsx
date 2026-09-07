@@ -4,7 +4,7 @@
 // full device-safe area.
 //
 // Hidden until the server is alive, so the panels don't show placeholder
-// zeros next to the "Loading..." prompt.
+// zeros next to the loading panel.
 
 import { engine } from '@dcl/sdk/ecs'
 import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
@@ -16,10 +16,10 @@ import { CornerPanelLayout } from './cornerPanelStyle'
 import { LevelPanel } from './levelUi'
 import { EMPHASIS_FONT_SIZE, MOBILE_TEXT_SCALE } from './uiStyle'
 
-// barThickness matches the order card’s progress bar (orderQueueStyle.ts:
-// barWidth 10 desktop), scaled up on mobile in step with the panel itself
-// — these panels get BIGGER on mobile while the cards get smaller, so
-// reusing the card’s 8px there would read as a hairline.
+// barThickness matches the order card's progress bar (orderQueueStyle.ts:
+// barWidth 10) on desktop. The card's bar stays at 10 on mobile while these
+// panels scale up, so mobile keeps its own thicker value instead of reusing
+// the card's.
 // fontSize matches the order card’s status overlay (uiStyle.ts’s
 // EMPHASIS_FONT_SIZE) so the two read as the same kind of text.
 const DESKTOP_PANEL_LAYOUT: CornerPanelLayout = {
@@ -71,7 +71,7 @@ function CornerPanelsRenderer() {
         alignItems: 'flex-end'
       }}
     >
-      {/* Level goes above coins: the "+N coins" toast hangs off the bottom of
+      {/* Level goes above coins: the coin-gain toast hangs off the bottom of
           the coin panel, so anything below it would shift on every grant. */}
       <LevelPanel layout={layout} />
       <CoinsPanel layout={layout} />

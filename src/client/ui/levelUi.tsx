@@ -1,7 +1,7 @@
 // The kitchen's current difficulty level and how far it is through to the
 // next one, shown above the coin total in the top-right column.
 //
-// Sits ABOVE the coin panel deliberately: the "+N coins" toast hangs off the
+// Sits ABOVE the coin panel deliberately: the coin-gain toast hangs off the
 // bottom of that panel and comes and goes constantly, so anything below it
 // would be shoved up and down on every delivery.
 //
@@ -17,7 +17,14 @@ import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 import { getDifficultyForStreak, getStreakProgress, MAX_DIFFICULTY_TIER } from '../../shared/recipes'
 import { GameState } from '../../shared/schemas'
 import { CornerPanelLayout } from './cornerPanelStyle'
-import { emphasize, getPanelBackground, PANEL_BORDER_RADIUS, TEXT_COLOR, PROGRESS_FILL_COLOR, PROGRESS_TRACK_COLOR } from './uiStyle'
+import {
+  emphasize,
+  getPanelBackground,
+  PANEL_BORDER_RADIUS,
+  TEXT_COLOR,
+  PROGRESS_FILL_COLOR,
+  PROGRESS_TRACK_COLOR
+} from './uiStyle'
 
 const HEIGHT_SCALE = 1.6 // taller than the sibling panels — it stacks a label over a bar
 
