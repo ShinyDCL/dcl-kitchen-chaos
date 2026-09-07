@@ -53,7 +53,8 @@ type CookPhase = 'cooking' | 'done' | 'burnt'
 
 interface RenderedCook {
   rawModel: string // '' means idle — mirrors the synced field this is reconciled against
-  startTimestamp: number
+  startTimestamp: number // what the bar is drawn from; slides toward targetStartTimestamp
+  targetStartTimestamp: number // the server's authoritative start, once it has arrived
   phase: CookPhase // local-only: how far the done/burnt transition has progressed
 }
 
@@ -149,7 +150,7 @@ function stoveCookingSystem(dt: number): void {
   const synced = getSyncedStates()
   for (const stove of registeredStoves) {
     reconcileTransition(stove, synced.get(stove) ?? { rawModel: '', startTimestamp: 0 })
-    tickProgress(stove)
+    tickProgress(stove, dt)
     tickCheckmarkPop(stove, dt)
   }
 }
@@ -176,8 +177,10 @@ function reconcileTransition(stove: Entity, synced: SyncedCook): void {
   const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
 
   if (synced.rawModel === rendered.rawModel) {
-    if (synced.startTimestamp !== rendered.startTimestamp) {
-      renderedCooks.set(stove, { ...rendered, startTimestamp: synced.startTimestamp })
+    if (synced.startTimestamp !== rendered.targetStartTimestamp) {
+      // Recorded as a target only — tickProgress spreads it over the rest of
+      // the cook rather than snapping the bar backwards.
+      renderedCooks.set(stove, { ...rendered, targetStartTimestamp: synced.startTimestamp })
     }
     return
   }
@@ -199,12 +202,14 @@ function computePhase(elapsedSecondsValue: number, definition: CookableIngredien
  * Also recomputes bar visibility every frame (not just on phase
  * transitions), so it restores correctly after an interruption.
  */
-function tickProgress(stove: Entity): void {
-  const rendered = renderedCooks.get(stove) ?? emptyRenderedCook()
-  if (rendered.rawModel === '') return // idle, nothing to advance
+function tickProgress(stove: Entity, dt: number): void {
+  const stored = renderedCooks.get(stove) ?? emptyRenderedCook()
+  if (stored.rawModel === '') return // idle, nothing to advance
 
-  const definition = getCookableItemDefinition(rendered.rawModel)
+  const definition = getCookableItemDefinition(stored.rawModel)
   if (!definition) return // shouldn't happen — unknown rawModel
+
+  const rendered: RenderedCook = { ...stored, startTimestamp: slideTowardTarget(stored, definition, dt) }
 
   const visuals = getOrCreateVisuals(stove)
   const elapsed = elapsedSeconds(rendered.startTimestamp)
@@ -215,7 +220,6 @@ function tickProgress(stove: Entity): void {
     if (elapsed >= definition.cookDurationSeconds) {
       applyDoneVisual(stove, definition)
       phase = 'done'
-      renderedCooks.set(stove, { ...rendered, phase })
     }
   } else if (phase === 'done') {
     const burnProgress = Math.min((elapsed - definition.cookDurationSeconds) / BURN_GRACE_SECONDS, 1)
@@ -223,11 +227,39 @@ function tickProgress(stove: Entity): void {
     if (burnProgress >= 1) {
       applyBurntVisual(stove)
       phase = 'burnt'
-      renderedCooks.set(stove, { ...rendered, phase })
     }
   }
 
+  renderedCooks.set(stove, { ...rendered, phase })
   setBarVisible(visuals, phase !== 'burnt')
+}
+
+/**
+ * Walks the rendered start toward the server's authoritative one, spread
+ * across however much of the cook is left. The client's optimistic guess is
+ * always early — the server stamps the start when the message lands, and
+ * serverNow() itself trails true server time by the heartbeat's own trip —
+ * so adopting it outright rewinds the bar by that much (measured at ~240ms
+ * locally, a twentieth of a five-second cook, which reads as a reset).
+ *
+ * Stepping by drift × dt / remaining holds drift/remaining constant, so the
+ * slide runs at a steady rate and lands exactly at completion. That is what
+ * keeps the phase honest: elapsed grows slightly slower than real time and
+ * reaches cookDurationSeconds precisely when the server says it does, never
+ * before — which matters, since the server ignores a collect sent early.
+ */
+function slideTowardTarget(rendered: RenderedCook, definition: CookableIngredientDefinition, dt: number): number {
+  const drift = rendered.targetStartTimestamp - rendered.startTimestamp
+  if (drift === 0) return rendered.startTimestamp
+
+  const doneAt = rendered.targetStartTimestamp + definition.cookDurationSeconds * 1000
+  const remainingMs = doneAt - serverNow()
+  if (remainingMs <= 0) return rendered.targetStartTimestamp // no cook left to hide it in
+
+  const stepMs = (drift * dt * 1000) / remainingMs
+  if (Math.abs(stepMs) >= Math.abs(drift)) return rendered.targetStartTimestamp
+
+  return rendered.startTimestamp + stepMs
 }
 
 /**
@@ -268,7 +300,12 @@ function applySyncedState(stove: Entity, synced: SyncedCook): void {
   setSmokeActive(visuals, true)
 
   const phase: CookPhase = definition ? computePhase(elapsed, definition) : 'cooking'
-  renderedCooks.set(stove, { rawModel: synced.rawModel, startTimestamp: synced.startTimestamp, phase })
+  renderedCooks.set(stove, {
+    rawModel: synced.rawModel,
+    startTimestamp: synced.startTimestamp,
+    targetStartTimestamp: synced.startTimestamp,
+    phase
+  })
   if (phase === 'done' && definition) applyDoneVisual(stove, definition)
   if (phase === 'burnt') applyBurntVisual(stove)
 }
@@ -288,5 +325,5 @@ function applyBurntVisual(stove: Entity): void {
 }
 
 function emptyRenderedCook(): RenderedCook {
-  return { rawModel: '', startTimestamp: 0, phase: 'cooking' }
+  return { rawModel: '', startTimestamp: 0, targetStartTimestamp: 0, phase: 'cooking' }
 }
