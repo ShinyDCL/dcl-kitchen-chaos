@@ -70,11 +70,12 @@ export function deliverHeldItem(): void {
   tickDeliveryAnimation(0) // apply immediately, same as the system's per-frame call
 }
 
-function getSyncedState(): { models: string[]; success: boolean; deliveryId: number } {
+/** Null until the component exists — a default would be indistinguishable from a real deliveryId of 0. */
+function getSyncedState(): { models: string[]; success: boolean; deliveryId: number } | null {
   for (const [, data] of engine.getEntitiesWith(DeliveryState)) {
     return { models: [...data.models], success: data.success, deliveryId: data.deliveryId }
   }
-  return { models: [], success: true, deliveryId: 0 }
+  return null
 }
 
 // --- Rendering: local timer, reconciled against synced DeliveryState ---
@@ -88,7 +89,7 @@ let renderedItem: RenderedItem | null = null
 let renderedModels: string[] = []
 let renderedSuccess: boolean | null = null // null until the server's verdict is known for the current delivery
 let elapsed = 0 // seconds since this client started animating the current delivery
-let lastSyncedDeliveryId = 0 // matches DeliveryState's initial value, so startup doesn't look like a change
+let lastSyncedDeliveryId: number | null = null // null until a synced value has been seen at all
 let checkmarkEntity: Entity | null = null
 let crossmarkEntity: Entity | null = null
 let systemRegistered = false
@@ -118,27 +119,25 @@ function deliveryRenderSystem(dt: number): void {
 }
 
 /**
- * Only reacts once deliveryId has actually advanced since last observed,
- * not whenever synced state merely differs from what's rendered — a live
- * read is briefly stale right after this client's own optimistic
- * deliverHeldItem, and reacting to that would flicker. deliveryId (not a
- * content diff) is what detects the change, since two deliveries in a row
- * can share identical models/success.
- *
- * Same models as already rendered means this is that guess being
- * confirmed, not a new delivery — just adopt success, don't restart.
+ * Reacts to deliveryId advancing rather than to a content diff: two deliveries
+ * in a row can carry identical models and success, and a live read is briefly
+ * stale right after this client's own optimistic deliverHeldItem.
  */
 function reconcileDelivery(): void {
   const synced = getSyncedState()
-  if (synced.deliveryId === lastSyncedDeliveryId) return
+  if (synced === null || synced.deliveryId === lastSyncedDeliveryId) return
+
+  // The first value seen is only a baseline: deliveryId carries no time, so
+  // replaying whatever the snapshot held would greet every joiner with a
+  // stranger's delivery.
+  const isBaseline = lastSyncedDeliveryId === null
   lastSyncedDeliveryId = synced.deliveryId
 
   if (sameModels(synced.models, renderedModels)) {
-    renderedSuccess = synced.success
-    return
+    renderedSuccess = synced.success // our own delivery, now confirmed — don't restart it
+  } else if (!isBaseline) {
+    startAnimating(synced.models, synced.success)
   }
-
-  startAnimating(synced.models, synced.success)
 }
 
 /** Starts the local animation for a delivery this client hasn't animated yet. */
@@ -155,6 +154,12 @@ function playDeliveryResultSound(success: boolean): void {
   else playRejectSound(rejectSoundEntity)
 }
 
+// Whichever of the two runs longer decides when a delivery is finished with.
+const DELIVERY_ANIMATION_SECONDS = Math.max(
+  DELIVERY_ITEM_SIT_DURATION + DELIVERY_ITEM_SHRINK_DURATION,
+  DELIVERY_RESULT_MARK_SCALE_SECONDS * 2 + DELIVERY_RESULT_MARK_HOLD_SECONDS
+)
+
 function tickDeliveryAnimation(dt: number): void {
   if (renderedModels.length === 0) return
   elapsed += dt
@@ -166,6 +171,12 @@ function tickDeliveryAnimation(dt: number): void {
   }
 
   revealDeliveryResult(elapsed, renderedSuccess)
+
+  // Forget the finished stack, so a later delivery of the same recipe reads as
+  // new rather than as this one being confirmed — and so this stops running
+  // every frame. Held until the verdict lands, since reconcileDelivery matches
+  // on these models to recognise our own delivery.
+  if (renderedSuccess !== null && elapsed >= DELIVERY_ANIMATION_SECONDS) renderedModels = []
 }
 
 function rebuildItemEntities(models: string[]): void {
