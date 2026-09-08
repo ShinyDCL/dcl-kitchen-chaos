@@ -8,6 +8,19 @@ export const FIXTURE_WIDTH = 1.4
 export const FIXTURE_DEPTH = 1.1
 export const FIXTURE_HEIGHT = 1
 
+// --- Server-side bounds on client-supplied values ---
+//
+// Not game rules — the client enforces those. A payload reaches every client's
+// renderer, so an unbounded one breaks the scene rather than cheats it. All sit
+// far above anything real play produces.
+
+// Sync ids are 0-based in build order (fixture.ts) and the layout builds under
+// 30. Unbounded, a client could mint a synced entity per message, or collide
+// with schemas.ts's 100000+ singleton ids.
+export const MAX_FIXTURE_SYNC_ID = 127
+export const MAX_HELD_MODELS = 32 // one item, or a stack off a counter
+export const MAX_COUNTER_MODELS = 64 // the client caps stacks at 10
+
 // Smoke/fire particle textures — used by both stove.ts and assetPreload.ts.
 export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
 export const FIRE_TEXTURE = 'assets/scene/textures/SpriteFire.png'

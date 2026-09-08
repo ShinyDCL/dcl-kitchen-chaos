@@ -16,7 +16,7 @@ import { engine, Entity } from '@dcl/sdk/ecs'
 import { getPlatform } from '@dcl/sdk/platform'
 
 import { BURN_GRACE_SECONDS } from '../../../shared/constants'
-import { CookableIngredientDefinition, getCookableItemDefinition } from '../../../shared/ingredients'
+import { CookableItem, getCookableItemDefinition } from '../../../shared/ingredients'
 import { room } from '../../../shared/messages'
 import { MODELS } from '../../../shared/models'
 import { StoveState } from '../../../shared/schemas'
@@ -76,10 +76,10 @@ export function getStoveStatus(stove: Entity): StoveStatus {
   return rendered.phase === 'cooking' ? 'cooking' : 'done'
 }
 
-export function startCookingOnStove(stove: Entity, definition: CookableIngredientDefinition): void {
+export function startCookingOnStove(stove: Entity, definition: CookableItem): void {
   takeHeldItemPending()
-  void room.send('startCookingOnStove', { stoveId: getFixtureSyncId(stove), rawModel: definition.heldModel })
-  applySyncedState(stove, { rawModel: definition.heldModel, startTimestamp: serverNow() })
+  void room.send('startCookingOnStove', { stoveId: getFixtureSyncId(stove), rawModel: definition.model })
+  applySyncedState(stove, { rawModel: definition.model, startTimestamp: serverNow() })
 }
 
 /** Sends the collect intent to the server. Deliberately renders nothing optimistically — see the module comment. */
@@ -162,9 +162,9 @@ function reconcileTransition(stove: Entity, synced: SyncedCook): void {
 }
 
 /** Which phase a cook is in, purely from elapsed time — the same rule tickProgress steps through incrementally and applySyncedState jumps to directly for a late observer. */
-function computePhase(elapsedSecondsValue: number, definition: CookableIngredientDefinition): CookPhase {
-  if (elapsedSecondsValue < definition.cookDurationSeconds) return 'cooking'
-  if (elapsedSecondsValue < definition.cookDurationSeconds + BURN_GRACE_SECONDS) return 'done'
+function computePhase(elapsedSecondsValue: number, definition: CookableItem): CookPhase {
+  if (elapsedSecondsValue < definition.durationSeconds) return 'cooking'
+  if (elapsedSecondsValue < definition.durationSeconds + BURN_GRACE_SECONDS) return 'done'
   return 'burnt'
 }
 
@@ -187,13 +187,13 @@ function tickProgress(stove: Entity, dt: number): void {
   let phase = rendered.phase
 
   if (phase === 'cooking') {
-    setFill(visuals, Math.min(elapsed / definition.cookDurationSeconds, 1))
-    if (elapsed >= definition.cookDurationSeconds) {
+    setFill(visuals, Math.min(elapsed / definition.durationSeconds, 1))
+    if (elapsed >= definition.durationSeconds) {
       applyDoneVisual(stove, definition)
       phase = 'done'
     }
   } else if (phase === 'done') {
-    const burnProgress = Math.min((elapsed - definition.cookDurationSeconds) / BURN_GRACE_SECONDS, 1)
+    const burnProgress = Math.min((elapsed - definition.durationSeconds) / BURN_GRACE_SECONDS, 1)
     setDrainFill(visuals, burnProgress) // drains back down instead of staying full
     if (burnProgress >= 1) {
       applyBurntVisual(stove)
@@ -213,14 +213,14 @@ function tickProgress(stove: Entity, dt: number): void {
  *
  * Stepping by drift × dt / remaining holds drift/remaining constant, so the
  * slide lands exactly at completion. That keeps elapsed reaching
- * cookDurationSeconds precisely when the server says it does, never before —
+ * durationSeconds precisely when the server says it does, never before —
  * the server ignores a collect sent early.
  */
-function slideTowardTarget(rendered: RenderedCook, definition: CookableIngredientDefinition, dt: number): number {
+function slideTowardTarget(rendered: RenderedCook, definition: CookableItem, dt: number): number {
   const drift = rendered.targetStartTimestamp - rendered.startTimestamp
   if (drift === 0) return rendered.startTimestamp
 
-  const doneAt = rendered.targetStartTimestamp + definition.cookDurationSeconds * 1000
+  const doneAt = rendered.targetStartTimestamp + definition.durationSeconds * 1000
   const remainingMs = doneAt - serverNow()
   if (remainingMs <= 0) return rendered.targetStartTimestamp // no cook left to hide it in
 
@@ -260,7 +260,7 @@ function applySyncedState(stove: Entity, synced: SyncedCook): void {
   // at 0 and correcting next tick — otherwise a late observer sees a
   // 0% flash before jumping to the real value.
   const elapsed = elapsedSeconds(synced.startTimestamp)
-  resetProgressBar(visuals, definition ? Math.min(elapsed / definition.cookDurationSeconds, 1) : 0)
+  resetProgressBar(visuals, definition ? Math.min(elapsed / definition.durationSeconds, 1) : 0)
   setSmokeActive(visuals, true)
 
   const phase: CookPhase = definition ? computePhase(elapsed, definition) : 'cooking'
@@ -275,7 +275,7 @@ function applySyncedState(stove: Entity, synced: SyncedCook): void {
 }
 
 /** Bar visibility is owned by tickProgress, checkmark's by tickCheckmarkPop — both called right after this. */
-function applyDoneVisual(stove: Entity, definition: CookableIngredientDefinition): void {
+function applyDoneVisual(stove: Entity, definition: CookableItem): void {
   const visuals = getOrCreateVisuals(stove)
   swapStoveItemModel(visuals, definition.cookedModel)
   setSmokeActive(visuals, false)

@@ -6,6 +6,8 @@
 //
 // Per-player entity management is syncedStore.ts's shared pattern.
 
+import { MAX_HELD_MODELS } from '../../shared/constants'
+import { isHoldableModel } from '../../shared/ingredients'
 import { HeldItem } from '../../shared/schemas'
 import { onSessionEnd, onSessionStart } from '../session'
 import { onPlayerAction } from './activity'
@@ -36,8 +38,14 @@ export function initHeldItems(): void {
   onSessionEnd(() => store.clear())
 
   onPlayerAction('setHeldItem', (data, playerId) => {
+    if (!isPlausibleHand(data.models)) return // hand-crafted payload
     grantHeldItem(playerId, data.models)
   })
+}
+
+/** Bounds, not anti-cheat: every model here becomes an entity on every client, so a made-up or oversized array breaks them rather than cheats. */
+function isPlausibleHand(models: string[]): boolean {
+  return models.length <= MAX_HELD_MODELS && models.every(isHoldableModel)
 }
 
 /** Sets a player's held item directly — used by other server modules that hand out an item as the result of a validated action (e.g. stove.ts's collectFromStove). */

@@ -8,6 +8,7 @@
 import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { Label, UiEntity } from '@dcl/sdk/react-ecs'
 
+import { Ingredient } from '../../shared/ingredients'
 import { getIngredientAtlasUvs, Recipe } from '../../shared/recipes'
 import { serverNow } from '../serverReadiness'
 import {
@@ -146,7 +147,7 @@ function SuccessMessage({ deliveredByName, layout }: { deliveredByName: string; 
 }
 
 /** Stacks ingredients bottom-up, each overlapping the one below and later ones on top. Height is fixed to the longest recipe, so a shorter stack leaves space above. */
-function IngredientStack({ ingredients, layout }: { ingredients: string[]; layout: OrderCardLayout }) {
+function IngredientStack({ ingredients, layout }: { ingredients: Ingredient[]; layout: OrderCardLayout }) {
   const iconStep = layout.iconHeight - layout.iconOverlap
 
   return (

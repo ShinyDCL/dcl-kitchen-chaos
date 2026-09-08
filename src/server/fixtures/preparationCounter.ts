@@ -23,6 +23,7 @@
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
+import { MAX_COUNTER_MODELS, MAX_FIXTURE_SYNC_ID } from '../../shared/constants'
 import { PreparationCounterState } from '../../shared/schemas'
 import { isAdoptableEntity } from '../entityAdoption'
 import { onPlayerAction } from '../players/activity'
@@ -54,12 +55,16 @@ export function initPreparationCounters(): void {
     const heldModels = getHeldItemModels(playerId)
     const state = getMutableState(data.counterId)
     if (!state) return
+    // Refused whole rather than trimmed, so no caller ever loses part of a stack.
+    if (state.ingredientModels.length + heldModels.length > MAX_COUNTER_MODELS) return
     state.ingredientModels = [...state.ingredientModels, ...heldModels]
     grantHeldItem(playerId, [])
   })
 }
 
+/** Null for an id no fixture could own — entities are created on first mention, so an unchecked id mints one per message. */
 function getMutableState(counterId: number) {
+  if (counterId < 0 || counterId > MAX_FIXTURE_SYNC_ID) return null
   return PreparationCounterState.getMutableOrNull(getOrCreateCounterEntity(counterId))
 }
 

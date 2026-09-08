@@ -19,14 +19,14 @@
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
-import { BURN_GRACE_SECONDS } from '../../shared/constants'
+import { BURN_GRACE_SECONDS, MAX_FIXTURE_SYNC_ID } from '../../shared/constants'
 import { getCookableItemDefinition } from '../../shared/ingredients'
 import { room } from '../../shared/messages'
 import { MODELS } from '../../shared/models'
 import { StoveState } from '../../shared/schemas'
 import { isAdoptableEntity } from '../entityAdoption'
 import { onPlayerAction } from '../players/activity'
-import { grantHeldItem } from '../players/heldItems'
+import { getHeldItemModels, grantHeldItem } from '../players/heldItems'
 import { onSessionStart } from '../session'
 
 const stoveEntities = new Map<number, Entity>()
@@ -52,10 +52,17 @@ export function initStoves(): void {
       return
     }
 
+    // Must actually hold it, or a message alone occupies the stove and mints the result.
+    const heldModels = getHeldItemModels(playerId)
+    if (heldModels.length !== 1 || heldModels[0] !== data.rawModel) {
+      void room.send('actionRejected', {}, { to: [address] })
+      return
+    }
+
     const entity = getOrCreateStoveEntity(data.stoveId)
-    const state = StoveState.getMutableOrNull(entity)
+    const state = entity === null ? null : StoveState.getMutableOrNull(entity)
     if (!state || state.rawModel !== '') {
-      void room.send('actionRejected', {}, { to: [address] }) // already cooking or done
+      void room.send('actionRejected', {}, { to: [address] }) // unknown stove, or already cooking
       return
     }
 
@@ -75,15 +82,18 @@ export function initStoves(): void {
     if (!definition) return // shouldn't happen — unknown rawModel
 
     const elapsedSeconds = (Date.now() - Number(state.startTimestamp)) / 1000
-    if (elapsedSeconds < definition.cookDurationSeconds) return // not done yet — ignore
+    if (elapsedSeconds < definition.durationSeconds) return // not done yet — ignore
 
-    const isBurnt = elapsedSeconds >= definition.cookDurationSeconds + BURN_GRACE_SECONDS
+    const isBurnt = elapsedSeconds >= definition.durationSeconds + BURN_GRACE_SECONDS
     state.rawModel = '' // reset first so a second, already-queued collect sees idle and no-ops
     grantHeldItem(playerId, [isBurnt ? MODELS.burntCookable : definition.cookedModel])
   })
 }
 
-function getOrCreateStoveEntity(stoveId: number): Entity {
+/** Null for an id no stove could own — entities are created on first mention, so an unchecked id mints one per message. */
+function getOrCreateStoveEntity(stoveId: number): Entity | null {
+  if (stoveId < 0 || stoveId > MAX_FIXTURE_SYNC_ID) return null
+
   const cached = stoveEntities.get(stoveId)
   if (cached !== undefined && StoveState.getOrNull(cached) !== null) return cached
 

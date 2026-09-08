@@ -26,7 +26,7 @@ export const Messages = {
 
   // Start cooking a raw cookable at this stove. rawModel identifies which
   // CookableIngredientDefinition (shared/ingredients.ts) — the server looks
-  // up cookedModel/cookDurationSeconds itself rather than trusting a
+  // up cookedModel/durationSeconds itself rather than trusting a
   // client-supplied value, since collecting hands out the result.
   startCookingOnStove: Schemas.Map({ stoveId: Schemas.Int, rawModel: Schemas.String }),
 

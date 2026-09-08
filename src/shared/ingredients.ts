@@ -1,90 +1,105 @@
-// Single registry of every pickup-able ingredient. Non-cookable ones just
-// have a model; cookable ones have three models — the one held before
-// cooking (heldModel, also used as the lookup key), the one shown on the
-// stove while cooking (stoveModel — may differ from heldModel, e.g. egg's
-// held model is "egg" but its stove model is "eggRaw"), and the one
-// swapped in once done (cookedModel) — plus a cook time.
+// Single registry of every pickup-able ingredient. `model` is what a player
+// carries and what sits on a counter; a cookable adds a `cooking` block for
+// what the stove shows and what comes off it.
 //
-// classifyItem() and getCookableItemDefinition() are both derived from
-// this one object, so there's one place to add or edit an ingredient.
+// Models are reused across states wherever that looks right — egg's cooked
+// form is its raw model on purpose. `stoveModel` defaults to `model`, so only
+// an ingredient that actually changes on the pan names one.
 //
-// MODELS.burntCookable classifies as 'cookedCookable' too, even though
-// it's not any ingredient's own cookedModel — server/fixtures/stove.ts
-// grants it instead of the real cookedModel once a finished cook sits too
-// long (see BURN_GRACE_SECONDS).
-//
-// Bacon isn't listed here yet — no models exist for it, and it currently
-// has no counter slot at all (see layout.ts). classifyItem/
-// getRequiredModelForIngredient just won't resolve it until it's added.
+// Everything below derives from this object. MODEL_INDEX inverts it, so the
+// model-keyed questions — what is this, can it be held, what does it cook into
+// — are one lookup rather than three separate sets.
 
-import { MODELS, ModelPath } from './models'
+import { MODELS, Model } from './models'
 
-export interface CookableIngredientDefinition {
-  cookable: true
-  heldModel: ModelPath // model held before cooking; used as the lookup key
-  stoveModel: ModelPath // model placed on the stove while cooking
-  cookedModel: ModelPath // model swapped in once cooking finishes
-  cookDurationSeconds: number
+/** Authored form; `stoveModel` is filled in from `model` when omitted. */
+interface IngredientSpec {
+  model: Model
+  cooking?: {
+    stoveModel?: Model
+    cookedModel: Model
+    durationSeconds: number
+  }
 }
 
-interface NonCookableIngredientDefinition {
-  cookable: false
-  model: ModelPath
-}
-
-type IngredientDefinition = CookableIngredientDefinition | NonCookableIngredientDefinition
-
-export const INGREDIENTS: Record<string, IngredientDefinition> = {
-  plate: { cookable: false, model: MODELS.plate },
-  tomato: { cookable: false, model: MODELS.tomatoSlice },
-  cucumber: { cookable: false, model: MODELS.cucumberSlice },
-  onion: { cookable: false, model: MODELS.onionSlice },
-  salad: { cookable: false, model: MODELS.saladLeaf },
-  cheese: { cookable: false, model: MODELS.cheeseSlice },
-  bunTop: { cookable: false, model: MODELS.bunTop },
-  bunBottom: { cookable: false, model: MODELS.bunBottom },
+export const INGREDIENTS = {
+  plate: { model: MODELS.plate },
+  tomato: { model: MODELS.tomatoSlice },
+  cucumber: { model: MODELS.cucumberSlice },
+  onion: { model: MODELS.onionSlice },
+  salad: { model: MODELS.saladLeaf },
+  cheese: { model: MODELS.cheeseSlice },
+  bunTop: { model: MODELS.bunTop },
+  bunBottom: { model: MODELS.bunBottom },
   patty: {
-    cookable: true,
-    heldModel: MODELS.pattyRaw,
-    stoveModel: MODELS.pattyRaw,
-    cookedModel: MODELS.pattyCooked,
-    cookDurationSeconds: 5
+    model: MODELS.pattyRaw,
+    cooking: { cookedModel: MODELS.pattyCooked, durationSeconds: 5 }
   },
   egg: {
-    cookable: true,
-    heldModel: MODELS.egg,
-    stoveModel: MODELS.eggRaw,
-    cookedModel: MODELS.eggRaw, // no dedicated cooked-egg model; reuses eggRaw's
-    cookDurationSeconds: 5
+    model: MODELS.egg,
+    cooking: { stoveModel: MODELS.eggRaw, cookedModel: MODELS.eggRaw, durationSeconds: 5 }
   }
+} satisfies Record<string, IngredientSpec>
+
+/** Every ingredient name, so a table keyed per ingredient fails to compile when one is missing. */
+export type Ingredient = keyof typeof INGREDIENTS
+
+/** A cookable with `stoveModel` resolved and its raw model carried along. */
+export interface CookableItem {
+  model: Model
+  stoveModel: Model
+  cookedModel: Model
+  durationSeconds: number
 }
 
-const HELD_MODEL_TO_DEFINITION = new Map<string, CookableIngredientDefinition>()
-const COOKED_MODELS = new Set<string>()
+interface ModelInfo {
+  cooked: boolean // this is a finished model, not something raw
+  cookable?: CookableItem // set on a cookable's raw model
+}
 
-for (const definition of Object.values(INGREDIENTS)) {
-  if (definition.cookable) {
-    HELD_MODEL_TO_DEFINITION.set(definition.heldModel, definition)
-    COOKED_MODELS.add(definition.cookedModel)
+const MODEL_INDEX = new Map<string, ModelInfo>()
+
+for (const spec of Object.values(INGREDIENTS) as IngredientSpec[]) {
+  if (!spec.cooking) {
+    MODEL_INDEX.set(spec.model, { cooked: false })
+    continue
   }
-}
-COOKED_MODELS.add(MODELS.burntCookable) // one universal burnt model, not tied to whatever was actually cooking
 
-export function getCookableItemDefinition(heldModel: string): CookableIngredientDefinition | undefined {
-  return HELD_MODEL_TO_DEFINITION.get(heldModel)
+  const cookable: CookableItem = {
+    model: spec.model,
+    stoveModel: spec.cooking.stoveModel ?? spec.model,
+    cookedModel: spec.cooking.cookedModel,
+    durationSeconds: spec.cooking.durationSeconds
+  }
+  MODEL_INDEX.set(spec.model, { cooked: false, cookable })
+  MODEL_INDEX.set(cookable.cookedModel, { cooked: true })
 }
 
-/** The model an ingredient key (shared/recipes.ts) must resolve to — the cooked model for a cookable, otherwise its one model. */
-export function getRequiredModelForIngredient(key: string): ModelPath | undefined {
-  const definition = INGREDIENTS[key]
-  if (!definition) return undefined
-  return definition.cookable ? definition.cookedModel : definition.model
+// Granted by server/fixtures/stove.ts when a finished cook sits too long, so it
+// is a cooked model that belongs to no single ingredient.
+MODEL_INDEX.set(MODELS.burntCookable, { cooked: true })
+
+/** The cookable this model is the raw form of, or undefined if it isn't one. */
+export function getCookableItemDefinition(model: string): CookableItem | undefined {
+  return MODEL_INDEX.get(model)?.cookable
+}
+
+/** The model an ingredient must appear as in a delivered stack — the cooked form for a cookable. */
+export function getRequiredModelForIngredient(ingredient: Ingredient): Model {
+  const spec: IngredientSpec = INGREDIENTS[ingredient]
+  return spec.cooking?.cookedModel ?? spec.model
 }
 
 type ItemCategory = 'nonCookable' | 'rawCookable' | 'cookedCookable'
 
 export function classifyItem(model: string): ItemCategory {
-  if (HELD_MODEL_TO_DEFINITION.has(model)) return 'rawCookable'
-  if (COOKED_MODELS.has(model)) return 'cookedCookable'
-  return 'nonCookable'
+  const info = MODEL_INDEX.get(model)
+  if (!info) return 'nonCookable'
+  if (info.cooked) return 'cookedCookable'
+  return info.cookable ? 'rawCookable' : 'nonCookable'
+}
+
+/** Whether a model is one a player can legitimately be holding — the server's guard against hand-crafted setHeldItem payloads. */
+export function isHoldableModel(model: string): boolean {
+  return MODEL_INDEX.has(model)
 }

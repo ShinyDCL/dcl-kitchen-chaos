@@ -5,7 +5,7 @@
 
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { MODELS } from '../../shared/models'
+import { MODELS, Model } from '../../shared/models'
 
 // --- Stacking height ---
 //
@@ -16,7 +16,7 @@ import { MODELS } from '../../shared/models'
 
 const DEFAULT_ITEM_HEIGHT = 0.1
 
-const ITEM_HEIGHTS: Record<string, number> = {
+const ITEM_HEIGHTS: Partial<Record<Model, number>> = {
   [MODELS.cucumberSlice]: 0.06,
   [MODELS.onionSlice]: 0.07,
   [MODELS.tomatoSlice]: 0.07,
@@ -27,12 +27,13 @@ const ITEM_HEIGHTS: Record<string, number> = {
   [MODELS.pattyRaw]: 0.07,
   [MODELS.pattyCooked]: 0.07,
   [MODELS.eggRaw]: 0.07,
-  [MODELS.plate]: 0.06
+  [MODELS.plate]: 0.06,
+  [MODELS.burntCookable]: 0.07
 }
 
 /** Falls back to DEFAULT_ITEM_HEIGHT for any model not listed above (e.g. a new item added to models.ts but not measured yet). */
 export function getItemHeight(model: string): number {
-  return ITEM_HEIGHTS[model] ?? DEFAULT_ITEM_HEIGHT
+  return ITEM_HEIGHTS[model as Model] ?? DEFAULT_ITEM_HEIGHT
 }
 
 // --- Hand attachment ---
@@ -63,7 +64,7 @@ function handTransform(
 
 const DEFAULT_HAND_TRANSFORM: HandTransform = handTransform(Vector3.create(0, 0, 0))
 
-const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
+const ITEM_HAND_TRANSFORMS: Partial<Record<Model, HandTransform>> = {
   [MODELS.cucumberSlice]: handTransform(Vector3.create(0.05, 0.32, 0), Quaternion.fromEulerDegrees(40, 0, 90)),
   [MODELS.onionSlice]: handTransform(Vector3.create(0.06, 0.25, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
   [MODELS.tomatoSlice]: handTransform(Vector3.create(0.03, 0.33, 0), Quaternion.fromEulerDegrees(60, 0, 90)),
@@ -85,5 +86,5 @@ const ITEM_HAND_TRANSFORMS: Record<string, HandTransform> = {
 
 /** Falls back to DEFAULT_HAND_TRANSFORM for any model not listed above (e.g. a new item added to models.ts but not tuned yet). */
 export function getHandTransform(model: string): HandTransform {
-  return ITEM_HAND_TRANSFORMS[model] ?? DEFAULT_HAND_TRANSFORM
+  return ITEM_HAND_TRANSFORMS[model as Model] ?? DEFAULT_HAND_TRANSFORM
 }

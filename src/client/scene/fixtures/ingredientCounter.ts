@@ -7,13 +7,13 @@ import { Entity } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
 import { FIXTURE_HEIGHT } from '../../../shared/constants'
-import { MODELS, ModelPath } from '../../../shared/models'
+import { MODELS, Model } from '../../../shared/models'
 import { evaluateIngredientCounterInteraction } from '../../interaction/interactionRules'
 import { createFixture } from './fixture'
 
 export interface IngredientDefinition {
-  displayModel: ModelPath
-  itemModel: ModelPath
+  displayModel: Model
+  itemModel: Model
 }
 
 export const RIGHT_SIDE_INGREDIENTS: IngredientDefinition[] = [

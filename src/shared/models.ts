@@ -37,8 +37,8 @@ export const MODELS = {
   deliveryCounter: 'assets/scene/models/DeliveryCounter.glb'
 } as const
 
-/** A known model path — for fields/params authored directly from MODELS, so a typo'd literal fails to compile instead of misclassifying at runtime. Held/synced item data stays plain `string`, since that crosses the network. */
-export type ModelPath = (typeof MODELS)[keyof typeof MODELS]
+/** One of the models above. For fields authored from the registry, so a typo'd literal fails to compile instead of misclassifying at runtime. Held and synced item data stays plain `string`, since that crosses the network. */
+export type Model = (typeof MODELS)[keyof typeof MODELS]
 
 /** Order-sensitive equality for a stack of model paths — used wherever a held/placed/delivered item stack needs to be compared against another (client and server). */
 export function sameModels(a: readonly string[], b: readonly string[]): boolean {

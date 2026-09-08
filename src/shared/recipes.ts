@@ -1,5 +1,8 @@
 // Recipe definitions for the order queue, picked by difficulty tier.
-// Ingredient keys match shared/ingredients.ts's INGREDIENTS.
+// Ingredient keys are typed against shared/ingredients.ts, so a typo or a
+// missing atlas cell is a compile error rather than a blank card.
+
+import { Ingredient } from './ingredients'
 
 // Difficulty tier = 1 + floor(streak / STREAK_DIFFICULTY_STEP), capped at
 // MAX_DIFFICULTY_TIER. At +2 a delivery, top tier lands after 14 clean ones,
@@ -16,7 +19,7 @@ export const MAX_STREAK = MAX_DIFFICULTY_TIER * STREAK_DIFFICULTY_STEP
 
 export interface Recipe {
   id: string
-  ingredients: string[] // bottom-to-top assembly order; keys into shared/ingredients.ts's INGREDIENTS
+  ingredients: Ingredient[] // bottom-to-top assembly order
   timerSeconds: number // shown as a countdown in the HUD; not currently a hard expiry
   difficulty: number // 1..MAX_DIFFICULTY_TIER — which streak tier this can be picked for
   coins: number // the whole payout for delivering it — see the scale below
@@ -354,7 +357,7 @@ const ATLAS_COLUMNS = 2
 const ATLAS_ROWS = 8
 
 // [column, row-from-top], per IngredientAtlas.png's actual layout.
-const INGREDIENT_ATLAS_POSITION: Record<string, [number, number]> = {
+const INGREDIENT_ATLAS_POSITION: Record<Ingredient, [number, number]> = {
   cheese: [0, 0],
   salad: [0, 1],
   onion: [0, 2],
@@ -368,11 +371,8 @@ const INGREDIENT_ATLAS_POSITION: Record<string, [number, number]> = {
 }
 
 /** UV coordinates (bottom-left, top-left, top-right, bottom-right) for an ingredient's cell in IngredientAtlas.png. */
-export function getIngredientAtlasUvs(ingredient: string): number[] {
-  const position = INGREDIENT_ATLAS_POSITION[ingredient]
-  if (!position) return [0, 0, 0, 0, 0, 0, 0, 0] // unknown ingredient — shouldn't happen with SAMPLE_RECIPES
-
-  const [col, row] = position
+export function getIngredientAtlasUvs(ingredient: Ingredient): number[] {
+  const [col, row] = INGREDIENT_ATLAS_POSITION[ingredient]
   const stepU = 1 / ATLAS_COLUMNS
   const stepV = 1 / ATLAS_ROWS
   const left = col * stepU
