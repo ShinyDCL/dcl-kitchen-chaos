@@ -1,7 +1,8 @@
 // Bumps BUILD_LABEL in src/client/buildInfo.ts, run from package.json's
-// predeploy hook. The label is shown in-scene (bottom-right corner and the
-// loading diagnostic) so a deploy can be confirmed live — deploys can lag by
-// minutes, and a stale one is otherwise indistinguishable from a fresh one.
+// predeploy hook, so a deploy can be identified — deploys can lag by minutes,
+// and a stale one is otherwise indistinguishable from a fresh one. Whether the
+// label is actually drawn is client/ui/buildLabel.tsx's SHOW_BUILD_LABEL,
+// currently off.
 //
 // <short commit>-<n>: n counts builds of that commit, so uncommitted work
 // still produces a distinct label each deploy. A new commit resets n to 1.

@@ -80,12 +80,12 @@ an action isn't allowed if you try it anyway.
 | Fixture                 | Count | What it does                                                             |
 | ----------------------- | ----- | ------------------------------------------------------------------------ |
 | **Ingredient counter**  | 10    | Take an endless supply of one ingredient.                                |
-| **Preparation counter** | 12    | Stack ingredients bottom to top; pick the whole stack back up.           |
+| **Preparation counter** | 14    | Stack ingredients bottom to top; pick the whole stack back up.           |
 | **Stove**               | 3     | Cook a raw ingredient. Shows a progress bar, then a checkmark when done. |
 | **Delivery counter**    | 1     | Hand in a finished stack. Checkmark for a match, cross for a miss.       |
 | **Discard counter**     | 1     | Bin whatever you're holding.                                             |
 
-Preparation counters line both side walls, alternate with the stoves along the front row, and form a 2×2 island in the
+Preparation counters line both side walls, alternate with the stoves along the front row, and form a 2×3 island in the
 middle of the room. The delivery and discard counters sit on the back wall by the entrance.
 
 Picking up from a preparation counter takes the **whole stack**, not just the top item.
@@ -115,15 +115,16 @@ A cookable ingredient takes **5 seconds** on a stove. After it finishes you have
 it — past that it comes off burnt, and a burnt item matches no recipe. The stove shows a progress bar while cooking and
 a checkmark once it's ready.
 
-The stove is the one place the server doesn't trust an optimistic client render: it re-derives the outcome itself, so
-two players racing a finished stove can't both walk away with the item.
+Collecting from a stove is the one action a client never renders optimistically. It hands out a scarce item, so it waits
+for the server to say who won the race rather than guessing — two players racing the same finished stove can't both walk
+away with it.
 
 ---
 
 ## Recipes
 
 45 recipes across the 5 difficulty tiers, 9 per tier. Tier 1 is three or four ingredients with at most one cooked item;
-tier 5 runs to seven ingredients with repeats. Timers scale with length, from 24 to 105 seconds.
+tier 5 runs to eight ingredients with repeats. Timers scale with length, from 24 to 105 seconds.
 
 Coin payouts follow a fixed scale, from 9 to 50:
 
@@ -150,9 +151,10 @@ explicit branch rather than one layout that happens to fit twice.
   visuals and the camera all wait for the answer.
 
 - **Interaction is proximity-based, and it shows you so.** Walking up to a counter focuses it — the nearest one in range
-  wins, so nothing ever has to be aimed at. A highlight on top of the focused fixture turns green when the action is
-  allowed and grey when it is not. On a touchscreen this matters more than on desktop: the player only ever has to walk,
-  never to aim.
+  wins, and which way you are facing only breaks ties between two that are almost equally close, enough to settle a
+  corner without ever needing to aim. A highlight on top of the focused fixture turns green when the action is allowed
+  and grey when it is not. On a touchscreen this matters more than on desktop: the player walks up to things instead of
+  aiming at them.
 
 - **Mobile locks the camera inside the kitchen.** On a phone, looking around means dragging with the thumb that is
   already steering. Mobile instead gets a fixed, slightly overhead camera that follows the player without rotating;
@@ -191,11 +193,11 @@ That opens the scene in the local preview with the authoritative server running 
 Session boundaries, the queue growing with the player count, and a delivery paying everyone who helped all need more
 than one client. The preview can supply them three ways:
 
-- `npm start -- --bevy-web` opens the preview in the Bevy web client rather than the desktop Explorer. Each browser
-  tab is its own player, so two or three chefs cost two or three tabs. On Chromium 142+ the page asks for Local Network
+- `npm start -- --bevy-web` opens the preview in the Bevy web client rather than the desktop Explorer. Each browser tab
+  is its own player, so two or three chefs cost two or three tabs. On Chromium 142+ the page asks for Local Network
   Access the first time — allow it, or it cannot reach the preview server.
-- `npm start -- --mobile` serves a QR code for a phone on the same network. The only way to check the mobile HUD,
-  the locked camera and the single action button against a real device.
+- `npm start -- --mobile` serves a QR code for a phone on the same network. The only way to check the mobile HUD, the
+  locked camera and the single action button against a real device.
 - `npm start -- --multi-instance` permits more than one desktop Explorer at a time.
 
 Deploying to the World is still worth doing before judging anything by feel — real network latency only shows up there,
@@ -213,8 +215,10 @@ npm run deploy -- --target-content https://worlds-content-server.decentraland.or
 
 Plain `npm run deploy` goes to the default Catalyst, which is Genesis City LAND — not the World named in `scene.json`.
 
-`predeploy` stamps a build label into the HUD first, so you can confirm at a glance which build is actually live —
-deploys can lag by several minutes, and a stale one is otherwise indistinguishable from a new one.
+`predeploy` stamps a build label into `src/client/buildInfo.ts` first, so a deploy can be identified — deploys can lag
+by several minutes, and a stale one is otherwise indistinguishable from a new one. The in-HUD readout of that label is
+switched off by default (`SHOW_BUILD_LABEL` in `src/client/ui/buildLabel.tsx`, where it overlapped the mobile action
+button); turn it on when a live build needs confirming.
 
 > [!IMPORTANT] **`worldConfiguration.name` must be lowercase**, even if the minted NAME is mixed case
 > (`kitchenchaos.dcl.eth`, not `KitchenChaos.dcl.eth`). The client resolves comms to the lowercase URL while the server
@@ -289,8 +293,8 @@ Ingredients and recipes each live in a single registry, so there's one place to 
 
 **A new ingredient** — add an entry to `INGREDIENTS` in `src/shared/ingredients.ts`. Non-cookable entries need one
 model; cookable ones need the held, stove and cooked models plus a cook duration. `classifyItem` and
-`getCookableItemDefinition` derive from that object, so nothing else needs updating. Give it a counter slot in
-`src/client/scene/layout.ts`.
+`getCookableItemDefinition` derive from that object, so nothing else needs updating. Give it a counter slot by adding it
+to `LEFT_SIDE_INGREDIENTS` or `RIGHT_SIDE_INGREDIENTS` in `src/client/scene/fixtures/ingredientCounter.ts`.
 
 **A new recipe** — add an entry to `SAMPLE_RECIPES` in `src/shared/recipes.ts`. Ingredient keys match `INGREDIENTS`,
 listed bottom-to-top in assembly order. Set `difficulty` to the tier it should unlock at and price it on the coin
@@ -320,11 +324,15 @@ use in Decentraland scenes:
 | `reject.mp3`     | Game Over (`gameover.mp3`)                |
 | `pickup.mp3`     | Padlock (`resolve.mp3`)                   |
 
+**Particle textures** — the stove smoke was generated with ChatGPT. The fire uses
+[`sprite_fire3.png`](https://github.com/decentraland/sdk7-test-scenes/blob/main/scenes/0%2C7-particle-system/assets/dcl-particles/sprite_fire3.png)
+from Decentraland's sdk7-test-scenes repository, saved here as `SpriteFire.png`.
+
 ---
 
 ## Licence
 
 [MIT](LICENSE) — do what you like with the code and the 3D models, keep the copyright notice.
 
-The audio is the one exception. Those files come from Decentraland's own asset packs and are licensed for use in
-Decentraland scenes, not relicensed by this repository.
+The audio and the fire particle texture are the exception. Those files come from Decentraland's own asset packs and
+repositories, licensed for use in Decentraland scenes rather than relicensed by this repository.
