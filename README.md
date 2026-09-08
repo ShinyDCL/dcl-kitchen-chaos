@@ -123,7 +123,7 @@ away with it.
 
 ## Recipes
 
-45 recipes across the 5 difficulty tiers, 9 per tier. Tier 1 is three or four ingredients with at most one cooked item;
+90 recipes across the 5 difficulty tiers, 18 per tier. Tier 1 is three or four ingredients with at most one cooked item;
 tier 5 runs to eight ingredients with repeats. Timers scale with length, from 24 to 105 seconds.
 
 Coin payouts follow a fixed scale, from 9 to 50:
@@ -296,9 +296,10 @@ model; cookable ones need the held, stove and cooked models plus a cook duration
 `getCookableItemDefinition` derive from that object, so nothing else needs updating. Give it a counter slot by adding it
 to `LEFT_SIDE_INGREDIENTS` or `RIGHT_SIDE_INGREDIENTS` in `src/client/scene/fixtures/ingredientCounter.ts`.
 
-**A new recipe** — add an entry to `SAMPLE_RECIPES` in `src/shared/recipes.ts`. Ingredient keys match `INGREDIENTS`,
-listed bottom-to-top in assembly order. Set `difficulty` to the tier it should unlock at and price it on the coin
-formula above so the tiers stay consistent.
+**A new recipe** — add an entry to `SAMPLE_RECIPES` in `src/shared/recipes.ts`. Ingredient keys are typed against
+`INGREDIENTS`, so a typo won't compile; list them bottom-to-top in assembly order, since a delivered stack has to match
+that order exactly. Set `difficulty` to the tier it should unlock at and price it on the coin formula above so the tiers
+stay consistent.
 
 ---
 

@@ -66,6 +66,52 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
   { id: 'sideSalad', ingredients: ['plate', 'cucumber', 'onion'], timerSeconds: 24, difficulty: 1, coins: 9 },
   { id: 'choppedSalad', ingredients: ['plate', 'tomato', 'onion'], timerSeconds: 24, difficulty: 1, coins: 9 },
 
+  { id: 'tomatoBun', ingredients: ['bunBottom', 'tomato', 'bunTop'], timerSeconds: 30, difficulty: 1, coins: 9 },
+  { id: 'onionBun', ingredients: ['bunBottom', 'onion', 'bunTop'], timerSeconds: 30, difficulty: 1, coins: 9 },
+  {
+    id: 'onionBurger',
+    ingredients: ['bunBottom', 'patty', 'onion', 'bunTop'],
+    timerSeconds: 40,
+    difficulty: 1,
+    coins: 19
+  },
+  {
+    id: 'pickleBurger',
+    ingredients: ['bunBottom', 'patty', 'cucumber', 'bunTop'],
+    timerSeconds: 40,
+    difficulty: 1,
+    coins: 19
+  },
+  {
+    id: 'leafBurger',
+    ingredients: ['bunBottom', 'patty', 'salad', 'bunTop'],
+    timerSeconds: 38,
+    difficulty: 1,
+    coins: 19
+  },
+  {
+    id: 'sunriseBun',
+    ingredients: ['bunBottom', 'egg', 'tomato', 'bunTop'],
+    timerSeconds: 38,
+    difficulty: 1,
+    coins: 19
+  },
+  {
+    id: 'onionMelt',
+    ingredients: ['bunBottom', 'cheese', 'onion', 'bunTop'],
+    timerSeconds: 32,
+    difficulty: 1,
+    coins: 12
+  },
+  {
+    id: 'crunchMelt',
+    ingredients: ['bunBottom', 'cheese', 'cucumber', 'bunTop'],
+    timerSeconds: 32,
+    difficulty: 1,
+    coins: 12
+  },
+  { id: 'cheesePlate', ingredients: ['plate', 'cheese', 'tomato'], timerSeconds: 26, difficulty: 1, coins: 9 },
+
   // Tier 2 - 4-5 ingredients, still at most one cooked and no repeats.
   {
     id: 'tomatoMelt',
@@ -121,6 +167,64 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
     id: 'dicedSalad',
     ingredients: ['plate', 'tomato', 'onion', 'cucumber'],
     timerSeconds: 28,
+    difficulty: 2,
+    coins: 14
+  },
+
+  {
+    id: 'meltedGreens',
+    ingredients: ['bunBottom', 'salad', 'cheese', 'bunTop'],
+    timerSeconds: 32,
+    difficulty: 2,
+    coins: 14
+  },
+  {
+    id: 'crunchBun',
+    ingredients: ['bunBottom', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 32,
+    difficulty: 2,
+    coins: 14
+  },
+  {
+    id: 'eggCrunch',
+    ingredients: ['bunBottom', 'egg', 'cucumber', 'bunTop'],
+    timerSeconds: 40,
+    difficulty: 2,
+    coins: 21
+  },
+  { id: 'eggOnion', ingredients: ['bunBottom', 'egg', 'onion', 'bunTop'], timerSeconds: 40, difficulty: 2, coins: 21 },
+  {
+    id: 'gardenMelt',
+    ingredients: ['bunBottom', 'patty', 'salad', 'cheese', 'bunTop'],
+    timerSeconds: 46,
+    difficulty: 2,
+    coins: 24
+  },
+  {
+    id: 'crispBurger',
+    ingredients: ['bunBottom', 'patty', 'tomato', 'cucumber', 'bunTop'],
+    timerSeconds: 46,
+    difficulty: 2,
+    coins: 24
+  },
+  {
+    id: 'brunchGarden',
+    ingredients: ['bunBottom', 'egg', 'salad', 'tomato', 'bunTop'],
+    timerSeconds: 44,
+    difficulty: 2,
+    coins: 24
+  },
+  {
+    id: 'tripleGreens',
+    ingredients: ['bunBottom', 'salad', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 36,
+    difficulty: 2,
+    coins: 17
+  },
+  {
+    id: 'cheeseGarden',
+    ingredients: ['plate', 'cheese', 'salad', 'cucumber'],
+    timerSeconds: 30,
     difficulty: 2,
     coins: 14
   },
@@ -185,6 +289,70 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
   {
     id: 'doubleOnionSalad',
     ingredients: ['plate', 'onion', 'salad', 'cucumber', 'onion'],
+    timerSeconds: 44,
+    difficulty: 3,
+    coins: 19
+  },
+
+  {
+    id: 'doubleTomato',
+    ingredients: ['bunBottom', 'patty', 'patty', 'tomato', 'bunTop'],
+    timerSeconds: 60,
+    difficulty: 3,
+    coins: 33
+  },
+  {
+    id: 'twinEgg',
+    ingredients: ['bunBottom', 'egg', 'egg', 'tomato', 'bunTop'],
+    timerSeconds: 58,
+    difficulty: 3,
+    coins: 33
+  },
+  {
+    id: 'surfTurf',
+    ingredients: ['bunBottom', 'patty', 'egg', 'onion', 'bunTop'],
+    timerSeconds: 60,
+    difficulty: 3,
+    coins: 33
+  },
+  {
+    id: 'gardenStack',
+    ingredients: ['bunBottom', 'patty', 'cheese', 'salad', 'cucumber', 'bunTop'],
+    timerSeconds: 62,
+    difficulty: 3,
+    coins: 29
+  },
+  {
+    id: 'marketBurger',
+    ingredients: ['bunBottom', 'patty', 'tomato', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 60,
+    difficulty: 3,
+    coins: 29
+  },
+  {
+    id: 'eggMarket',
+    ingredients: ['bunBottom', 'egg', 'cheese', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 58,
+    difficulty: 3,
+    coins: 29
+  },
+  {
+    id: 'leafyDouble',
+    ingredients: ['bunBottom', 'patty', 'patty', 'salad', 'bunTop'],
+    timerSeconds: 58,
+    difficulty: 3,
+    coins: 33
+  },
+  {
+    id: 'greenhouse',
+    ingredients: ['bunBottom', 'cheese', 'salad', 'tomato', 'onion', 'bunTop'],
+    timerSeconds: 50,
+    difficulty: 3,
+    coins: 22
+  },
+  {
+    id: 'cheeseCobb',
+    ingredients: ['plate', 'cheese', 'tomato', 'cucumber', 'salad'],
     timerSeconds: 44,
     difficulty: 3,
     coins: 19
@@ -255,6 +423,70 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
     coins: 24
   },
 
+  {
+    id: 'twinPatty',
+    ingredients: ['bunBottom', 'patty', 'patty', 'tomato', 'onion', 'bunTop'],
+    timerSeconds: 70,
+    difficulty: 4,
+    coins: 38
+  },
+  {
+    id: 'twinBrunch',
+    ingredients: ['bunBottom', 'egg', 'egg', 'tomato', 'salad', 'bunTop'],
+    timerSeconds: 68,
+    difficulty: 4,
+    coins: 38
+  },
+  {
+    id: 'surfTurfPlus',
+    ingredients: ['bunBottom', 'patty', 'egg', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 72,
+    difficulty: 4,
+    coins: 38
+  },
+  {
+    id: 'doubleMelt',
+    ingredients: ['bunBottom', 'patty', 'cheese', 'cheese', 'tomato', 'salad', 'bunTop'],
+    timerSeconds: 80,
+    difficulty: 4,
+    coins: 34
+  },
+  {
+    id: 'fieldBurger',
+    ingredients: ['bunBottom', 'patty', 'salad', 'cucumber', 'onion', 'tomato', 'bunTop'],
+    timerSeconds: 82,
+    difficulty: 4,
+    coins: 34
+  },
+  {
+    id: 'brunchDeluxe',
+    ingredients: ['bunBottom', 'egg', 'cheese', 'tomato', 'cucumber', 'onion', 'bunTop'],
+    timerSeconds: 80,
+    difficulty: 4,
+    coins: 34
+  },
+  {
+    id: 'leafyTwin',
+    ingredients: ['bunBottom', 'patty', 'patty', 'cheese', 'salad', 'bunTop'],
+    timerSeconds: 70,
+    difficulty: 4,
+    coins: 38
+  },
+  {
+    id: 'gardenTower',
+    ingredients: ['bunBottom', 'cheese', 'tomato', 'cucumber', 'onion', 'salad', 'bunTop'],
+    timerSeconds: 64,
+    difficulty: 4,
+    coins: 27
+  },
+  {
+    id: 'cheeseHarvest',
+    ingredients: ['plate', 'tomato', 'cucumber', 'onion', 'salad', 'cheese'],
+    timerSeconds: 62,
+    difficulty: 4,
+    coins: 24
+  },
+
   // Tier 5 - 7-8 ingredients. Three cooked only at 7 ingredients, which is what holds the 50-coin ceiling.
   {
     id: 'supreme',
@@ -315,6 +547,69 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
   {
     id: 'harvestFeast',
     ingredients: ['plate', 'onion', 'salad', 'cucumber', 'tomato', 'onion', 'salad'],
+    timerSeconds: 86,
+    difficulty: 5,
+    coins: 29
+  },
+  {
+    id: 'twinSupreme',
+    ingredients: ['bunBottom', 'patty', 'patty', 'cheese', 'tomato', 'salad', 'bunTop'],
+    timerSeconds: 95,
+    difficulty: 5,
+    coins: 43
+  },
+  {
+    id: 'twinBrunchMelt',
+    ingredients: ['bunBottom', 'egg', 'egg', 'cheese', 'tomato', 'onion', 'bunTop'],
+    timerSeconds: 92,
+    difficulty: 5,
+    coins: 43
+  },
+  {
+    id: 'surfTurfMelt',
+    ingredients: ['bunBottom', 'patty', 'egg', 'cheese', 'cucumber', 'salad', 'bunTop'],
+    timerSeconds: 95,
+    difficulty: 5,
+    coins: 43
+  },
+  {
+    id: 'tripleBrunch',
+    ingredients: ['bunBottom', 'patty', 'patty', 'egg', 'cheese', 'onion', 'bunTop'],
+    timerSeconds: 105,
+    difficulty: 5,
+    coins: 50
+  },
+  {
+    id: 'tripleSunrise',
+    ingredients: ['bunBottom', 'egg', 'egg', 'patty', 'tomato', 'salad', 'bunTop'],
+    timerSeconds: 102,
+    difficulty: 5,
+    coins: 50
+  },
+  {
+    id: 'harvestBurger',
+    ingredients: ['bunBottom', 'patty', 'cheese', 'tomato', 'cucumber', 'onion', 'salad', 'bunTop'],
+    timerSeconds: 100,
+    difficulty: 5,
+    coins: 39
+  },
+  {
+    id: 'twinHarvest',
+    ingredients: ['bunBottom', 'patty', 'patty', 'tomato', 'cucumber', 'onion', 'salad', 'bunTop'],
+    timerSeconds: 100,
+    difficulty: 5,
+    coins: 46
+  },
+  {
+    id: 'brunchTower',
+    ingredients: ['bunBottom', 'egg', 'patty', 'cheese', 'cheese', 'tomato', 'cucumber', 'bunTop'],
+    timerSeconds: 98,
+    difficulty: 5,
+    coins: 46
+  },
+  {
+    id: 'gardenDeluxe',
+    ingredients: ['plate', 'salad', 'tomato', 'cucumber', 'onion', 'cheese', 'salad'],
     timerSeconds: 86,
     difficulty: 5,
     coins: 29
