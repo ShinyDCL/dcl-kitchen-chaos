@@ -30,8 +30,8 @@ const INTERACTION_RANGE = 2.5 // meters
 // Clamped at 0, so facing away is never a penalty — it just earns nothing.
 const FACING_BONUS = 0.6 // meters
 
-// Without this, focus flickers between near-tied fixtures (e.g. the 2x2
-// island) as per-frame noise — the avatar bob, small look adjustments —
+// Without this, focus flickers between near-tied fixtures (e.g. the island's
+// adjacent counters) as per-frame noise — the avatar bob, small look adjustments —
 // nudges the score. Keeps the current focus unless something clearly beats
 // it, not just marginally.
 const FOCUS_SWITCH_MARGIN = 0.3 // meters

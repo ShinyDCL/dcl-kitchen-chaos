@@ -1,6 +1,6 @@
 // Assembles the kitchen: ingredient counters along the left and right walls
 // (both bookended by a preparation counter), a front row alternating
-// preparation counters and stoves, a 2x2 preparation-counter island, a back
+// preparation counters and stoves, a 2x3 preparation-counter island, a back
 // wall carrying the discard and delivery counters, and a decorative counter in
 // each corner. All positions are local to `parent`, the scene root.
 
@@ -34,6 +34,10 @@ const BACK_WALL_DISTANCE = 5.45 // meters, along Z
 
 // The discard/delivery counter models are wider than a standard fixture — also tuned to match Scene.glb.
 const BACK_WALL_COUNTER_WIDTH = 3.5 // meters
+
+// Counters per island row. Odd, so one sits at x=0 facing the entrance
+// walkway rather than a seam between two.
+const ISLAND_COLUMNS = 3
 
 // Y-axis rotation (degrees) for a fixture whose unrotated model faces +Z.
 const FACE_POSITIVE_Z = 0
@@ -130,9 +134,8 @@ function createCorners(parent: Entity): void {
   }
 }
 
-/** The 2x2 island: two counters facing -Z, two facing +Z, backs touching at Z=0 so fronts face outward on both sides. */
+/** The island: an ISLAND_COLUMNS-wide row facing -Z and another facing +Z, backs touching at Z=0 so fronts face outward on both sides. */
 function createIsland(parent: Entity): void {
-  const halfWidth = FIXTURE_WIDTH / 2
   const halfDepth = FIXTURE_DEPTH / 2
 
   const rows: Array<{ z: number; facingDegrees: number }> = [
@@ -142,8 +145,9 @@ function createIsland(parent: Entity): void {
 
   for (const row of rows) {
     const rotation = rotationDegrees(row.facingDegrees)
-    for (const x of [-halfWidth, halfWidth]) {
-      createPreparationCounterFixture(Vector3.create(x, 0, row.z), rotation, parent)
+    for (let column = 0; column < ISLAND_COLUMNS; column++) {
+      const position = Vector3.create(slotOffset(ISLAND_COLUMNS, column), 0, row.z)
+      createPreparationCounterFixture(position, rotation, parent)
     }
   }
 }
