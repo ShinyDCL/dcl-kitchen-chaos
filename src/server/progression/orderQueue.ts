@@ -4,19 +4,17 @@
 // scene targets 0, so the queue drains and nothing regenerates until someone
 // arrives — session.ts is what clears it.
 //
-// evaluateDelivery pays every recently-active player (players/activity.ts) and
-// broadcasts 'orderDelivered' on a match. Expiry and generation get no
-// broadcast: an expiring order is stamped with expiredAt and left in place for
-// ORDER_RESULT_DISPLAY_SECONDS, so its card is synced state and the slot it
-// holds is itself the gap before a replacement. A delivered entity has to go
-// immediately, so delivery holds the next order off with nextGenerationAt.
+// evaluateDelivery pays every recently-active player (players/activity.ts).
+// Neither outcome is broadcast: a resolved order is stamped with expiredAt or
+// deliveredAt and left in place for ORDER_RESULT_DISPLAY_SECONDS, so its result
+// card is synced state and the slot it holds is itself the gap before a
+// replacement.
 
 import { engine, Entity } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
 import { getRequiredModelForIngredient } from '../../shared/ingredients'
-import { room } from '../../shared/messages'
 import { sameModels } from '../../shared/models'
 import {
   getDifficultyForStreak,
@@ -53,8 +51,7 @@ const STREAK_PER_WRONG_DELIVERY = -1
 const STREAK_PER_TIMEOUT = -1
 
 const orderEntities = new Map<number, Entity>() // keyed by orderNumber
-let nextOrderNumber = 1 // session-wide ticket counter — see OrderState.orderNumber
-let nextGenerationAt = 0 // server timestamp — no new order before this
+let nextOrderNumber = 1 // reset per session, so the HUD badge stays a short number
 
 export function initOrderQueue(): void {
   reconcileOrderEntities()
@@ -63,6 +60,7 @@ export function initOrderQueue(): void {
   // group's difficulty tier is what made arriving alone read as broken.
   onSessionStart(() => {
     clearQueue()
+    nextOrderNumber = 1 // safe: clearQueue just dropped every order, so nothing can collide
     const gameState = getGameStateMutable()
     if (gameState) gameState.streak = 0
   })
@@ -89,14 +87,11 @@ export function evaluateDelivery(models: string[], delivererId: string): boolean
   const recipe = getRecipeById(matched.recipeId)
   grantCoins(getRecentlyActivePlayerIds(), recipe?.coins ?? 0)
 
-  void room.send('orderDelivered', {
-    recipeId: matched.recipeId,
-    deliveredByName: getPlayerDisplayName(delivererId),
-    generatedAt: matched.generatedAt,
-    orderNumber: matched.orderNumber
-  })
+  // Stamped and kept, exactly like an expired order — see the module comment.
+  const mutable = OrderState.getMutable(matched.entity)
+  mutable.deliveredAt = Date.now()
+  mutable.deliveredByName = getPlayerDisplayName(delivererId)
 
-  removeOrder(matched.entity, matched.orderNumber)
   return true
 }
 
@@ -108,8 +103,8 @@ function growQueueSystem(): void {
     const data = OrderState.getOrNull(entity)
     if (!data) continue
 
-    const expiredAt = Number(data.expiredAt)
-    if (expiredAt === 0) {
+    const resolvedAt = Math.max(Number(data.expiredAt), Number(data.deliveredAt))
+    if (resolvedAt === 0) {
       // Stamped, not removed — the card is drawn from this field, so the
       // entity has to outlive the deadline for clients to ever see it.
       if (isExpired(data.recipeId, Number(data.generatedAt))) {
@@ -119,13 +114,10 @@ function growQueueSystem(): void {
       continue
     }
 
-    // Result display over. No generation cooldown to set: this order held
-    // its own slot for the whole window, so the queue is short right now
-    // and refills on this same tick.
-    if (Date.now() - expiredAt >= ORDER_RESULT_DISPLAY_SECONDS * 1000) discardOrder(entity, orderNumber)
+    // Result display over. Its own slot was the gap, so the queue is short
+    // right now and refills on this same tick.
+    if (Date.now() - resolvedAt >= ORDER_RESULT_DISPLAY_SECONDS * 1000) discardOrder(entity, orderNumber)
   }
-
-  if (Date.now() < nextGenerationAt) return // still cooling down after a recent resolution
 
   const target = getTargetQueueSize(gameState.playerCount)
   while (orderEntities.size < target) generateOrder(gameState.streak)
@@ -159,37 +151,27 @@ function generateOrder(streak: number): void {
   orderEntities.set(orderNumber, entity)
 }
 
-/** Drops every live order at once — no streak penalty and no regeneration cooldown, so whoever arrives next starts on a fresh queue immediately. */
+/** Drops every live order at once — no streak penalty, so whoever arrives next starts on a fresh queue immediately. */
 function clearQueue(): void {
   for (const [, entity] of orderEntities) engine.removeEntity(entity)
   orderEntities.clear()
-  nextGenerationAt = 0
 }
 
-/** Removes a delivered order and pushes back its replacement's earliest generation time — see the module comment. */
-function removeOrder(entity: Entity, orderNumber: number): void {
-  discardOrder(entity, orderNumber)
-  nextGenerationAt = Math.max(nextGenerationAt, Date.now() + ORDER_RESULT_DISPLAY_SECONDS * 1000)
-}
-
-/** Drops an order's entity and nothing else — for one whose slot already served as the gap. */
+/** Drops an order's entity once its slot has served as the gap before a replacement. */
 function discardOrder(entity: Entity, orderNumber: number): void {
   orderEntities.delete(orderNumber)
   engine.removeEntity(entity)
 }
 
-function findMatchingOrder(
-  models: string[]
-): { entity: Entity; orderNumber: number; recipeId: string; generatedAt: number } | null {
-  for (const [orderNumber, entity] of orderEntities) {
+function findMatchingOrder(models: string[]): { entity: Entity; recipeId: string } | null {
+  for (const [, entity] of orderEntities) {
     const data = OrderState.getOrNull(entity)
     if (!data) continue
-    if (Number(data.expiredAt) !== 0) continue // still on screen as a result card, but no longer deliverable
+    // Already resolved: still on screen as a result card, but no longer deliverable.
+    if (Number(data.expiredAt) !== 0 || Number(data.deliveredAt) !== 0) continue
 
     const recipe = getRecipeById(data.recipeId)
-    if (recipe && sameModels(getRequiredModels(recipe), models)) {
-      return { entity, orderNumber, recipeId: data.recipeId, generatedAt: Number(data.generatedAt) }
-    }
+    if (recipe && sameModels(getRequiredModels(recipe), models)) return { entity, recipeId: data.recipeId }
   }
   return null
 }
@@ -204,15 +186,22 @@ function getRequiredModels(recipe: Recipe): string[] {
  * nextOrderNumber from the highest one handed out, so a restart cannot reissue
  * numbers.
  *
- * expiredAt is rewritten rather than trusted: a snapshot from a build predating
- * the field carries a stamp it never wrote, and one in the future never
- * satisfies the discard check, holding a queue slot indefinitely.
+ * A resolved order is dropped rather than adopted — see below.
  */
 function reconcileOrderEntities(): void {
   for (const [entity, data] of engine.getEntitiesWith(OrderState)) {
     if (!isAdoptableEntity(entity)) continue
-    orderEntities.set(data.orderNumber, entity)
     if (data.orderNumber >= nextOrderNumber) nextOrderNumber = data.orderNumber + 1
-    OrderState.getMutable(entity).expiredAt = 0
+
+    // Reviving one would pay it out twice: expiredAt re-derives from
+    // generatedAt, but deliveredAt has nothing to re-derive from. A snapshot
+    // predating these fields decodes as nonsense, which reads as resolved and
+    // is dropped here too. growQueueSystem refills the slot next tick.
+    if (Number(data.expiredAt) !== 0 || Number(data.deliveredAt) !== 0) {
+      engine.removeEntity(entity)
+      continue
+    }
+
+    orderEntities.set(data.orderNumber, entity)
   }
 }

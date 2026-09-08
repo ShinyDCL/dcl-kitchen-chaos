@@ -120,12 +120,15 @@ lockToServer(PlayerCoins)
  * above. `name` is captured on write, since coins only change while a player is
  * connected and resolvable. `version` is bumped per publish so a client detects
  * a change with one integer compare.
+ *
+ * An entry carries only what the board draws. The server keys its own rows by
+ * address, but syncing that would hand every client the wallet of a player who
+ * isn't even in the scene.
  */
 export const Leaderboard = engine.defineComponent('game::Leaderboard', {
   version: Schemas.Int,
   entries: Schemas.Array(
     Schemas.Map({
-      playerId: Schemas.String,
       name: Schemas.String,
       lifetimeCoins: Schemas.Int
     })
@@ -135,17 +138,23 @@ export const Leaderboard = engine.defineComponent('game::Leaderboard', {
 lockToServer(Leaderboard)
 
 /**
- * One entity per active order, matched by `orderNumber` (never reused).
- * `recipeId` looks up shared/recipes.ts; `generatedAt` (server clock) drives
- * the HUD countdown. `expiredAt` (0 while live) is stamped when the timer runs
- * out and the entity kept for the result display, so the timed-out card is
- * state the client is handed rather than a deadline it must catch.
+ * One entity per active order, matched by `orderNumber` (unique within a
+ * session). `recipeId` looks up shared/recipes.ts; `generatedAt` (server
+ * clock) drives the HUD countdown.
+ *
+ * `expiredAt` and `deliveredAt` are both 0 while the order is live, and at
+ * most one is ever set — whichever resolved it. The entity is kept either way
+ * for the result display, so both result cards are state the client is handed
+ * rather than a deadline it must catch. `deliveredByName` is stamped alongside
+ * `deliveredAt` and stays empty otherwise.
  */
 export const OrderState = engine.defineComponent('game::OrderState', {
   orderNumber: Schemas.Int,
   recipeId: Schemas.String,
   generatedAt: Schemas.Int64,
-  expiredAt: Schemas.Int64
+  expiredAt: Schemas.Int64,
+  deliveredAt: Schemas.Int64,
+  deliveredByName: Schemas.String
 })
 
 lockToServer(OrderState)

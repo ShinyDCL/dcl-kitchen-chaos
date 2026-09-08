@@ -42,15 +42,16 @@ export function initLeaderboard(): void {
 /** One component write per tick — a delivery pays every recently-active player, so recordCoins calls land in batches. */
 function publishPendingBoard(): void {
   if (!needsPublish) return
-  needsPublish = false
 
   entries.sort((a, b) => b.lifetimeCoins - a.lifetimeCoins)
   entries.length = Math.min(entries.length, LEADERBOARD_SIZE)
 
   const mutable = Leaderboard.getMutableOrNull(getOrCreateLeaderboardEntity())
-  if (!mutable) return
+  if (!mutable) return // still pending, so the next tick retries rather than dropping the change
+
+  needsPublish = false
   mutable.version += 1 // lets clients detect the change without diffing contents
-  mutable.entries = entries.map((entry) => ({ ...entry }))
+  mutable.entries = entries.map(({ name, lifetimeCoins }) => ({ name, lifetimeCoins })) // playerId stays server-side
 
   // The whole board, so a dropped write is healed by the next change's.
   // Several recordCoins calls per delivery collapse into one write here, and
@@ -82,14 +83,19 @@ export function recordCoins(playerId: string, lifetimeCoins: number): void {
   needsPublish = true
 }
 
-/** Whether a total is good enough to enter a board that isn't full yet, or to displace its last entry. */
+/** Whether a total is good enough to enter a board that isn't full yet, or to displace a row on a full one. */
 function qualifies(lifetimeCoins: number): boolean {
   // Connecting alone loads a player at 0 and records it — without this, merely
   // joining put everyone on the board (and persisted it).
   if (lifetimeCoins <= 0) return false
   if (entries.length < LEADERBOARD_SIZE) return true
-  const last = entries[entries.length - 1]
-  return last !== undefined && lifetimeCoins > last.lifetimeCoins
+
+  // Beating any row, rather than the last one specifically: recordCoins appends,
+  // so within a tick the tail is whoever was just added, not the lowest. A
+  // delivery pays several players at once, and comparing against the wrong
+  // threshold dropped the second newcomer of the batch. Over-length is fine —
+  // publishPendingBoard truncates on the same tick.
+  return entries.some((entry) => lifetimeCoins > entry.lifetimeCoins)
 }
 
 /** Updates the name if it resolves to something new, returning whether it changed. An unresolvable name leaves the stored one alone. */
@@ -157,11 +163,25 @@ function getOrCreateLeaderboardEntity(): Entity {
   return entity
 }
 
-/** Re-adopts the leaderboard entity if it already exists in the CRDT snapshot from a previous server run. */
+/**
+ * Re-adopts the leaderboard entity if it already exists in the CRDT snapshot
+ * from a previous server run.
+ *
+ * Rows are blanked, not trusted: entries are a positional Schemas.Map, so a
+ * snapshot from a build with a different field layout decodes as nonsense.
+ * publishPendingBoard heals it a tick after the stored read — but not when
+ * storage is empty or unreadable. The version bump forces a redraw.
+ */
 function reconcileLeaderboardEntity(): void {
   for (const [entity] of engine.getEntitiesWith(Leaderboard)) {
     if (!isAdoptableEntity(entity)) continue
     leaderboardEntity = entity
+
+    const mutable = Leaderboard.getMutableOrNull(entity)
+    if (mutable) {
+      mutable.entries = []
+      mutable.version += 1
+    }
     return
   }
 }

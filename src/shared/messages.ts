@@ -41,17 +41,7 @@ export const Messages = {
   // (see server/fixtures/deliveryCounter.ts) and timestamps it into the
   // synced DeliveryState everyone animates from. deliveryCounterId just
   // avoids colliding with another fixture's sync id.
-  deliverHeldItem: Schemas.Map({ deliveryCounterId: Schemas.Int }),
-
-  // Server -> all: broadcast on a matched delivery. Each client times its
-  // own success display locally from receipt, not a shared deadline
-  // latency could cut short — see orderQueue.ts/ordersUi.tsx.
-  orderDelivered: Schemas.Map({
-    recipeId: Schemas.String,
-    deliveredByName: Schemas.String,
-    generatedAt: Schemas.Int64, // keeps the card's row position instead of jumping to the front
-    orderNumber: Schemas.Int // the order's ticket number — also the result card's key
-  })
+  deliverHeldItem: Schemas.Map({ deliveryCounterId: Schemas.Int })
 }
 
 export const room = registerMessages(Messages)

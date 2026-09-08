@@ -2,10 +2,9 @@
 // on mobile (orderQueueStyle.ts). Reads the synced OrderState entities every
 // frame; no local prediction to protect, so no reconcile step.
 //
-// A delivery is timed locally from the 'orderDelivered' broadcast; timing out
-// needs no local timing at all, since the server stamps expiredAt and keeps
-// the entity for the display window. A delivery result and a live order are
-// independent entries keyed by orderNumber, so both can render at once.
+// Result cards need no local timing: the server stamps expiredAt or
+// deliveredAt and keeps the entity for the display window, so a card is only
+// ever drawn from the state in front of it.
 //
 // This file owns which cards exist and their state; orderCard.tsx draws them.
 
@@ -13,8 +12,6 @@ import { engine } from '@dcl/sdk/ecs'
 import { Color4 } from '@dcl/sdk/math'
 import ReactEcs, { ReactEcsRenderer, UiEntity } from '@dcl/sdk/react-ecs'
 
-import { ORDER_RESULT_DISPLAY_SECONDS } from '../../shared/constants'
-import { room } from '../../shared/messages'
 import { getRecipeById, Recipe } from '../../shared/recipes'
 import { OrderState } from '../../shared/schemas'
 import { onPlatformResolved } from '../platform/platformDetection'
@@ -44,34 +41,10 @@ export function setupOrdersUi(): void {
   onPlatformResolved((mobile) => {
     currentLayout = mobile ? MOBILE_LAYOUT : DESKTOP_LAYOUT
   })
-
-  room.onMessage('orderDelivered', (data) => {
-    const recipe = getRecipeById(data.recipeId)
-    if (!recipe) return // shouldn't happen — recipeId always comes from the shared recipe pool
-    deliveryResults.set(data.orderNumber, {
-      recipe,
-      deliveredByName: data.deliveredByName,
-      generatedAt: Number(data.generatedAt),
-      orderNumber: data.orderNumber,
-      endsAt: serverNow() + ORDER_RESULT_DISPLAY_SECONDS * 1000
-    })
-  })
 }
-
-interface DeliveryResult {
-  recipe: Recipe
-  deliveredByName: string
-  generatedAt: number // the order's own generatedAt, not the result's start time — keeps its row position instead of jumping to the front
-  orderNumber: number
-  endsAt: number
-}
-
-// Keyed by orderNumber — client-local timing, see the file header comment.
-// Deliveries only: a timeout is synced state, so it needs nothing here.
-const deliveryResults = new Map<number, DeliveryResult>()
 
 interface ActiveOrder {
-  cardKey: string // orderNumber as a string — never reused, so unique across both delivery results and live orders
+  cardKey: string // orderNumber as a string — unique among the orders alive at once
   recipe: Recipe
   generatedAt: number
   orderNumber: number
@@ -79,42 +52,12 @@ interface ActiveOrder {
   deliveredByName: string
 }
 
-/**
- * Newest first by generatedAt. A delivery result and a *different*
- * order's live entry can render at once (e.g. a fresh order beating an
- * earlier result display ending). But the *same* order's result and live
- * entry are mutually exclusive: a delivered order's broadcast and its
- * entity's CRDT removal propagate on separate channels with no ordering
- * guarantee, so a brief window can show both — without deduping that's a
- * duplicate cardKey, confusing the keyed reconciler and thrashing
- * getStatusOverlayColor. So once an order has a delivery result, its live
- * entry is skipped.
- *
- * A timed-out order needs none of that: it's still a live entity, just one
- * carrying expiredAt.
- */
+/** Newest first by generatedAt. One entry per synced order, resolved or not — the server keeps a resolved one alive for its result display. */
 function getActiveOrders(): ActiveOrder[] {
   const now = serverNow()
   const active: ActiveOrder[] = []
 
-  for (const [orderNumber, result] of deliveryResults) {
-    if (now >= result.endsAt) {
-      deliveryResults.delete(orderNumber)
-      continue
-    }
-    active.push({
-      cardKey: String(orderNumber),
-      recipe: result.recipe,
-      generatedAt: result.generatedAt,
-      orderNumber,
-      visualState: 'success',
-      deliveredByName: result.deliveredByName
-    })
-  }
-
   for (const [, data] of engine.getEntitiesWith(OrderState)) {
-    if (deliveryResults.has(data.orderNumber)) continue // already represented by its result above — see this function's comment
-
     const recipe = getRecipeById(data.recipeId)
     if (!recipe) continue // shouldn't happen — recipeId always comes from the shared recipe pool
     const generatedAt = Number(data.generatedAt)
@@ -125,8 +68,8 @@ function getActiveOrders(): ActiveOrder[] {
       recipe,
       generatedAt,
       orderNumber: data.orderNumber,
-      visualState: getLiveVisualState(Number(data.expiredAt), elapsedSeconds),
-      deliveredByName: ''
+      visualState: getVisualState(Number(data.expiredAt), Number(data.deliveredAt), elapsedSeconds),
+      deliveredByName: data.deliveredByName
     })
   }
 
@@ -139,14 +82,14 @@ function getActiveOrders(): ActiveOrder[] {
 }
 
 /**
- * Timing out is read off expiredAt rather than compared against the
- * deadline locally: the server stamps the field and holds the entity open
- * for the result display (see orderQueue.ts), so the card can't be missed
- * by a client whose clock disagrees about when the timer ran out. The
- * new-order flash stays local — it's cosmetic, and being a moment early or
- * late costs nothing.
+ * Both results are read off their stamp rather than timed locally: the server
+ * holds the entity open for the display window (see orderQueue.ts), so no card
+ * can be missed by a client whose clock disagrees about when it resolved. The
+ * new-order flash stays local — it's cosmetic, and being a moment early or late
+ * costs nothing.
  */
-function getLiveVisualState(expiredAt: number, elapsedSeconds: number): CardVisualState {
+function getVisualState(expiredAt: number, deliveredAt: number, elapsedSeconds: number): CardVisualState {
+  if (deliveredAt !== 0) return 'success'
   if (expiredAt !== 0) return 'timedOut'
   return elapsedSeconds <= ORDER_NEW_FLASH_SECONDS ? 'new' : 'normal'
 }
@@ -160,7 +103,7 @@ interface OverlayColorTransition {
 }
 const overlayColorTransitions = new Map<string, OverlayColorTransition>()
 
-/** cardKey is a never-reused orderNumber, so without this, a transition entry would linger forever once its card is gone. */
+/** Without this a transition entry would linger once its card is gone — and orderNumber restarts at 1 each session, so a stale one could be inherited. */
 function pruneOverlayColorTransitions(activeOrders: ActiveOrder[]): void {
   const activeCardKeys = new Set(activeOrders.map((order) => order.cardKey))
   for (const cardKey of overlayColorTransitions.keys()) {
