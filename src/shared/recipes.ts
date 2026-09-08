@@ -630,13 +630,14 @@ export function getDifficultyForStreak(streak: number): number {
 
 /**
  * How far through the current tier the streak sits, 0..1 — drives the HUD's
- * level bar. Reads 1 at the top tier rather than wrapping: the streak keeps
- * climbing to MAX_STREAK past that point, so a plain modulo would make the
- * bar appear to reset exactly when the team is doing best.
+ * level bar. At the top tier that span is the buffer above the demotion
+ * threshold, so a full bar means a full buffer and every miss drains it in
+ * view rather than silently.
  */
 export function getStreakProgress(streak: number): number {
-  if (getDifficultyForStreak(streak) >= MAX_DIFFICULTY_TIER) return 1
-  return (Math.max(streak, 0) % STREAK_DIFFICULTY_STEP) / STREAK_DIFFICULTY_STEP
+  const clamped = Math.max(streak, 0)
+  if (clamped >= MAX_STREAK) return 1 // the cap fills the bar instead of wrapping it back to empty
+  return (clamped % STREAK_DIFFICULTY_STEP) / STREAK_DIFFICULTY_STEP
 }
 
 /** Picks a random recipe at the given difficulty, falling back to the whole pool if that tier is empty (e.g. no recipes defined for it yet). */

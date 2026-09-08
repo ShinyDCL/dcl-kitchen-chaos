@@ -5,4 +5,4 @@
 // Rewritten by scripts/stamp-build.mjs from package.json's predeploy hook —
 // don't edit by hand. <short commit>-<n>, where n counts builds of that
 // commit, so uncommitted work still gets a distinct label per deploy.
-export const BUILD_LABEL = 'd7b66da-1'
+export const BUILD_LABEL = '0367dd8-1'
