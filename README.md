@@ -171,9 +171,8 @@ explicit branch rather than one layout that happens to fit twice.
 - **World-space visuals rotated facing camera.** On desktop, floating labels turn to face a camera that orbits; on
   mobile the camera never rotates, so they take a fixed facing instead.
 
-- **Two limits are worth naming.** The camera eases in when you enter the kitchen but cuts instantly when you leave —
-  the SDK has no exit transition. And the background music is desktop-only: it would not play reliably on mobile, so
-  rather than ship something broken it simply is not started there.
+- **One limit is worth naming.** The camera eases in when you enter the kitchen but cuts instantly when you leave — the
+  SDK has no exit transition.
 
 ---
 

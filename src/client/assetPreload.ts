@@ -1,12 +1,14 @@
 // Preloads assets not otherwise referenced until first use (pickup
 // models, checkmark/crossmark, message, smoke, ingredient atlas), so that
 // first use doesn't hitch. Fixture/display models aren't listed — already eager.
+//
+// Sounds must not be listed — a clip preloaded here never plays on mobile;
+// sound.ts preloads them itself.
 
 import { AssetLoad, engine } from '@dcl/sdk/ecs'
 
 import { FIRE_TEXTURE, SMOKE_TEXTURE } from '../shared/constants'
 import { MODELS } from '../shared/models'
-import { ACCEPT_SOUND, INTERACTION_SOUND, REJECT_SOUND } from './sound'
 import { ATLAS_TEXTURE_SRC } from './ui/orderQueueStyle'
 
 export function preloadAssets(): void {
@@ -30,10 +32,7 @@ export function preloadAssets(): void {
       MODELS.message,
       SMOKE_TEXTURE,
       FIRE_TEXTURE,
-      ATLAS_TEXTURE_SRC,
-      INTERACTION_SOUND,
-      ACCEPT_SOUND,
-      REJECT_SOUND
+      ATLAS_TEXTURE_SRC
     ]
   })
 }

@@ -21,7 +21,7 @@ import { setupInfoDisplay } from './scene/infoDisplay'
 import { createSceneLayout } from './scene/layout'
 import { setupLeaderboardDisplay } from './scene/leaderboardDisplay'
 import { startPlayArea } from './scene/playArea'
-import { startBackgroundMusic } from './sound'
+import { setupSound } from './sound'
 import { setupBuildLabel } from './ui/buildLabel'
 import { setupCornerPanels } from './ui/cornerPanels'
 import { setupEntryOverlay } from './ui/entryOverlay'
@@ -49,5 +49,5 @@ export function initClient(): void {
   startPlayArea() // before the mobile camera, which reads it
   setupMobileControls()
   startMobileCamera()
-  startBackgroundMusic()
+  setupSound()
 }

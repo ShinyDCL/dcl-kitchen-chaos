@@ -33,16 +33,14 @@ const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
 let deliveryCounterEntity: Entity | null = null
 let resultMarkWorldPosition: Vector3 | null = null
 
-// Separate entity per sound role — one AudioSource would let a later call
-// cut off a clip still playing (see sound.ts).
-let acceptSoundEntity: Entity | null = null
-let rejectSoundEntity: Entity | null = null
+// One entity for both results, so a newer delivery replaces the clip still
+// playing rather than layering over it (see sound.ts).
+let resultSoundEntity: Entity | null = null
 
 /** Call once when the delivery counter fixture is created. */
 export function registerDeliveryCounter(fixtureEntity: Entity): void {
   deliveryCounterEntity = fixtureEntity
-  acceptSoundEntity = createSoundAnchor(fixtureEntity)
-  rejectSoundEntity = createSoundAnchor(fixtureEntity)
+  resultSoundEntity = createSoundAnchor(fixtureEntity)
 
   const worldPosition = getWorldPosition(fixtureEntity)
   resultMarkWorldPosition = Vector3.create(
@@ -149,9 +147,10 @@ function startAnimating(models: string[], success: boolean | null): void {
   rebuildItemEntities(models)
 }
 
-function playDeliveryResultSound(success: boolean): void {
-  if (success) playAcceptSound(acceptSoundEntity)
-  else playRejectSound(rejectSoundEntity)
+/** `position` is only used on mobile — see sound.ts. */
+function playDeliveryResultSound(success: boolean, position: Vector3): void {
+  if (success) playAcceptSound(resultSoundEntity, position)
+  else playRejectSound(resultSoundEntity, position)
 }
 
 // Whichever of the two runs longer decides when a delivery is finished with.
@@ -248,7 +247,7 @@ function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): 
 
   if (!soundPlayed) {
     soundPlayed = true
-    playDeliveryResultSound(success)
+    playDeliveryResultSound(success, resultMarkWorldPosition)
   }
 
   VisibilityComponent.getMutable(shown).visible = true
