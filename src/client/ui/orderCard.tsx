@@ -26,7 +26,6 @@ import { emphasize, getPanelBackground, PROGRESS_FILL_COLOR, PROGRESS_TRACK_COLO
 export type CardVisualState = 'normal' | 'new' | 'success' | 'timedOut'
 
 export function OrderCard({
-  cardKey,
   orderNumber,
   recipe,
   generatedAt,
@@ -35,7 +34,7 @@ export function OrderCard({
   overlayColor,
   layout
 }: {
-  cardKey: string
+  key?: string // consumed by the reconciler, never passed through to the component
   orderNumber: number
   recipe: Recipe
   generatedAt: number
@@ -46,7 +45,6 @@ export function OrderCard({
 }) {
   return (
     <UiEntity
-      key={cardKey}
       uiTransform={{
         width: layout.cardWidth,
         height: 'auto',

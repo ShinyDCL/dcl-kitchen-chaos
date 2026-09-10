@@ -159,7 +159,7 @@ function OrdersUI() {
       >
         {orders.map(({ cardKey, recipe, generatedAt, orderNumber, visualState, deliveredByName }) => (
           <OrderCard
-            cardKey={cardKey}
+            key={cardKey}
             orderNumber={orderNumber}
             recipe={recipe}
             generatedAt={generatedAt}
