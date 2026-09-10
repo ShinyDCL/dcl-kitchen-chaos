@@ -5,7 +5,7 @@
 
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 
-import { MODELS, Model } from '../../shared/models'
+import { Model, MODELS } from '../../shared/models'
 
 // --- Stacking height ---
 //
@@ -13,6 +13,11 @@ import { MODELS, Model } from '../../shared/models'
 // preparation counters without them clipping into each other. Tuned by eye
 // against the models — adjust an entry if an item sits into or floats above
 // the one below it.
+
+// Items read small at model scale, so they are enlarged once placed on a
+// counter or the stove. Stack offsets scale with them, or the gaps stay at
+// model size.
+export const PLACED_ITEM_SCALE = 1.25
 
 const DEFAULT_ITEM_HEIGHT = 0.1
 

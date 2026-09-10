@@ -17,7 +17,7 @@ import { DeliveryState } from '../../../shared/schemas'
 import { playAcceptSound, playRejectSound } from '../../sound'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemModels } from '../heldItems'
-import { getItemHeight } from '../itemPlacement'
+import { getItemHeight, PLACED_ITEM_SCALE } from '../itemPlacement'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixture'
 
@@ -27,8 +27,8 @@ const DELIVERY_RESULT_MARK_SCALE_SECONDS = 0.3 // seconds — scale-up and scale
 const DELIVERY_RESULT_MARK_HOLD_SECONDS = 0.6 // seconds at full scale
 const DELIVERY_RESULT_MARK_MODEL_SCALE = 1.5
 const MOBILE_RESULT_MARK_SCALE = 1.4 // bigger on mobile — see fixtureMessage.ts's MOBILE_SCALE
-const DELIVERY_ITEM_Y_OFFSET = 0.05 // clearance above the counter top so the bottom item does not sit in the surface — same as the stove pan
-const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 0.8
+const DELIVERY_ITEM_Y_OFFSET = 0.05 // clearance above the counter top so the bottom item does not sit in the surface
+const DELIVERY_RESULT_MARK_Y_OFFSET = FIXTURE_HEIGHT + 1.1
 
 let deliveryCounterEntity: Entity | null = null
 let resultMarkWorldPosition: Vector3 | null = null
@@ -185,6 +185,7 @@ function rebuildItemEntities(models: string[]): void {
   const root = engine.addEntity()
   Transform.create(root, {
     position: Vector3.create(0, FIXTURE_HEIGHT + DELIVERY_ITEM_Y_OFFSET, 0),
+    scale: Vector3.create(PLACED_ITEM_SCALE, PLACED_ITEM_SCALE, PLACED_ITEM_SCALE),
     parent: deliveryCounterEntity
   })
 
@@ -208,16 +209,17 @@ function teardownItemEntities(): void {
   renderedItem = null
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(value, 1))
+}
+
 function updateItemScale(elapsedSeconds: number): void {
   if (renderedItem === null) return
 
-  if (elapsedSeconds < DELIVERY_ITEM_SIT_DURATION) {
-    Transform.getMutable(renderedItem.root).scale = Vector3.One()
-    return
-  }
-
-  const shrinkT = Math.min((elapsedSeconds - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_ITEM_SHRINK_DURATION, 1)
-  const scale = 1 - shrinkT
+  // Clamped low so the sit phase, where this goes negative, holds at full size.
+  // Scaling the root shrinks the stack gaps along with the items.
+  const shrinkT = clamp01((elapsedSeconds - DELIVERY_ITEM_SIT_DURATION) / DELIVERY_ITEM_SHRINK_DURATION)
+  const scale = (1 - shrinkT) * PLACED_ITEM_SCALE
   Transform.getMutable(renderedItem.root).scale = Vector3.create(scale, scale, scale)
 }
 

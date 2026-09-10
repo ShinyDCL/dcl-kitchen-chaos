@@ -24,10 +24,11 @@ import { isMobile } from '@dcl/sdk/platform'
 import { FIRE_TEXTURE, FIXTURE_HEIGHT, SMOKE_TEXTURE } from '../../../shared/constants'
 import { MODELS } from '../../../shared/models'
 import { createCameraFacingTransform } from '../cameraFacing'
+import { PLACED_ITEM_SCALE } from '../itemPlacement'
 import { createPopState, PopState, tickPopState } from '../popScale'
 import { getWorldPosition } from '../worldPosition'
 
-const STOVE_ITEM_OFFSET = Vector3.create(0.24, FIXTURE_HEIGHT + 0.05, 0.22) // sits on the pan, not the stove base
+const STOVE_ITEM_OFFSET = Vector3.create(0.24, FIXTURE_HEIGHT + 0.08, 0.22) // sits on the pan, not the stove base
 
 const PROGRESS_BAR_WIDTH = 0.6
 const PROGRESS_BAR_HEIGHT = 0.1
@@ -116,7 +117,11 @@ export function getOrCreateVisuals(stove: Entity): StoveVisuals {
 export function showStoveItem(visuals: StoveVisuals, model: string): void {
   clearStoveItem(visuals)
   visuals.itemEntity = engine.addEntity()
-  Transform.create(visuals.itemEntity, { position: STOVE_ITEM_OFFSET, parent: visuals.stove })
+  Transform.create(visuals.itemEntity, {
+    position: STOVE_ITEM_OFFSET,
+    scale: Vector3.create(PLACED_ITEM_SCALE, PLACED_ITEM_SCALE, PLACED_ITEM_SCALE),
+    parent: visuals.stove
+  })
   GltfContainer.create(visuals.itemEntity, { src: model })
 }
 

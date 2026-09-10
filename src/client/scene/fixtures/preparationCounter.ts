@@ -17,7 +17,7 @@ import { room } from '../../../shared/messages'
 import { sameModels } from '../../../shared/models'
 import { PreparationCounterState } from '../../../shared/schemas'
 import { takeHeldItemModels } from '../heldItems'
-import { getItemHeight } from '../itemPlacement'
+import { PLACED_ITEM_SCALE, getItemHeight } from '../itemPlacement'
 import { getFixtureSyncId } from './fixture'
 
 interface CounterContents {
@@ -123,7 +123,7 @@ function renderCounter(counter: Entity, contents: CounterContents): void {
   let yOffset = 0
   for (const model of contents.ingredientModels) {
     newRendered.ingredientEntities.push(placeVisual(counter, model, yOffset))
-    yOffset += getItemHeight(model)
+    yOffset += getItemHeight(model) * PLACED_ITEM_SCALE
   }
 
   renderedStates.set(counter, newRendered)
@@ -135,7 +135,11 @@ function teardownVisuals(rendered: RenderedCounter): void {
 
 function placeVisual(counter: Entity, model: string, yOffset: number): Entity {
   const entity = engine.addEntity()
-  Transform.create(entity, { position: Vector3.create(0, FIXTURE_HEIGHT + yOffset, 0), parent: counter })
+  Transform.create(entity, {
+    position: Vector3.create(0, FIXTURE_HEIGHT + yOffset, 0),
+    scale: Vector3.create(PLACED_ITEM_SCALE, PLACED_ITEM_SCALE, PLACED_ITEM_SCALE),
+    parent: counter
+  })
   GltfContainer.create(entity, { src: model })
   return entity
 }
