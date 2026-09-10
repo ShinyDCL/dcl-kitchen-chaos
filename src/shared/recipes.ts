@@ -618,6 +618,12 @@ export const SAMPLE_RECIPES: [Recipe, ...Recipe[]] = [
 
 const RECIPES_BY_ID = new Map(SAMPLE_RECIPES.map((recipe) => [recipe.id, recipe]))
 
+/** Longest recipe in the pool — nothing needs a taller stack than the biggest order. */
+export const MAX_RECIPE_INGREDIENTS = SAMPLE_RECIPES.reduce(
+  (longest, recipe) => Math.max(longest, recipe.ingredients.length),
+  0
+)
+
 /** Looks up a recipe by id — resolves a synced OrderState's recipeId for rendering. */
 export function getRecipeById(id: string): Recipe | undefined {
   return RECIPES_BY_ID.get(id)

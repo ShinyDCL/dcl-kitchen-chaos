@@ -6,6 +6,7 @@
 import { Entity } from '@dcl/sdk/ecs'
 
 import { classifyItem, getCookableItemDefinition } from '../../shared/ingredients'
+import { MAX_RECIPE_INGREDIENTS } from '../../shared/recipes'
 import { deliverHeldItem } from '../scene/fixtures/deliveryCounter'
 import { getPreparationCounterSnapshot, pickUpFromCounter, placeOnCounter } from '../scene/fixtures/preparationCounter'
 import { collectFromStove, getStoveStatus, startCookingOnStove } from '../scene/fixtures/stove'
@@ -18,10 +19,10 @@ import {
   peekHeldItemModel
 } from '../scene/heldItems'
 
-// How many models one preparation counter will hold. Placing an assembled
-// stack counts every model in it, so a stack that would overflow is refused
-// whole rather than part-placed.
-const MAX_COUNTER_STACK = 10
+// How many models one preparation counter will hold — the longest recipe, since
+// no order can need more. Placing an assembled stack counts every model in it,
+// so a stack that would overflow is refused whole rather than part-placed.
+const MAX_COUNTER_STACK = MAX_RECIPE_INGREDIENTS
 
 export interface InteractionResult {
   allowed: boolean

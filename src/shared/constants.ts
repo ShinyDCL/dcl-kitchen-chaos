@@ -19,7 +19,7 @@ export const FIXTURE_HEIGHT = 1
 // with schemas.ts's 100000+ singleton ids.
 export const MAX_FIXTURE_SYNC_ID = 127
 export const MAX_HELD_MODELS = 32 // one item, or a stack off a counter
-export const MAX_COUNTER_MODELS = 64 // the client caps stacks at 10
+export const MAX_COUNTER_MODELS = 64 // the client caps stacks at the longest recipe
 
 // Smoke/fire particle textures — used by both stove.ts and assetPreload.ts.
 export const SMOKE_TEXTURE = 'assets/scene/textures/Smoke.png'
