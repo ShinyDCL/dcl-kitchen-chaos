@@ -202,6 +202,13 @@ than one client. The preview can supply them three ways:
 Deploying to the World is still worth doing before judging anything by feel — real network latency only shows up there,
 and it is where the optimistic hand updates and the server corrections actually get tested against each other.
 
+### Inspecting the running scene
+
+`npm start -- --mcp` launches the preview with the Explorer's MCP automation server on port 8123. `.mcp.json` registers
+it as `explorer`, so a Claude Code session can drive the running scene — move the camera, take screenshots, read the
+scene logs, and sample draw calls and frame rate from a given viewpoint. Start the Explorer before the session: the
+tools bind once, at session startup.
+
 ---
 
 ## Deploying
