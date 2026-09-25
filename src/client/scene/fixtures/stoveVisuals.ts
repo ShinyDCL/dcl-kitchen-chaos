@@ -80,7 +80,8 @@ const FIRE_COLOR_OVER_TIME = { start: Color4.create(1, 0.8, 0.5, 1), end: Color4
 const FIRE_SPRITE_SHEET = { tilesX: 4, tilesY: 3, framesPerSecond: 12 }
 
 interface ProgressBar {
-  root: Entity // background + fill, no own VisibilityComponent — controlled via root's propagateToChildren
+  root: Entity // holds position, facing and the mobile scale; draws nothing itself
+  background: Entity
   fill: Entity
   checkmarkAnchor: Entity // checkmark legs, no own VisibilityComponent — controlled via this entity's propagateToChildren
   checkmarkPop: PopState // see tickCheckmark — the bar itself just snaps visible/hidden, no pop
@@ -148,8 +149,35 @@ export function setFireActive(visuals: StoveVisuals, active: boolean): void {
 
 // --- Progress bar ---
 
+/**
+ * The fill box for a given progress, 0..1. Used at creation as well as per
+ * frame: a mesh created without an explicit scale is a 1m cube until something
+ * resizes it, which on a stove reads as a green block sitting on the hob.
+ */
+function fillGeometry(progress: number): { scale: Vector3; position: Vector3 } {
+  const fillWidth = Math.max(PROGRESS_BAR_WIDTH * progress, 0.001) // avoid a zero-scale mesh
+  return {
+    scale: Vector3.create(
+      fillWidth * PROGRESS_BAR_FILL_OVERSCALE,
+      PROGRESS_BAR_HEIGHT * PROGRESS_BAR_FILL_OVERSCALE,
+      PROGRESS_BAR_THICKNESS * PROGRESS_BAR_FILL_OVERSCALE
+    ),
+    position: Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0)
+  }
+}
+
 export function setBarVisible(visuals: StoveVisuals, visible: boolean): void {
-  VisibilityComponent.getMutable(visuals.progressBar.root).visible = visible
+  const { root, background, fill } = visuals.progressBar
+  // The caller ticks this every frame a stove is cooking, so only write on a
+  // change — three components dirtied per stove per frame is pure churn.
+  if (VisibilityComponent.get(root).visible === visible) return
+
+  // Every drawn box is set directly rather than left to propagate from the
+  // root. Propagation is the documented behaviour, but it is the renderer's to
+  // honour, and a client that does not leaves the bar stuck on screen.
+  for (const entity of [root, background, fill]) {
+    VisibilityComponent.getMutable(entity).visible = visible
+  }
 }
 
 /** Seeds fill/color for a fresh cook — visibility is owned by the caller's per-frame tick. */
@@ -159,14 +187,10 @@ export function resetProgressBar(visuals: StoveVisuals, progress: number): void 
 }
 
 export function setFill(visuals: StoveVisuals, progress: number): void {
-  const fillWidth = Math.max(PROGRESS_BAR_WIDTH * progress, 0.001) // avoid a zero-scale mesh
+  const geometry = fillGeometry(progress)
   const transform = Transform.getMutable(visuals.progressBar.fill)
-  transform.scale = Vector3.create(
-    fillWidth * PROGRESS_BAR_FILL_OVERSCALE,
-    PROGRESS_BAR_HEIGHT * PROGRESS_BAR_FILL_OVERSCALE,
-    PROGRESS_BAR_THICKNESS * PROGRESS_BAR_FILL_OVERSCALE
-  )
-  transform.position = Vector3.create(-PROGRESS_BAR_WIDTH / 2 + fillWidth / 2, 0, 0)
+  transform.scale = geometry.scale
+  transform.position = geometry.position
 }
 
 /** The done->burnt drain: the bar empties while shifting yellow -> red. `burnProgress` runs 0..1. */
@@ -216,6 +240,7 @@ function createProgressBar(stove: Entity): ProgressBar {
     scale: Vector3.create(PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, PROGRESS_BAR_THICKNESS),
     parent: root
   })
+  VisibilityComponent.create(background, { visible: false })
   MeshRenderer.setBox(background)
   Material.setPbrMaterial(background, {
     albedoColor: PROGRESS_BAR_BACKGROUND_COLOR,
@@ -224,7 +249,8 @@ function createProgressBar(stove: Entity): ProgressBar {
   })
 
   const fill = engine.addEntity()
-  Transform.create(fill, { parent: root })
+  Transform.create(fill, { ...fillGeometry(0), parent: root })
+  VisibilityComponent.create(fill, { visible: false })
   MeshRenderer.setBox(fill)
   Material.setPbrMaterial(fill, {
     albedoColor: PROGRESS_BAR_FILL_COLOR,
@@ -245,7 +271,7 @@ function createProgressBar(stove: Entity): ProgressBar {
   VisibilityComponent.create(checkmarkAnchor, { visible: false, propagateToChildren: true })
   createCheckmark(checkmarkAnchor)
 
-  return { root, fill, checkmarkAnchor, checkmarkPop: createPopState() }
+  return { root, background, fill, checkmarkAnchor, checkmarkPop: createPopState() }
 }
 
 function createCheckmark(parent: Entity): void {
