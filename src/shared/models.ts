@@ -21,7 +21,6 @@ export const MODELS = {
   egg: 'assets/scene/models/Egg.glb',
   eggRaw: 'assets/scene/models/EggRaw.glb',
   burntCookable: 'assets/scene/models/BurntCookable.glb',
-  plate: 'assets/scene/models/Plate.glb',
 
   // Display items
   bunBottomDisplay: 'assets/scene/models/BunBottomDisplay.glb',
@@ -33,7 +32,6 @@ export const MODELS = {
   saladDisplay: 'assets/scene/models/SaladDisplay.glb',
   eggDisplay: 'assets/scene/models/EggDisplay.glb',
   bunTopDisplay: 'assets/scene/models/BunTopDisplay.glb',
-  plateDisplay: 'assets/scene/models/PlateDisplay.glb',
   deliveryCounter: 'assets/scene/models/DeliveryCounter.glb'
 } as const
 

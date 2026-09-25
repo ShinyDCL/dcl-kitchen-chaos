@@ -16,15 +16,18 @@ export interface IngredientDefinition {
   itemModel: Model
 }
 
-export const RIGHT_SIDE_INGREDIENTS: IngredientDefinition[] = [
-  { displayModel: MODELS.plateDisplay, itemModel: MODELS.plate },
+/** A slot in a side wall: a dispenser, or a preparation counter where no dispenser belongs. */
+export type WallSlot = IngredientDefinition | 'preparation'
+
+export const RIGHT_SIDE_SLOTS: WallSlot[] = [
+  'preparation',
   { displayModel: MODELS.bunBottomDisplay, itemModel: MODELS.bunBottom },
   { displayModel: MODELS.bunTopDisplay, itemModel: MODELS.bunTop },
   { displayModel: MODELS.eggDisplay, itemModel: MODELS.egg },
   { displayModel: MODELS.pattyDisplay, itemModel: MODELS.pattyRaw }
 ]
 
-export const LEFT_SIDE_INGREDIENTS: IngredientDefinition[] = [
+export const LEFT_SIDE_SLOTS: WallSlot[] = [
   { displayModel: MODELS.cheeseDisplay, itemModel: MODELS.cheeseSlice },
   { displayModel: MODELS.onionDisplay, itemModel: MODELS.onionSlice },
   { displayModel: MODELS.cucumberDisplay, itemModel: MODELS.cucumberSlice },

@@ -1,5 +1,6 @@
 // Assembles the kitchen: ingredient counters along the left and right walls
-// (both bookended by a preparation counter), a front row alternating
+// (bookended by preparation counters, with another in the right wall's first
+// slot), a front row alternating
 // preparation counters and stoves, a 2x3 preparation-counter island, a back
 // wall carrying the discard and delivery counters, and a decorative counter in
 // each corner. All positions are local to `parent`, the scene root.
@@ -17,12 +18,7 @@ import {
 } from '../interaction/interactionRules'
 import { registerDeliveryCounter } from './fixtures/deliveryCounter'
 import { createFixture } from './fixtures/fixture'
-import {
-  createIngredientCounter,
-  IngredientDefinition,
-  LEFT_SIDE_INGREDIENTS,
-  RIGHT_SIDE_INGREDIENTS
-} from './fixtures/ingredientCounter'
+import { createIngredientCounter, LEFT_SIDE_SLOTS, RIGHT_SIDE_SLOTS, WallSlot } from './fixtures/ingredientCounter'
 import { registerPreparationCounter } from './fixtures/preparationCounter'
 import { registerStove } from './fixtures/stove'
 
@@ -75,24 +71,29 @@ function createDecorativeModel(model: string, position: Vector3, rotation: Quate
 }
 
 export function createSceneLayout(parent: Entity): void {
-  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_INGREDIENTS, FACE_NEGATIVE_X)
-  createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_INGREDIENTS, FACE_POSITIVE_X)
+  createSideWall(parent, SIDE_WALL_DISTANCE, RIGHT_SIDE_SLOTS, FACE_NEGATIVE_X)
+  createSideWall(parent, -SIDE_WALL_DISTANCE, LEFT_SIDE_SLOTS, FACE_POSITIVE_X)
   createFrontRow(parent)
   createBackWall(parent)
   createIsland(parent)
   createCorners(parent)
 }
 
-/** A wall row at a fixed X: ingredient counters edge-to-edge along Z, centered on 0, bookended by a preparation counter at each end. */
-function createSideWall(parent: Entity, x: number, ingredients: IngredientDefinition[], facingDegrees: number): void {
-  const slotCount = ingredients.length + 2 // +2 for the bookending preparation counters
+/** A wall row at a fixed X: its slots edge-to-edge along Z, centered on 0, bookended by a preparation counter at each end. */
+function createSideWall(parent: Entity, x: number, slots: WallSlot[], facingDegrees: number): void {
+  const slotCount = slots.length + 2 // +2 for the bookending preparation counters
   const rotation = rotationDegrees(facingDegrees)
   const slotPosition = (slotIndex: number) => Vector3.create(x, 0, slotOffset(slotCount, slotIndex))
 
   createPreparationCounterFixture(slotPosition(0), rotation, parent)
 
-  ingredients.forEach((definition, index) => {
-    createIngredientCounter(slotPosition(index + 1), rotation, parent, definition)
+  slots.forEach((slot, index) => {
+    const position = slotPosition(index + 1)
+    if (slot === 'preparation') {
+      createPreparationCounterFixture(position, rotation, parent)
+      return
+    }
+    createIngredientCounter(position, rotation, parent, slot)
   })
 
   createPreparationCounterFixture(slotPosition(slotCount - 1), rotation, parent)

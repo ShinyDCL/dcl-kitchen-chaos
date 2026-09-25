@@ -23,7 +23,6 @@ interface IngredientSpec {
 }
 
 export const INGREDIENTS = {
-  plate: { model: MODELS.plate },
   tomato: { model: MODELS.tomatoSlice },
   cucumber: { model: MODELS.cucumberSlice },
   onion: { model: MODELS.onionSlice },

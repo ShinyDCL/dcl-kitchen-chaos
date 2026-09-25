@@ -53,7 +53,7 @@ a few mistakes before demoting.
 ### Coins and the leaderboard
 
 A delivery pays its recipe's full coin value to **every player who has acted in the last 3 minutes** — not just whoever
-carried the plate. Fetching and cooking is the real work; the last step shouldn't take the whole reward.
+handed it in. Fetching and cooking is the real work; the last step shouldn't take the whole reward.
 
 Coin totals are permanent, saved per wallet, and rank the top 10 on the in-world leaderboard — which includes players
 who aren't currently in the scene.
@@ -79,14 +79,15 @@ an action isn't allowed if you try it anyway.
 
 | Fixture                 | Count | What it does                                                             |
 | ----------------------- | ----- | ------------------------------------------------------------------------ |
-| **Ingredient counter**  | 10    | Take an endless supply of one ingredient.                                |
-| **Preparation counter** | 14    | Stack ingredients bottom to top; pick the whole stack back up.           |
+| **Ingredient counter**  | 9     | Take an endless supply of one ingredient.                                |
+| **Preparation counter** | 15    | Stack ingredients bottom to top; pick the whole stack back up.           |
 | **Stove**               | 3     | Cook a raw ingredient. Shows a progress bar, then a checkmark when done. |
 | **Delivery counter**    | 1     | Hand in a finished stack. Checkmark for a match, cross for a miss.       |
 | **Discard counter**     | 1     | Bin whatever you're holding.                                             |
 
-Preparation counters line both side walls, alternate with the stoves along the front row, and form a 2×3 island in the
-middle of the room. The delivery and discard counters sit on the back wall by the entrance.
+Preparation counters bookend both side walls, take the right wall's spare dispenser slot, alternate with the stoves
+along the front row, and form a 2×3 island in the middle of the room. The delivery and discard counters sit on the back
+wall by the entrance.
 
 Picking up from a preparation counter takes the **whole stack**, not just the top item.
 
@@ -94,11 +95,10 @@ Picking up from a preparation counter takes the **whole stack**, not just the to
 
 ## Ingredients
 
-Ten ingredients, two of which need cooking.
+Nine ingredients, two of which need cooking.
 
 | Ingredient   | Type         | Wall  |
 | ------------ | ------------ | ----- |
-| Plate        | Non-cookable | Right |
 | Bun (bottom) | Non-cookable | Right |
 | Bun (top)    | Non-cookable | Right |
 | Cheese       | Non-cookable | Left  |
@@ -123,8 +123,9 @@ away with it.
 
 ## Recipes
 
-90 recipes across the 5 difficulty tiers, 18 per tier. Tier 1 is three or four ingredients with at most one cooked item;
-tier 5 runs to eight ingredients with repeats. Timers scale with length, from 24 to 105 seconds.
+90 recipes across the 5 difficulty tiers, 18 per tier. Every one is a burger: a bottom bun, a stack of fillings, a top
+bun. Tier 1 is three or four ingredients with at most one cooked item; tier 5 runs to eight ingredients with repeats.
+Timers scale with length, from 30 to 105 seconds.
 
 Coin payouts follow a fixed scale, from 9 to 50:
 
@@ -133,8 +134,8 @@ coins = 3 × ingredients + 7 × cooked items + 2 × (difficulty − 1)
 ```
 
 Three per ingredient is one grab and one place. A cookable is worth roughly triple, since it also costs a stove trip, a
-wait and a collect. The difficulty term only stops the tiers inverting — a long salad is genuinely less work than a
-short burger with a patty, and the payout says so.
+wait and a collect. The difficulty term only stops the tiers inverting — a tall stack of raw toppings is genuinely less
+work than a short burger with a patty, and the payout says so.
 
 The streak is deliberately **not** multiplied into the payout. It already raises pay by unlocking higher-difficulty
 recipes.

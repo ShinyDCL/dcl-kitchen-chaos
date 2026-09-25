@@ -32,7 +32,6 @@ const ITEM_HEIGHTS: Partial<Record<Model, number>> = {
   [MODELS.pattyRaw]: 0.07,
   [MODELS.pattyCooked]: 0.07,
   [MODELS.eggRaw]: 0.07,
-  [MODELS.plate]: 0.06,
   [MODELS.burntCookable]: 0.07
 }
 
@@ -81,12 +80,7 @@ const ITEM_HAND_TRANSFORMS: Partial<Record<Model, HandTransform>> = {
   [MODELS.pattyCooked]: handTransform(Vector3.create(0.08, 0.28, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
   [MODELS.egg]: handTransform(Vector3.create(0.05, 0.45, 0), Quaternion.fromEulerDegrees(180, 0, 0)),
   [MODELS.eggRaw]: handTransform(Vector3.create(0.05, 0.31, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
-  [MODELS.burntCookable]: handTransform(Vector3.create(0.06, 0.28, 0), Quaternion.fromEulerDegrees(0, 0, 90)),
-  [MODELS.plate]: handTransform(
-    Vector3.create(0.04, 0.32),
-    Quaternion.fromEulerDegrees(0, 0, 90),
-    Vector3.create(0.8, 0.8, 0.8)
-  )
+  [MODELS.burntCookable]: handTransform(Vector3.create(0.06, 0.28, 0), Quaternion.fromEulerDegrees(0, 0, 90))
 }
 
 /** Falls back to DEFAULT_HAND_TRANSFORM for any model not listed above (e.g. a new item added to models.ts but not tuned yet). */
