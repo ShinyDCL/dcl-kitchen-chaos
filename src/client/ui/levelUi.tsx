@@ -16,7 +16,7 @@ import ReactEcs, { UiEntity } from '@dcl/sdk/react-ecs'
 
 import { getDifficultyForStreak, getStreakProgress, MAX_DIFFICULTY_TIER } from '../../shared/recipes'
 import { GameState } from '../../shared/schemas'
-import { CornerPanelLayout } from './cornerPanelStyle'
+import { CornerPanelLayout, PANEL_MARGIN_TOP } from './cornerPanelStyle'
 import {
   emphasize,
   getPanelBackground,
@@ -42,6 +42,7 @@ export function LevelPanel({ layout }: { layout: CornerPanelLayout }) {
       uiTransform={{
         width: layout.width,
         height: layout.height * HEIGHT_SCALE,
+        margin: { top: PANEL_MARGIN_TOP },
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',

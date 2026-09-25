@@ -11,6 +11,7 @@ import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
 import { preloadAssets } from './assetPreload'
+import { setupCinematic } from './cinematic'
 import { startMobileCamera } from './platform/mobileCamera'
 import { setupMobileControls } from './platform/mobileControls'
 import { startRenderingDeliveryCounter } from './scene/fixtures/deliveryCounter'
@@ -25,6 +26,7 @@ import { setupSound } from './sound'
 import { setupBuildLabel } from './ui/buildLabel'
 import { setupCornerPanels } from './ui/cornerPanels'
 import { setupEntryOverlay } from './ui/entryOverlay'
+import { setupHowToPlay } from './ui/howToPlay'
 import { setupOrdersUi } from './ui/ordersUi'
 
 export function initClient(): void {
@@ -45,9 +47,11 @@ export function initClient(): void {
   setupOrdersUi()
   setupEntryOverlay()
   setupCornerPanels()
+  setupHowToPlay()
   setupBuildLabel()
   startPlayArea() // before the mobile camera, which reads it
   setupMobileControls()
   startMobileCamera()
   setupSound()
+  setupCinematic()
 }

@@ -13,6 +13,7 @@ import { onPlatformResolved } from '../platform/platformDetection'
 import { isServerAlive } from '../serverReadiness'
 import { CoinsPanel } from './coinsUi'
 import { CornerPanelLayout } from './cornerPanelStyle'
+import { HowToPlayButton } from './howToPlay'
 import { LevelPanel } from './levelUi'
 import { EMPHASIS_FONT_SIZE, MOBILE_TEXT_SCALE } from './uiStyle'
 
@@ -73,6 +74,7 @@ function CornerPanelsRenderer() {
     >
       {/* Level goes above coins: the coin-gain toast hangs off the bottom of
           the coin panel, so anything below it would shift on every grant. */}
+      <HowToPlayButton layout={layout} />
       <LevelPanel layout={layout} />
       <CoinsPanel layout={layout} />
     </UiEntity>
