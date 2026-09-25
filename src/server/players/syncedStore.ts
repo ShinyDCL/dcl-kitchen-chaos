@@ -2,14 +2,14 @@
 // playerId field, not network id (see the authoritative-server skill —
 // explicit or hashed ids are unsafe on a long-running server).
 
-import { Entity, LastWriteWinElementSetComponentDefinition, engine } from '@dcl/sdk/ecs'
+import { Entity, MapComponentDefinition, engine } from '@dcl/sdk/ecs'
 import { syncEntity } from '@dcl/sdk/network'
 
 import { isAdoptableEntity } from '../entityAdoption'
 
 /** Call reconcile() once at init; look up/create entities by playerId (caller lower-cases it). */
 export function createPerPlayerStore<T extends { playerId: string }>(
-  component: LastWriteWinElementSetComponentDefinition<T>,
+  component: MapComponentDefinition<T>, // what engine.defineComponent returns; the LWW supertype takes its value deep-readonly
   makeDefault: (playerId: string) => T
 ) {
   const playerEntities = new Map<string, Entity>()
