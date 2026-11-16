@@ -6,7 +6,7 @@
 // startRenderingDeliveryCounter), then the order queue HUD, the entry
 // overlay and corner panels, and mobile-specific input/camera setup.
 
-import { engine, GltfContainer, Transform } from '@dcl/sdk/ecs'
+import { engine, GltfContainer, SkyboxTime, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 
 import { SCENE_CENTER } from '../shared/constants'
@@ -29,7 +29,14 @@ import { setupEntryOverlay } from './ui/entryOverlay'
 import { setupHowToPlay } from './ui/howToPlay'
 import { setupOrdersUi } from './ui/ordersUi'
 
+// Noon, in seconds since midnight. scene.json's worldConfiguration.skyboxConfig
+// sets the same, but the mobile app has been seen to ignore that — the
+// component applies everywhere. Keep the two in step.
+const FIXED_TIME_OF_DAY = 43200
+
 export function initClient(): void {
+  SkyboxTime.createOrReplace(engine.RootEntity, { fixedTime: FIXED_TIME_OF_DAY })
+
   const scene = engine.addEntity()
   Transform.create(scene, {
     position: Vector3.create(SCENE_CENTER, 0, SCENE_CENTER)

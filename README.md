@@ -161,9 +161,9 @@ explicit branch rather than one layout that happens to fit twice.
   already steering. Mobile instead gets a fixed, slightly overhead camera that follows the player without rotating;
   stepping out of the kitchen hands the normal camera back. Desktop keeps free look, where a mouse costs nothing.
 
-- **The on-screen buttons the game never uses are removed.** Decentraland's mobile HUD ships eight gamepad buttons and
-  this scene uses one, so the other seven are hidden — a single unambiguous action button instead of a pad where most of
-  it does nothing.
+- **The on-screen buttons the game never uses are removed.** Decentraland's mobile HUD has eight gamepad buttons (jump,
+  pointer and E showing by default) and this scene uses one, so the other seven are hidden — a single unambiguous action
+  button instead of a pad where most of it does nothing.
 
 - **The HUD is a separate design, not a scaled one.** Mobile runs on a narrower virtual canvas, so the same values do
   not simply scale up. The order queue moves to the bottom of the screen, since the middle of a phone is the player's
@@ -171,9 +171,6 @@ explicit branch rather than one layout that happens to fit twice.
 
 - **World-space visuals rotated facing camera.** On desktop, floating labels turn to face a camera that orbits; on
   mobile the camera never rotates, so they take a fixed facing instead.
-
-- **One limit is worth naming.** The camera eases in when you enter the kitchen but cuts instantly when you leave — the
-  SDK has no exit transition.
 
 ---
 
@@ -239,13 +236,20 @@ button); turn it on when a live build needs confirming.
 npm run server-logs
 ```
 
-Reading production server logs requires a `logsPermissions` array in `scene.json` holding your wallet address.
+Follows the deployed server's logs live (`sdk-commands scene-insights tail`); logs and metrics are kept for 7 days and
+can be searched after the fact with `npx sdk-commands scene-insights logs`. Sign in once with
+`npx sdk-commands scene-insights login`. The World's owner can read them as is; anyone else needs their wallet in a
+`logsPermissions` array in `scene.json` — and that grants all retained history, not just new logs.
 
 ### SDK version
 
-> [!WARNING] Do not run `npm run upgrade-sdk` or `upgrade-sdk:next`. The `latest` and `next` SDK lineages have no
-> authoritative-server support — the scene would build and then fail to talk to its server. This project is pinned to an
-> `auth-server` build on purpose.
+```bash
+npm run upgrade-sdk
+```
+
+Installs the newest `auth-server` build, pinned exactly. Never move to `@dcl/sdk@latest` or `@next`: those lineages have
+no Multiplayer Server support, so the scene would build and then fail to talk to its server. An exact pin (rather than
+a `^` range) is what stops a plain `npm install` from drifting onto them.
 
 ---
 
