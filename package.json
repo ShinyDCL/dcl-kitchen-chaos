@@ -4,7 +4,6 @@
   "description": "SDK7 Template scene",
   "scripts": {
     "start": "sdk-commands start",
-    "predeploy": "node scripts/stamp-build.mjs && npm run build",
     "deploy": "sdk-commands deploy",
     "build": "sdk-commands build",
     "upgrade-sdk": "npm install --save-dev --save-exact @dcl/sdk@auth-server @dcl/js-runtime@auth-server",

@@ -219,11 +219,6 @@ npm run deploy -- --target-content https://worlds-content-server.decentraland.or
 
 Plain `npm run deploy` goes to the default Catalyst, which is Genesis City LAND — not the World named in `scene.json`.
 
-`predeploy` stamps a build label into `src/client/buildInfo.ts` first, so a deploy can be identified — deploys can lag
-by several minutes, and a stale one is otherwise indistinguishable from a new one. The in-HUD readout of that label is
-switched off by default (`SHOW_BUILD_LABEL` in `src/client/ui/buildLabel.tsx`, where it overlapped the mobile action
-button); turn it on when a live build needs confirming.
-
 > [!IMPORTANT] **`worldConfiguration.name` must be lowercase**, even if the minted NAME is mixed case
 > (`kitchenchaos.dcl.eth`, not `KitchenChaos.dcl.eth`). The client resolves comms to the lowercase URL while the server
 > registers under the name as written, so a mixed-case name puts them in different comms rooms and the scene hangs on
