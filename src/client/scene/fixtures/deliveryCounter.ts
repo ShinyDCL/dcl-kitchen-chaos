@@ -6,7 +6,7 @@
 // state is fine here unlike stove.ts's per-stove Map. Both animations run on a
 // local timer started when this client first sees a new `models` value.
 
-import { engine, Entity, GltfContainer, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
+import { engine, Entity, GltfContainer, Transform } from '@dcl/sdk/ecs'
 import { Quaternion, Vector3 } from '@dcl/sdk/math'
 import { getPlatform, isMobile } from '@dcl/sdk/platform'
 
@@ -18,6 +18,7 @@ import { playAcceptSound, playRejectSound } from '../../sound'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { takeHeldItemModels } from '../heldItems'
 import { getItemHeight, PLACED_ITEM_SCALE } from '../itemPlacement'
+import { createVisibilityGroup, setGroupVisible, VisibilityGroup } from '../visibilityGroup'
 import { getWorldPosition } from '../worldPosition'
 import { getFixtureSyncId } from './fixture'
 
@@ -88,8 +89,13 @@ let renderedModels: string[] = []
 let renderedSuccess: boolean | null = null // null until the server's verdict is known for the current delivery
 let elapsed = 0 // seconds since this client started animating the current delivery
 let lastSyncedDeliveryId: number | null = null // null until a synced value has been seen at all
-let checkmarkEntity: Entity | null = null
-let crossmarkEntity: Entity | null = null
+interface ResultMark {
+  anchor: Entity // faces the camera and carries the animated scale
+  group: VisibilityGroup // anchor and model
+}
+
+let checkmark: ResultMark | null = null
+let crossmark: ResultMark | null = null
 let systemRegistered = false
 
 /** Reconciles the delivery counter's synced state against what's currently rendered. Call once during client setup. */
@@ -232,8 +238,8 @@ function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): 
   // Marks may not be built yet (see prebuildResultMarksOnceReady) —
   // nothing to hide in that case.
   if (success === null) {
-    if (checkmarkEntity !== null) VisibilityComponent.getMutable(checkmarkEntity).visible = false
-    if (crossmarkEntity !== null) VisibilityComponent.getMutable(crossmarkEntity).visible = false
+    if (checkmark !== null) setGroupVisible(checkmark.group, false)
+    if (crossmark !== null) setGroupVisible(crossmark.group, false)
     return
   }
 
@@ -241,9 +247,9 @@ function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): 
   const hidden = success ? getOrCreateCrossmark() : getOrCreateCheckmark()
 
   const totalDuration = DELIVERY_RESULT_MARK_SCALE_SECONDS * 2 + DELIVERY_RESULT_MARK_HOLD_SECONDS
-  VisibilityComponent.getMutable(hidden).visible = false
+  setGroupVisible(hidden.group, false)
   if (elapsedSeconds > totalDuration) {
-    VisibilityComponent.getMutable(shown).visible = false
+    setGroupVisible(shown.group, false)
     return
   }
 
@@ -252,10 +258,10 @@ function revealDeliveryResult(elapsedSeconds: number, success: boolean | null): 
     playDeliveryResultSound(success, resultMarkWorldPosition)
   }
 
-  VisibilityComponent.getMutable(shown).visible = true
+  setGroupVisible(shown.group, true)
   const modelScale = DELIVERY_RESULT_MARK_MODEL_SCALE * (isMobile() ? MOBILE_RESULT_MARK_SCALE : 1)
   const scale = resultMarkScale(elapsedSeconds) * modelScale
-  Transform.getMutable(shown).scale = Vector3.create(scale, scale, scale)
+  Transform.getMutable(shown.anchor).scale = Vector3.create(scale, scale, scale)
 }
 
 /** 0→1 over the scale-up, held at 1 through the hold, then 1→0 over the scale-down. */
@@ -268,25 +274,24 @@ function resultMarkScale(elapsed: number): number {
   return 1 - (elapsed - holdEnd) / DELIVERY_RESULT_MARK_SCALE_SECONDS
 }
 
-function getOrCreateCheckmark(): Entity {
-  if (checkmarkEntity === null) checkmarkEntity = createResultMark(MODELS.checkmark)
-  return checkmarkEntity
+function getOrCreateCheckmark(): ResultMark {
+  if (checkmark === null) checkmark = createResultMark(MODELS.checkmark)
+  return checkmark
 }
 
-function getOrCreateCrossmark(): Entity {
-  if (crossmarkEntity === null) crossmarkEntity = createResultMark(MODELS.crossmark)
-  return crossmarkEntity
+function getOrCreateCrossmark(): ResultMark {
+  if (crossmark === null) crossmark = createResultMark(MODELS.crossmark)
+  return crossmark
 }
 
 /** Anchor faces the camera; model is a child rotated 180° to face the right way. */
-function createResultMark(model: string): Entity {
+function createResultMark(model: string): ResultMark {
   const anchor = engine.addEntity()
   createCameraFacingTransform(anchor, { position: resultMarkWorldPosition ?? Vector3.Zero(), scale: Vector3.Zero() })
-  VisibilityComponent.create(anchor, { visible: false, propagateToChildren: true })
 
   const mark = engine.addEntity()
   Transform.create(mark, { parent: anchor, rotation: Quaternion.fromEulerDegrees(0, 180, 0) })
   GltfContainer.create(mark, { src: model })
 
-  return anchor
+  return { anchor, group: createVisibilityGroup([anchor, mark]) }
 }

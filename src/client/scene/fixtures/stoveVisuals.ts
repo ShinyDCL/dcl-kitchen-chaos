@@ -15,8 +15,7 @@ import {
   MeshRenderer,
   ParticleSystem,
   PBParticleSystem_BlendMode,
-  Transform,
-  VisibilityComponent
+  Transform
 } from '@dcl/sdk/ecs'
 import { Color4, Quaternion, Vector3 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
@@ -26,6 +25,7 @@ import { MODELS } from '../../../shared/models'
 import { createCameraFacingTransform } from '../cameraFacing'
 import { PLACED_ITEM_SCALE } from '../itemPlacement'
 import { createPopState, PopState, tickPopState } from '../popScale'
+import { createVisibilityGroup, setGroupVisible, VisibilityGroup } from '../visibilityGroup'
 import { getWorldPosition } from '../worldPosition'
 
 const STOVE_ITEM_OFFSET = Vector3.create(0.24, FIXTURE_HEIGHT + 0.08, 0.22) // sits on the pan, not the stove base
@@ -81,9 +81,10 @@ const FIRE_SPRITE_SHEET = { tilesX: 4, tilesY: 3, framesPerSecond: 12 }
 
 interface ProgressBar {
   root: Entity // holds position, facing and the mobile scale; draws nothing itself
-  background: Entity
   fill: Entity
-  checkmarkAnchor: Entity // checkmark legs, no own VisibilityComponent — controlled via this entity's propagateToChildren
+  bar: VisibilityGroup // root, background, fill
+  checkmarkAnchor: Entity // carries the pop scale
+  checkmark: VisibilityGroup // anchor and model — toggled independently of the bar
   checkmarkPop: PopState // see tickCheckmark — the bar itself just snaps visible/hidden, no pop
 }
 
@@ -166,18 +167,9 @@ function fillGeometry(progress: number): { scale: Vector3; position: Vector3 } {
   }
 }
 
+/** Ticked every frame a stove is cooking; the group only writes on a change. */
 export function setBarVisible(visuals: StoveVisuals, visible: boolean): void {
-  const { root, background, fill } = visuals.progressBar
-  // The caller ticks this every frame a stove is cooking, so only write on a
-  // change — three components dirtied per stove per frame is pure churn.
-  if (VisibilityComponent.get(root).visible === visible) return
-
-  // Every drawn box is set directly rather than left to propagate from the
-  // root. Propagation is the documented behaviour, but it is the renderer's to
-  // honour, and a client that does not leaves the bar stuck on screen.
-  for (const entity of [root, background, fill]) {
-    VisibilityComponent.getMutable(entity).visible = visible
-  }
+  setGroupVisible(visuals.progressBar.bar, visible)
 }
 
 /** Seeds fill/color for a fresh cook — visibility is owned by the caller's per-frame tick. */
@@ -201,10 +193,10 @@ export function setDrainFill(visuals: StoveVisuals, burnProgress: number): void 
 
 /** Steps the checkmark's pop animation and applies it. Called every frame, so it still eases out after a stove goes idle. */
 export function tickCheckmark(visuals: StoveVisuals, shown: boolean, dt: number): void {
-  const { checkmarkPop, checkmarkAnchor } = visuals.progressBar
-  const checkmark = tickPopState(checkmarkPop, shown, dt)
-  VisibilityComponent.getMutable(checkmarkAnchor).visible = checkmark.shown
-  Transform.getMutable(checkmarkAnchor).scale = Vector3.create(checkmark.scale, checkmark.scale, checkmark.scale)
+  const { checkmarkPop, checkmarkAnchor, checkmark } = visuals.progressBar
+  const pop = tickPopState(checkmarkPop, shown, dt)
+  setGroupVisible(checkmark, pop.shown)
+  Transform.getMutable(checkmarkAnchor).scale = Vector3.create(pop.scale, pop.scale, pop.scale)
 }
 
 /** Only called during the done->burnt drain, where the color actually changes frame to frame — cooking keeps the material set once at creation. */
@@ -232,7 +224,6 @@ function createProgressBar(stove: Entity): ProgressBar {
   const root = engine.addEntity()
   const scale = isMobile() ? MOBILE_PROGRESS_BAR_SCALE : 1
   createCameraFacingTransform(root, { position: worldPosition, scale: Vector3.create(scale, scale, scale) })
-  VisibilityComponent.create(root, { visible: false, propagateToChildren: true })
 
   const background = engine.addEntity()
   Transform.create(background, {
@@ -240,7 +231,6 @@ function createProgressBar(stove: Entity): ProgressBar {
     scale: Vector3.create(PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT, PROGRESS_BAR_THICKNESS),
     parent: root
   })
-  VisibilityComponent.create(background, { visible: false })
   MeshRenderer.setBox(background)
   Material.setPbrMaterial(background, {
     albedoColor: PROGRESS_BAR_BACKGROUND_COLOR,
@@ -250,7 +240,6 @@ function createProgressBar(stove: Entity): ProgressBar {
 
   const fill = engine.addEntity()
   Transform.create(fill, { ...fillGeometry(0), parent: root })
-  VisibilityComponent.create(fill, { visible: false })
   MeshRenderer.setBox(fill)
   Material.setPbrMaterial(fill, {
     albedoColor: PROGRESS_BAR_FILL_COLOR,
@@ -265,19 +254,25 @@ function createProgressBar(stove: Entity): ProgressBar {
     position: Vector3.create(0, 0.2, -0.06),
     parent: root
   })
-  // Own VisibilityComponent so this can be toggled independently of root
-  // (hidden while cooking, shown only once done) — a child's own component
-  // overrides whatever its parent propagates.
-  VisibilityComponent.create(checkmarkAnchor, { visible: false, propagateToChildren: true })
-  createCheckmark(checkmarkAnchor)
+  // Its own group, so it can show once done while the bar is hidden — every
+  // member carries its own VisibilityComponent, so nothing inherits from root.
+  const checkmarkModel = createCheckmark(checkmarkAnchor)
 
-  return { root, background, fill, checkmarkAnchor, checkmarkPop: createPopState() }
+  return {
+    root,
+    fill,
+    bar: createVisibilityGroup([root, background, fill]),
+    checkmarkAnchor,
+    checkmark: createVisibilityGroup([checkmarkAnchor, checkmarkModel]),
+    checkmarkPop: createPopState()
+  }
 }
 
-function createCheckmark(parent: Entity): void {
+function createCheckmark(parent: Entity): Entity {
   const checkmark = engine.addEntity()
   Transform.create(checkmark, { parent, rotation: Quaternion.fromEulerDegrees(0, 180, 0) })
   GltfContainer.create(checkmark, { src: MODELS.checkmark })
+  return checkmark
 }
 
 /** Persistent per-stove smoke emitter, created once and toggled via `active` rather than recreated per cook. */

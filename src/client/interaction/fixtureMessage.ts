@@ -8,13 +8,14 @@
 // Scaled up on mobile — world-space text reads smaller from mobileCamera.ts's
 // more distant camera. Camera-facing itself is handled by cameraFacing.ts.
 
-import { engine, Entity, GltfContainer, TextShape, Transform, VisibilityComponent } from '@dcl/sdk/ecs'
+import { engine, Entity, GltfContainer, TextShape, Transform } from '@dcl/sdk/ecs'
 import { Vector3 } from '@dcl/sdk/math'
 import { isMobile } from '@dcl/sdk/platform'
 
 import { MODELS } from '../../shared/models'
 import { createCameraFacingTransform } from '../scene/cameraFacing'
 import { WORLD_TEXT_COLOR } from '../scene/textStyle'
+import { createVisibilityGroup, setGroupVisible, VisibilityGroup } from '../scene/visibilityGroup'
 
 const MESSAGE_DURATION_SECONDS = 2
 const MESSAGE_POP_SECONDS = 0.15 // quick scale in/out at the start/end of MESSAGE_DURATION_SECONDS
@@ -26,6 +27,7 @@ const MOBILE_SCALE = 2 // bigger on mobile — see header
 
 let root: Entity | null = null
 let textEntity: Entity | null = null
+let group: VisibilityGroup | null = null // root, background, text
 let remainingSeconds = 0
 let systemRegistered = false
 
@@ -39,15 +41,15 @@ export function showMessage(text: string, worldPosition: Vector3): void {
     worldPosition.y + MESSAGE_Y_OFFSET,
     worldPosition.z
   )
-  VisibilityComponent.getMutable(entities.root).visible = true
+  setGroupVisible(entities.group, true)
   remainingSeconds = MESSAGE_DURATION_SECONDS
   applyPopScale() // apply immediately, same as the system's per-frame call — avoids one frame at the old scale
 
   ensureSystemRegistered()
 }
 
-function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
-  if (root !== null && textEntity !== null) return { root, textEntity }
+function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity; group: VisibilityGroup } {
+  if (root !== null && textEntity !== null && group !== null) return { root, textEntity, group }
 
   const scale = isMobile() ? MOBILE_SCALE : 1
   const textYOffset = TEXT_Y_OFFSET * scale
@@ -55,7 +57,6 @@ function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
 
   root = engine.addEntity()
   createCameraFacingTransform(root, { position: Vector3.Zero() })
-  VisibilityComponent.create(root, { visible: false, propagateToChildren: true })
 
   const background = engine.addEntity()
   Transform.create(background, { scale: Vector3.create(scale, scale, scale), parent: root })
@@ -72,7 +73,8 @@ function getOrCreateMessageEntities(): { root: Entity; textEntity: Entity } {
     textColor: WORLD_TEXT_COLOR
   })
 
-  return { root, textEntity }
+  group = createVisibilityGroup([root, background, textEntity])
+  return { root, textEntity, group }
 }
 
 function ensureSystemRegistered(): void {
@@ -108,9 +110,7 @@ function applyPopScale(): void {
 }
 
 function hideMessage(): void {
-  if (root !== null) {
-    VisibilityComponent.getMutable(root).visible = false
-  }
+  if (group !== null) setGroupVisible(group, false)
   if (textEntity !== null) {
     TextShape.getMutable(textEntity).text = ''
   }
